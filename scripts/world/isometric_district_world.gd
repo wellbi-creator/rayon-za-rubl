@@ -68,29 +68,61 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _initialize_demo_traffic() -> void:
-	# Temporary showcase traffic uses the existing road graph only. It does not
-	# alter resident schedules, economy, save data, or the road network.
+	# Showcase traffic uses the road graph only; it never changes game or save data.
 	var horizontal_route := get_transport_route(Vector2i(0, 3), Vector2i(8, 3))
 	var vertical_route := get_transport_route(Vector2i(4, 0), Vector2i(4, 6))
 	if horizontal_route.size() >= 2:
-		_traffic_vehicles.append({
-			"route": horizontal_route,
-			"route_index": 1,
-			"direction": 1,
-			"segment_progress": 0.0,
-			"speed": 48.0,
-			"color": Color("#c46f55")
-		})
+		_add_demo_vehicle(horizontal_route, 1, 48.0, Color("#c46f55"), 7.0, 0.0, 0)
+		_add_demo_vehicle(horizontal_route, -1, 44.0, Color("#5b8497"), 7.0, 1.2, 1)
 	if vertical_route.size() >= 2:
-		_traffic_vehicles.append({
-			"route": vertical_route,
-			"route_index": 1,
-			"direction": 1,
-			"segment_progress": 0.0,
-			"speed": 42.0,
-			"color": Color("#5b8497")
-		})
+		_add_demo_vehicle(vertical_route, 1, 42.0, Color("#d0a85e"), 7.0, 0.6, 2)
+		_add_demo_vehicle(vertical_route, -1, 40.0, Color("#71917a"), 7.0, 1.8, 3)
 	_update_demo_traffic(0.0)
+
+func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body_color: Color, lane_offset: float, spawn_delay: float, seed: int) -> void:
+	var route_length := _get_traffic_route_length(route)
+	if route_length <= 0.001:
+		return
+	_traffic_vehicles.append({
+		"route": route,
+		"route_length": route_length,
+		"distance": 0.0 if direction > 0 else route_length,
+		"direction": direction,
+		"speed": speed,
+		"lane_offset": lane_offset,
+		"color": body_color,
+		"active": spawn_delay <= 0.0,
+		"respawn_timer": spawn_delay,
+		"spawn_seed": seed
+	})
+
+func _get_traffic_route_length(route: Array) -> float:
+	var total_length := 0.0
+	for i in range(route.size() - 1):
+		var from_point: Vector2 = route[i]
+		var to_point: Vector2 = route[i + 1]
+		total_length += from_point.distance_to(to_point)
+	return total_length
+
+func _sample_traffic_route(route: Array, distance: float, lane_offset: float) -> Dictionary:
+	var remaining := clampf(distance, 0.0, _get_traffic_route_length(route))
+	for i in range(route.size() - 1):
+		var from_point: Vector2 = route[i]
+		var to_point: Vector2 = route[i + 1]
+		var segment := to_point - from_point
+		var segment_length := segment.length()
+		if segment_length <= 0.001:
+			continue
+		if remaining <= segment_length or i == route.size() - 2:
+			var direction := segment / segment_length
+			var base_position := from_point + direction * minf(remaining, segment_length)
+			var lane_normal := Vector2(-direction.y, direction.x)
+			return {
+				"position": base_position + lane_normal * lane_offset,
+				"rotation": direction.angle()
+			}
+		remaining -= segment_length
+	return {"position": route[route.size() - 1], "rotation": 0.0}
 
 func _update_demo_traffic(delta: float) -> void:
 	_demo_transport_entries.clear()
@@ -98,47 +130,33 @@ func _update_demo_traffic(delta: float) -> void:
 		var route: Array = vehicle.get("route", [])
 		if route.size() < 2:
 			continue
-		var route_index := int(vehicle.get("route_index", 0))
 		var direction := int(vehicle.get("direction", 1))
-		var segment_progress := float(vehicle.get("segment_progress", 0.0))
-		var remaining_distance := maxf(0.0, float(vehicle.get("speed", 40.0)) * delta)
-		var safety_steps := 0
-		while remaining_distance > 0.0 and safety_steps < 32:
-			safety_steps += 1
-			var next_index := route_index + direction
-			if next_index < 0 or next_index >= route.size():
-				direction *= -1
-				next_index = route_index + direction
-			var from_point: Vector2 = route[route_index]
-			var to_point: Vector2 = route[next_index]
-			var segment_length := from_point.distance_to(to_point)
-			if segment_length <= 0.001:
-				route_index = next_index
-				segment_progress = 0.0
-				continue
-			var available := segment_length - segment_progress
-			if remaining_distance < available:
-				segment_progress += remaining_distance
-				remaining_distance = 0.0
+		var route_length := float(vehicle.get("route_length", 0.0))
+		if not bool(vehicle.get("active", false)):
+			var respawn_timer := float(vehicle.get("respawn_timer", 0.0)) - delta
+			vehicle["respawn_timer"] = respawn_timer
+			if respawn_timer <= 0.0:
+				vehicle["active"] = true
+				vehicle["distance"] = 0.0 if direction > 0 else route_length
 			else:
-				remaining_distance -= available
-				route_index = next_index
-				segment_progress = 0.0
-		var target_index := clampi(route_index + direction, 0, route.size() - 1)
-		var segment_start: Vector2 = route[route_index]
-		var segment_end: Vector2 = route[target_index]
-		var current_segment_length := segment_start.distance_to(segment_end)
-		var ratio := 0.0 if current_segment_length <= 0.001 else clampf(segment_progress / current_segment_length, 0.0, 1.0)
-		var vehicle_position := segment_start.lerp(segment_end, ratio)
-		var facing := (segment_end - segment_start).angle()
-		vehicle["route_index"] = route_index
-		vehicle["direction"] = direction
-		vehicle["segment_progress"] = segment_progress
+				continue
+		var distance := float(vehicle.get("distance", 0.0)) + float(vehicle.get("speed", 40.0)) * delta * float(direction)
+		if distance < 0.0 or distance > route_length:
+			vehicle["active"] = false
+			vehicle["distance"] = 0.0 if direction < 0 else route_length
+			vehicle["respawn_timer"] = 1.15 + fposmod(float(vehicle.get("spawn_seed", 0)) * 0.43, 0.9)
+			continue
+		vehicle["distance"] = distance
+		var sample := _sample_traffic_route(route, distance, float(vehicle.get("lane_offset", 7.0)) * float(direction))
+		var vehicle_position: Vector2 = sample["position"]
+		var edge_fade := clampf(distance / 34.0, 0.0, 1.0) * clampf((route_length - distance) / 34.0, 0.0, 1.0)
+		var vehicle_color: Color = vehicle.get("color", Color("#587b8a"))
+		vehicle_color.a *= edge_fade
 		_demo_transport_entries.append({
 			"position": vehicle_position,
 			"depth": vehicle_position.y + 5.0,
-			"rotation": facing,
-			"color": vehicle.get("color", Color("#587b8a"))
+			"rotation": float(sample["rotation"]) + (PI if direction < 0 else 0.0),
+			"color": vehicle_color
 		})
 
 func _draw() -> void:
