@@ -441,13 +441,20 @@ func _on_plot_selected(plot_id: int) -> void:
 				member_toggle.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 				member_toggle.pressed.connect(_on_member_autonomy_toggle_pressed.bind(str(member.get("id", ""))))
 				member_autonomy_container.add_child(member_toggle)
-				var talk_button := Button.new()
-				talk_button.text = "Поговорить с семьёй: %s" % str(member.get("name", "Житель"))
-				talk_button.custom_minimum_size = Vector2(0, 34)
-				talk_button.add_theme_font_size_override("font_size", 11)
-				talk_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
-				talk_button.pressed.connect(_on_resident_talk_pressed.bind(str(member.get("id", ""))))
-				member_autonomy_container.add_child(talk_button)
+				for target_value in current_family.get("members", []):
+					if not target_value is Dictionary:
+						continue
+					var target_member: Dictionary = target_value
+					var target_id := str(target_member.get("id", ""))
+					if target_id == str(member.get("id", "")):
+						continue
+					var talk_button := Button.new()
+					talk_button.text = "%s → поговорить с %s" % [str(member.get("name", "Житель")), str(target_member.get("name", "родственником"))]
+					talk_button.custom_minimum_size = Vector2(0, 34)
+					talk_button.add_theme_font_size_override("font_size", 11)
+					talk_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
+					talk_button.pressed.connect(_on_resident_talk_to_member_pressed.bind(str(member.get("id", "")), target_id))
+					member_autonomy_container.add_child(talk_button)
 			var member_summary := "\n".join(member_lines)
 			var history_lines := PackedStringArray()
 			var activity_history: Array = current_family.get("activity_history", [])
@@ -555,18 +562,29 @@ func _on_member_autonomy_toggle_pressed(member_id: String) -> void:
 				_on_plot_selected(selected_plot_id)
 			return
 
-func _on_resident_talk_pressed(member_id: String) -> void:
-	if selected_plot_id < 1 or member_id.is_empty():
+func _on_resident_talk_to_member_pressed(speaker_id: String, target_id: String) -> void:
+	if selected_plot_id < 1 or speaker_id.is_empty() or target_id.is_empty():
 		return
-	if resident_service.talk_to_family(selected_plot_id, member_id):
+	if resident_service.talk_to_member(selected_plot_id, speaker_id, target_id):
 		_save_game()
-		status_label.text = "Разговор состоялся! Отношения и настроение семьи немного улучшились."
+		var family := resident_service.get_family_at_plot(selected_plot_id)
+		var speaker_name := speaker_id
+		var target_name := target_id
+		for member_value in family.get("members", []):
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			if str(member.get("id", "")) == speaker_id:
+				speaker_name = str(member.get("name", speaker_id))
+			elif str(member.get("id", "")) == target_id:
+				target_name = str(member.get("name", target_id))
+		status_label.text = "%s поговорил(а) с %s. Их отношения улучшились!" % [speaker_name, target_name]
 	else:
-		var remaining := resident_service.get_social_cooldown_remaining(selected_plot_id, member_id)
+		var remaining := resident_service.get_targeted_social_cooldown_remaining(selected_plot_id, speaker_id, target_id)
 		if remaining > 0:
-			status_label.text = "Следующий разговор будет доступен через %d игровых минут." % remaining
+			status_label.text = "Следующий разговор между этими жителями будет доступен через %d игровых минут." % remaining
 		else:
-			status_label.text = "Для разговора житель должен быть дома или на прогулке вместе с кем-то из семьи."
+			status_label.text = "Для разговора оба жителя должны быть дома или на прогулке."
 
 
 func _on_household_action_pressed(action_id: String) -> void:
