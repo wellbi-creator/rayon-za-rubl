@@ -406,7 +406,8 @@ func _save_game() -> void:
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
-		"construction": construction_service.get_save_data(),\n\t\t"move_in": move_in_service.get_save_data()
+		"construction": construction_service.get_save_data(),
+		"move_in": move_in_service.get_save_data()
 	}
 	save_service.save_game(data)
 
@@ -420,7 +421,10 @@ func _load_game() -> void:
 	var world_data: Variant = data.get("world", {})
 	if world_data is Dictionary:
 		world.load_save_data(world_data)
-	var move_in_data: Variant = data.get("move_in", {})\n	if move_in_data is Dictionary:\n\t\tmove_in_service.load_save_data(move_in_data)\n\tvar saved_at := int(data.get("saved_at", 0))
+	var move_in_data: Variant = data.get("move_in", {})
+	if move_in_data is Dictionary:
+		move_in_service.load_save_data(move_in_data)
+	var saved_at := int(data.get("saved_at", 0))
 	var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
 	var construction_data: Variant = data.get("construction", {})
 	if construction_data is Dictionary and not construction_data.is_empty():
