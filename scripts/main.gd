@@ -62,6 +62,7 @@ func _ready() -> void:
 	_create_interface()
 	_create_save_timer()
 	_load_game()
+	world.set_resident_groups(resident_service.get_resident_display_data())
 	_update_balance()
 	_show_empty_selection()
 
@@ -393,6 +394,7 @@ func _on_resident_button_pressed() -> void:
 		_save_game()
 
 func _on_residents_changed(plot_id: int) -> void:
+	world.set_resident_groups(resident_service.get_resident_display_data())
 	if selected_plot_id == plot_id:
 		_on_plot_selected(plot_id)
 
