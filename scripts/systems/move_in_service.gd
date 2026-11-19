@@ -26,7 +26,12 @@ func get_checklist(plot_id: int) -> Dictionary:
 	return (house_checklists[plot_id] as Dictionary).duplicate(true)
 
 func complete_requirement(plot_id: int, requirement_id: String) -> bool:
-	if requirement_id not in REQUIREMENTS.map(func(item: Dictionary) -> String: return str(item["id"])):
+	var known_requirement := false
+	for requirement in REQUIREMENTS:
+		if str(requirement["id"]) == requirement_id:
+			known_requirement = true
+			break
+	if not known_requirement:
 		return false
 	if not house_checklists.has(plot_id):
 		house_checklists[plot_id] = {}
