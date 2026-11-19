@@ -164,11 +164,9 @@ func _draw_ground() -> void:
 				_draw_grass_detail(center + Vector2(float((x * 17) % 35) - 17.0, float((y * 11) % 15) - 7.0))
 
 func _draw_roads() -> void:
-	# The two streets follow the same logical cells as the approved preview.
-	for x in MAP_WIDTH:
-		_draw_road_cell(Vector2i(x, 3))
-	for y in MAP_HEIGHT:
-		_draw_road_cell(Vector2i(4, y))
+	# Rendering and pathfinding share one source of truth for road cells.
+	for cell in road_path_network.get_road_cells():
+		_draw_road_cell(cell)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
 		var p: Vector2 = Grid.grid_to_world(Vector2i(x, 3), TILE)
