@@ -268,6 +268,11 @@ func _on_plot_selected(plot_id: int) -> void:
 	selected_plot_id = plot_id
 	var plot_name := world.get_plot_name(plot_id)
 	var kind := world.get_plot_kind(plot_id)
+	readiness_heading.visible = false
+	readiness_label.visible = false
+	readiness_selector.visible = false
+	readiness_note.visible = false
+	readiness_button.visible = false
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
