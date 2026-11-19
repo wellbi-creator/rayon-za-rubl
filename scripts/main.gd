@@ -1,13 +1,18 @@
 extends Node2D
 
 const DistrictWorldScript = preload("res://scripts/world/district_world.gd")
+const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const BUILD_SECONDS := 600.0
+const BABA_REPAIR_COST := 120000
+const BABA_QUEST_REWARD := 150000
 
 var world: DistrictWorld
 var selected_plot_id: int = -1
 var construction_plot_id: int = -1
 var construction_elapsed: float = 0.0
-var balance: int = 1000000
+var economy: EconomyService
+var baba_notebook_opened: bool = false
+var baba_wiring_repaired: bool = false
 
 var balance_label: Label
 var plot_title: Label
@@ -19,6 +24,9 @@ var control_root: Control
 var hint_label: Label
 
 func _ready() -> void:
+	economy = EconomyServiceScript.new()
+	add_child(economy)
+	economy.balance_changed.connect(_on_balance_changed)
 	world = DistrictWorldScript.new()
 	add_child(world)
 	world.plot_selected.connect(_on_plot_selected)
@@ -114,7 +122,7 @@ func _create_interface() -> void:
 	build_button.text = "Построить обычный дом"
 	build_button.custom_minimum_size = Vector2(0, 46)
 	build_button.disabled = true
-	build_button.pressed.connect(_on_build_pressed)
+	build_button.pressed.connect(_on_context_action_pressed)
 	build_button.add_theme_color_override("font_color", Color("#26372d"))
 	build_button.add_theme_stylebox_override("normal", _button_style(Color("#e6c77d")))
 	build_button.add_theme_stylebox_override("hover", _button_style(Color("#f0d99d")))
@@ -161,7 +169,10 @@ func _button_style(color: Color) -> StyleBoxFlat:
 	return style
 
 func _update_balance() -> void:
-	balance_label.text = "₽ %s" % _format_money(balance)
+	balance_label.text = "₽ %s" % _format_money(economy.balance)
+
+func _on_balance_changed(_new_balance: int) -> void:
+	_update_balance()
 
 func _format_money(value: int) -> String:
 	var raw := str(value)
@@ -184,31 +195,64 @@ func _on_plot_selected(plot_id: int) -> void:
 	var kind := world.get_plot_kind(plot_id)
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
-		plot_description.text = "Здесь живёт Баба Зина. Её дому нужна забота — загляни к ней и узнай, с чего начать."
-		status_label.text = "Сюжетный дом • Первый житель района"
-		build_button.disabled = true
+		if baba_wiring_repaired:
+			plot_description.text = "Баба Зина благодарит тебя: в доме снова работает электричество. В её блокноте появятся новые просьбы."
+			status_label.text = "Задание выполнено • Проводка восстановлена"
+			build_button.text = "Задание выполнено"
+			build_button.disabled = true
+		elif baba_notebook_opened:
+			plot_description.text = "Блокнот Бабы Зины: «В доме совсем старая проводка. Свет мигает, а вечером страшно включать чайник. Помоги заменить проводку»."
+			status_label.text = "Первое поручение • Замена электропроводки"
+			build_button.text = "Починить проводку — 120 000 ₽"
+			build_button.disabled = economy.balance < BABA_REPAIR_COST
+		else:
+			plot_description.text = "Здесь живёт Баба Зина. Её дому нужна забота. Поговори с ней и загляни в её старый блокнот."
+			status_label.text = "Сюжетный дом • Первый житель района"
+			build_button.text = "Открыть блокнот Бабы Зины"
+			build_button.disabled = false
 	elif kind == "empty":
 		plot_description.text = "Свободный участок. Здесь можно начать строительство нового обычного дома."
 		status_label.text = "Стоимость строительства: будет уточнена в балансе M1."
-		build_button.disabled = balance < 100000
+		build_button.text = "Построить обычный дом — 100 000 ₽"
+		build_button.disabled = economy.balance < 100000
 	elif kind == "building":
 		plot_description.text = "На участке уже работает строительная бригада."
 		status_label.text = "Строительство: %d%%" % int(float(world.plot_states[plot_id]["progress"]) * 100.0)
+		build_button.text = "Строительство уже идёт"
 		build_button.disabled = true
 	else:
 		plot_description.text = "Дом построен. Подготовка к заселению появится в следующем этапе."
 		status_label.text = "Строительство завершено."
+		build_button.text = "Дом построен"
 		build_button.disabled = true
+
+func _on_context_action_pressed() -> void:
+	if selected_plot_id == 0:
+		if not baba_notebook_opened:
+			baba_notebook_opened = true
+			_on_plot_selected(0)
+			status_label.text = "Баба Зина доверила тебе своё первое поручение."
+			return
+		if not baba_wiring_repaired:
+			if not economy.try_spend(BABA_REPAIR_COST, "Ремонт электропроводки дома Бабы Зины"):
+				status_label.text = "Не хватает денег на материалы и работу электрика."
+				return
+			baba_wiring_repaired = true
+			world.set_baba_home_repaired(true)
+			economy.add_money(BABA_QUEST_REWARD, "Награда за помощь Бабе Зине")
+			_on_plot_selected(0)
+			status_label.text = "Проводка восстановлена! Баба Зина вручает награду: 150 000 ₽."
+			return
+		return
+	_on_build_pressed()
 
 func _on_build_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "empty":
 		return
 	const BUILD_COST := 100000
-	if balance < BUILD_COST:
+	if not economy.try_spend(BUILD_COST, "Строительство обычного дома"):
 		status_label.text = "Недостаточно средств."
 		return
-	balance -= BUILD_COST
-	_update_balance()
 	construction_plot_id = selected_plot_id
 	construction_elapsed = 0.0
 	world.set_plot_building(construction_plot_id, 0.0)
