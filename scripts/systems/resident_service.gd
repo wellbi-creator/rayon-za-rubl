@@ -464,6 +464,7 @@ func _simulate_needs_minute(total_minute: int) -> void:
 		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
 		if posmod(total_minute, 60) == 0:
 			_run_autonomous_social_interaction(state, total_minute)
+			_run_autonomous_shared_time(state, total_minute)
 		if minute_of_day % 60 == 0:
 			_update_relationships(state)
 			members = state.get("members", [])
@@ -874,6 +875,65 @@ func _run_autonomous_social_interaction(state: Dictionary, total_minute: int) ->
 		_record_family_event(state, "%s самостоятельно поговорил(а) с семьёй" % str(speaker.get("name", "Житель")), "autonomous", total_minute)
 		_refresh_family_aggregates(state)
 		return
+
+
+func _run_autonomous_shared_time(state: Dictionary, total_minute: int) -> void:
+	if not bool(state.get("autonomy_enabled", true)):
+		return
+	if str(state.get("last_action_source", "")) == "autonomous" and int(state.get("last_action_minute", -1)) == total_minute:
+		return
+	var members: Array = state.get("members", [])
+	if members.size() < 2:
+		return
+	var start_index := posmod(int(total_minute / 60) + 1, members.size())
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	for speaker_offset in range(members.size()):
+		var speaker_value: Variant = members[posmod(start_index + speaker_offset, members.size())]
+		if not speaker_value is Dictionary:
+			continue
+		var speaker: Dictionary = speaker_value
+		if not bool(speaker.get("autonomy_enabled", true)):
+			continue
+		if str(speaker.get("activity", "")) not in ["at_home", "walking"]:
+			continue
+		var speaker_id := str(speaker.get("id", ""))
+		var cooldowns: Dictionary = speaker.get("shared_time_cooldowns", {}).duplicate(true)
+		for target_offset in range(members.size()):
+			var target_value: Variant = members[posmod(start_index + target_offset, members.size())]
+			if not target_value is Dictionary:
+				continue
+			var target: Dictionary = target_value
+			var target_id := str(target.get("id", ""))
+			if target_id == speaker_id or not bool(target.get("autonomy_enabled", true)):
+				continue
+			if str(target.get("activity", "")) not in ["at_home", "walking"]:
+				continue
+			if total_minute < int(cooldowns.get(target_id, -1)):
+				continue
+			var key := _relationship_key(speaker_id, target_id)
+			var previous_score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+			if previous_score >= 100:
+				continue
+			var new_score := clampi(previous_score + 2, 0, 100)
+			relationships[key] = new_score
+			_record_relationship_milestones(state, speaker_id, target_id, previous_score, new_score, "autonomous", total_minute)
+			for participant in [speaker, target]:
+				participant["mood"] = clampi(int(participant.get("mood", 75)) + 1, 0, 100)
+				participant["satisfaction"] = clampi(int(participant.get("satisfaction", 75)) + 1, 0, 100)
+			cooldowns[target_id] = total_minute + 180
+			speaker["shared_time_cooldowns"] = cooldowns
+			speaker["last_action_label"] = "Провёл(а) время с %s" % str(target.get("name", "родственником"))
+			speaker["last_action_minute"] = total_minute
+			target["last_action_label"] = "Провёл(а) время с %s" % str(speaker.get("name", "родственником"))
+			target["last_action_minute"] = total_minute
+			state["relationships"] = relationships
+			state["members"] = members
+			state["last_action_label"] = "%s провёл(а) время с %s" % [str(speaker.get("name", "Житель")), str(target.get("name", "родственником"))]
+			state["last_action_source"] = "autonomous"
+			state["last_action_minute"] = total_minute
+			_record_family_event(state, "%s самостоятельно провёл(а) время с %s" % [str(speaker.get("name", "Житель")), str(target.get("name", "родственником"))], "autonomous", total_minute)
+			_refresh_family_aggregates(state)
+			return
 
 
 func _apply_action_to_member(member: Dictionary, action_id: String, total_minute: int, activity: String) -> bool:
