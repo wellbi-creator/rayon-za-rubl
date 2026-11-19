@@ -27,13 +27,20 @@ var drag_active := false
 var touch_active := false
 var touch_moved := false
 var touch_start := Vector2.ZERO
+var camera_target_position := Vector2.ZERO
+var camera_target_zoom := 0.82
+var camera_smoothing := 10.0
+var keyboard_pan_speed := 520.0
+var camera_min_zoom := 0.55
+var camera_max_zoom := 1.6
 
 func _ready() -> void:
 	for i in PLOT_CELLS.size():
 		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0})
 	camera = Camera2D.new()
 	camera.position = Grid.grid_to_world(Vector2i(4, 3), TILE)
-	camera.zoom = Vector2(0.82, 0.82)
+	camera_target_position = camera.position
+	camera.zoom = Vector2(camera_target_zoom, camera_target_zoom)
 	add_child(camera)
 	camera.make_current()
 	queue_redraw()
@@ -41,6 +48,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	construction_animation_time += delta
 	pedestrian_time += delta
+	_update_keyboard_camera(delta)
+	_clamp_camera_target()
+	var weight := 1.0 - exp(-camera_smoothing * delta)
+	camera.position = camera.position.lerp(camera_target_position, weight)
+	var zoom_value := lerpf(camera.zoom.x, camera_target_zoom, weight)
+	camera.zoom = Vector2(zoom_value, zoom_value)
 	queue_redraw()
 
 func _draw() -> void:
@@ -291,16 +304,16 @@ func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
+		if event.button_index == MOUSE_BUTTON_RIGHT or event.button_index == MOUSE_BUTTON_MIDDLE:
 			drag_active = event.pressed
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_zoom(1.1)
+			_zoom_at_screen_position(1.12, event.position)
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_zoom(0.9)
+			_zoom_at_screen_position(1.0 / 1.12, event.position)
 		elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_select_world_position(get_global_mouse_position())
 	elif event is InputEventMouseMotion and drag_active:
-		camera.position -= event.relative / camera.zoom.x
+		camera_target_position -= event.relative / camera.zoom.x
 	elif event is InputEventScreenTouch:
 		if event.pressed:
 			touch_active = true
@@ -314,7 +327,54 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.position.distance_to(touch_start) > 12.0:
 			touch_moved = true
 		if touch_moved:
-			camera.position -= event.relative / camera.zoom.x
+			camera_target_position -= event.relative / camera.zoom.x
+	elif event is InputEventMagnifyGesture:
+		_zoom_at_screen_position(event.factor, get_viewport_rect().size * 0.5)
+	elif event is InputEventPanGesture:
+		camera_target_position -= event.delta / camera.zoom.x
+
+func _zoom_at_screen_position(factor: float, screen_position: Vector2) -> void:
+	var before := get_viewport().get_canvas_transform().affine_inverse() * screen_position
+	camera_target_zoom = clampf(camera_target_zoom * factor, camera_min_zoom, camera_max_zoom)
+	var after := get_viewport().get_canvas_transform().affine_inverse() * screen_position
+	camera_target_position += before - after
+	_clamp_camera_target()
+
+func _update_keyboard_camera(delta: float) -> void:
+	var direction := Vector2.ZERO
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+		direction.x -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+		direction.x += 1.0
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+		direction.y -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+		direction.y += 1.0
+	if direction.length_squared() > 0.0:
+		camera_target_position += direction.normalized() * keyboard_pan_speed * delta / maxf(camera.zoom.x, 0.1)
+
+func _clamp_camera_target() -> void:
+	var first: Vector2 = Grid.grid_to_world(Vector2i(0, 0), TILE)
+	var last: Vector2 = Grid.grid_to_world(Vector2i(MAP_WIDTH - 1, MAP_HEIGHT - 1), TILE)
+	var left_top: Vector2 = Grid.grid_to_world(Vector2i(0, MAP_HEIGHT - 1), TILE)
+	var right_bottom: Vector2 = Grid.grid_to_world(Vector2i(MAP_WIDTH - 1, 0), TILE)
+	var min_x := minf(first.x, last.x, left_top.x, right_bottom.x) - TILE.x * 0.9
+	var max_x := maxf(first.x, last.x, left_top.x, right_bottom.x) + TILE.x * 0.9
+	var min_y := minf(first.y, last.y, left_top.y, right_bottom.y) - 150.0
+	var max_y := maxf(first.y, last.y, left_top.y, right_bottom.y) + 90.0
+	var visible_half := get_viewport_rect().size * 0.5 / maxf(camera_target_zoom, 0.1)
+	var low_x := min_x + visible_half.x
+	var high_x := max_x - visible_half.x
+	var low_y := min_y + visible_half.y
+	var high_y := max_y - visible_half.y
+	if low_x > high_x:
+		camera_target_position.x = (min_x + max_x) * 0.5
+	else:
+		camera_target_position.x = clampf(camera_target_position.x, low_x, high_x)
+	if low_y > high_y:
+		camera_target_position.y = (min_y + max_y) * 0.5
+	else:
+		camera_target_position.y = clampf(camera_target_position.y, low_y, high_y)
 
 func _select_world_position(world_position: Vector2) -> void:
 	var cell: Vector2i = Grid.world_to_grid(world_position, TILE)
@@ -331,8 +391,8 @@ func _select_world_position(world_position: Vector2) -> void:
 			return
 
 func _zoom(factor: float) -> void:
-	var next_zoom := clampf(camera.zoom.x * factor, 0.55, 1.5)
-	camera.zoom = Vector2(next_zoom, next_zoom)
+	camera_target_zoom = clampf(camera_target_zoom * factor, camera_min_zoom, camera_max_zoom)
+	_clamp_camera_target()
 
 func set_resident_groups(groups: Array) -> void:
 	resident_groups = groups.duplicate(true)
