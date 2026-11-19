@@ -62,10 +62,53 @@ func _draw() -> void:
 	_draw_ground()
 	_draw_roads()
 	_draw_environment()
-	for plot_id in PLOT_CELLS.size():
-		_draw_plot(plot_id)
-	_draw_residents()
+	_draw_depth_sorted_world_objects()
 	_draw_ambient_birds()
+
+func _draw_depth_sorted_world_objects() -> void:
+	# Trees, plots and residents share one painter's queue. Ground-contact Y controls
+	# front-to-back order so tall sprites can overlap naturally without changing game data.
+	var entries: Array[Dictionary] = []
+	for cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5)]:
+		var tree_pos: Vector2 = Grid.grid_to_world(cell, TILE) + Vector2(0, -7)
+		entries.append({"kind": "tree", "position": tree_pos, "depth": tree_pos.y + 20.0})
+	for plot_id in PLOT_CELLS.size():
+		var plot_pos: Vector2 = Grid.grid_to_world(PLOT_CELLS[plot_id], TILE)
+		entries.append({"kind": "plot", "plot_id": plot_id, "position": plot_pos, "depth": plot_pos.y})
+	for resident in _collect_resident_draw_entries():
+		entries.append({
+			"kind": "resident",
+			"position": resident["position"],
+			"depth": resident["position"].y + 8.0,
+			"resident": resident
+		})
+	entries.sort_custom(_world_depth_order)
+	for entry in entries:
+		match str(entry.get("kind", "")):
+			"tree":
+				_draw_tree(entry["position"])
+			"plot":
+				_draw_plot(int(entry["plot_id"]))
+			"resident":
+				var resident: Dictionary = entry["resident"]
+				_draw_person(
+					resident["position"],
+					int(resident["variant"]),
+					bool(resident["walking"]),
+					float(resident["phase"])
+				)
+
+func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
+	var depth_a := float(a.get("depth", 0.0))
+	var depth_b := float(b.get("depth", 0.0))
+	if not is_equal_approx(depth_a, depth_b):
+		return depth_a < depth_b
+	var pos_a: Vector2 = a.get("position", Vector2.ZERO)
+	var pos_b: Vector2 = b.get("position", Vector2.ZERO)
+	if not is_equal_approx(pos_a.x, pos_b.x):
+		return pos_a.x < pos_b.x
+	var kind_order := {"tree": 0, "plot": 1, "resident": 2}
+	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
@@ -107,8 +150,6 @@ func _draw_road_cell(cell: Vector2i) -> void:
 	draw_line(center + Vector2(0, 25), center + Vector2(52, -2), curb_color, 1.4)
 
 func _draw_environment() -> void:
-	for cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5)]:
-		_draw_tree(Grid.grid_to_world(cell, TILE) + Vector2(0, -7))
 	for cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
 		_draw_lamp(Grid.grid_to_world(cell, TILE) + Vector2(0, -10))
 	# Park greenery between the lower plots.
@@ -315,8 +356,7 @@ func _draw_lamp(pos: Vector2) -> void:
 		draw_circle(pos + Vector2(9, -29), 9.0 + sin(construction_animation_time * 2.0) * 1.0, Color("#f3d98e", lamp_glow * 0.22))
 		draw_circle(pos + Vector2(9, -29), 17.0, Color("#f3d98e", lamp_glow * 0.06))
 
-func _draw_residents() -> void:
-	# Collect visible pedestrians first so their feet are drawn in stable isometric depth order.
+func _collect_resident_draw_entries() -> Array[Dictionary]:
 	var draw_entries: Array[Dictionary] = []
 	for group in resident_groups:
 		if not group is Dictionary:
@@ -348,13 +388,7 @@ func _draw_residents() -> void:
 				"member_index": member_index
 			})
 	draw_entries.sort_custom(_resident_draw_order)
-	for entry in draw_entries:
-		_draw_person(
-			entry["position"],
-			int(entry["variant"]),
-			bool(entry["walking"]),
-			float(entry["phase"])
-		)
+	return draw_entries
 
 func _resident_draw_order(a: Dictionary, b: Dictionary) -> bool:
 	# The ground contact point (feet), not the head, determines front-to-back order.
