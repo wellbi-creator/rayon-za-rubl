@@ -575,6 +575,40 @@ func get_targeted_social_cooldown_remaining(plot_id: int, speaker_id: String, ta
 	return -1
 
 
+func get_targeted_relationship_data(plot_id: int, speaker_id: String, target_id: String) -> Dictionary:
+	if not occupied_homes.has(plot_id) or speaker_id == target_id:
+		return {}
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	if state.is_empty():
+		return {}
+	var members: Array = state.get("members", [])
+	var speaker: Dictionary = {}
+	var target: Dictionary = {}
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if str(member.get("id", "")) == speaker_id:
+			speaker = member
+		elif str(member.get("id", "")) == target_id:
+			target = member
+	if speaker.is_empty() or target.is_empty():
+		return {}
+	var key := _relationship_key(speaker_id, target_id)
+	var relationships: Dictionary = state.get("relationships", {})
+	var remaining := get_targeted_social_cooldown_remaining(plot_id, speaker_id, target_id)
+	var participants_available := str(speaker.get("activity", "")) in ["at_home", "walking"] and str(target.get("activity", "")) in ["at_home", "walking"]
+	var score := float(relationships.get(key, RELATIONSHIP_DEFAULT))
+	return {
+		"score": score,
+		"label": _get_relationship_label(score),
+		"cooldown_remaining": remaining,
+		"participants_available": participants_available,
+		"available": participants_available and remaining <= 0
+	}
+
+
 func get_social_cooldown_remaining(plot_id: int, member_id: String) -> int:
 	if not occupied_homes.has(plot_id):
 		return -1
