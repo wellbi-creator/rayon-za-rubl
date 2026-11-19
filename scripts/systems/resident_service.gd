@@ -34,11 +34,21 @@ const FAMILY_CATALOG := {
 	}
 }
 const NEED_DEFAULTS := {"energy": 75.0, "hunger": 80.0, "hygiene": 80.0, "leisure": 75.0, "home_comfort": 75.0}
+const PREFERENCE_LABELS := {
+	"walking": "Любит прогулки",
+	"at_home": "Предпочитает отдых дома"
+}
+const ACTION_PREFERENCE_LABELS := {
+	"meal": "Любит домашнюю еду",
+	"shower": "Ценит свежесть",
+	"rest": "Любит спокойный отдых",
+	"leisure": "Любит развлечения"
+}
 const MEMBER_TEMPLATES := {
 	"first_neighbors": [
-		{"id": "adult_one", "name": "Взрослый 1", "role": "Взрослый", "need_rates": {"energy": 1.0, "hunger": 1.0, "hygiene": 1.0, "leisure": 1.0}},
-		{"id": "adult_two", "name": "Взрослый 2", "role": "Взрослый", "need_rates": {"energy": 0.9, "hunger": 1.05, "hygiene": 0.95, "leisure": 1.1}},
-		{"id": "child_one", "name": "Ребёнок", "role": "Ребёнок", "need_rates": {"energy": 1.15, "hunger": 1.2, "hygiene": 1.0, "leisure": 1.25}}
+		{"id": "adult_one", "name": "Взрослый 1", "role": "Взрослый", "need_rates": {"energy": 1.0, "hunger": 1.0, "hygiene": 1.0, "leisure": 1.0}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}},
+		{"id": "adult_two", "name": "Взрослый 2", "role": "Взрослый", "need_rates": {"energy": 0.9, "hunger": 1.05, "hygiene": 0.95, "leisure": 1.1}, "preferences": {"favorite_activity": "at_home", "favorite_action": "meal"}},
+		{"id": "child_one", "name": "Ребёнок", "role": "Ребёнок", "need_rates": {"energy": 1.15, "hunger": 1.2, "hygiene": 1.0, "leisure": 1.25}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}}
 	]
 }
 const MAX_SIMULATION_MINUTES := 10080
@@ -68,6 +78,7 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"id": str(template.get("id", "resident_%d" % result.size())),
 			"name": str(template.get("name", "Житель")),
 			"role": str(template.get("role", "Житель")),
+			"preferences": template.get("preferences", {"favorite_activity": "walking", "favorite_action": "leisure"}).duplicate(true),
 			"need_rates": template.get("need_rates", {}).duplicate(true),
 			"needs": starting_needs.duplicate(true),
 			"mood": 75,
@@ -99,6 +110,12 @@ func _normalize_member_states(state: Dictionary) -> void:
 		member["mood"] = clampi(int(member.get("mood", state.get("mood", 75))), 0, 100)
 		member["satisfaction"] = clampi(int(member.get("satisfaction", state.get("satisfaction", 75))), 0, 100)
 		member["need_rates"] = member.get("need_rates", {}).duplicate(true)
+		var preferences: Dictionary = member.get("preferences", {"favorite_activity": "walking", "favorite_action": "leisure"}).duplicate(true)
+		if not PREFERENCE_LABELS.has(str(preferences.get("favorite_activity", ""))):
+			preferences["favorite_activity"] = "walking"
+		if not ACTION_PREFERENCE_LABELS.has(str(preferences.get("favorite_action", ""))):
+			preferences["favorite_action"] = "leisure"
+		member["preferences"] = preferences
 		member["autonomy_enabled"] = bool(member.get("autonomy_enabled", true))
 		member["action_cooldowns"] = member.get("action_cooldowns", {}).duplicate(true)
 		member["last_action_label"] = str(member.get("last_action_label", "Пока действий не было"))
@@ -142,10 +159,18 @@ func _get_member_display_data(state: Dictionary) -> Array:
 		if not member_value is Dictionary:
 			continue
 		var member: Dictionary = member_value
+		var preferences: Dictionary = member.get("preferences", {})
+		var favorite_activity := str(preferences.get("favorite_activity", "walking"))
+		var favorite_action := str(preferences.get("favorite_action", "leisure"))
 		result.append({
 			"id": str(member.get("id", "")),
 			"name": str(member.get("name", "Житель")),
 			"role": str(member.get("role", "Житель")),
+			"preferences": preferences.duplicate(true),
+			"preferences_label": "%s • %s" % [
+				str(PREFERENCE_LABELS.get(favorite_activity, "Любит прогулки")),
+				str(ACTION_PREFERENCE_LABELS.get(favorite_action, "Любит развлечения"))
+			],
 			"needs": member.get("needs", NEED_DEFAULTS).duplicate(true),
 			"mood": int(member.get("mood", 75)),
 			"satisfaction": int(member.get("satisfaction", 75)),
@@ -300,6 +325,10 @@ func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void
 		satisfaction -= 1
 	elif total / 5.0 >= 70.0:
 		satisfaction += 1
+	var preferences: Dictionary = state.get("preferences", {})
+	var favorite_activity := str(preferences.get("favorite_activity", ""))
+	if not favorite_activity.is_empty() and str(state.get("activity", "")) == favorite_activity and total / 5.0 >= 60.0:
+		satisfaction += 1
 	state["satisfaction"] = clampi(satisfaction, 0, 100)
 
 
@@ -390,6 +419,11 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 				candidates.append("leisure")
 		elif member_activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
 			candidates.append("leisure")
+		var preferences: Dictionary = member.get("preferences", {})
+		var favorite_action := str(preferences.get("favorite_action", ""))
+		if candidates.has(favorite_action):
+			candidates.erase(favorite_action)
+			candidates.push_front(favorite_action)
 		for action_id in candidates:
 			if _apply_action_to_member(member, str(action_id), total_minute, member_activity):
 				state["last_action_label"] = "%s: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])]
