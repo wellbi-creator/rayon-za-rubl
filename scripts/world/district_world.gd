@@ -20,6 +20,9 @@ var plot_states: Array[Dictionary] = []
 var selected_plot: int = -1
 var camera: Camera2D
 var dragging: bool = false
+var touch_active: bool = false
+var touch_start_position: Vector2 = Vector2.ZERO
+var touch_moved: bool = false
 var traffic_time: float = 0.0
 var car_positions: Array[float] = [80.0, 880.0]
 
@@ -220,9 +223,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		camera.position -= event.relative / camera.zoom.x
 	elif event is InputEventScreenTouch:
 		if event.pressed:
-			_select_at(get_global_transform_with_canvas().affine_inverse() * event.position)
+			touch_active = true
+			touch_start_position = event.position
+			touch_moved = false
+		else:
+			if touch_active and not touch_moved:
+				var world_position := get_viewport().get_canvas_transform().affine_inverse() * event.position
+				_select_at(world_position)
+			touch_active = false
 	elif event is InputEventScreenDrag:
-		camera.position -= event.relative / camera.zoom.x
+		if touch_active:
+			if event.position.distance_to(touch_start_position) > 12.0:
+				touch_moved = true
+			if touch_moved:
+				camera.position -= event.relative / camera.zoom.x
 
 func _zoom(factor: float) -> void:
 	var next_zoom := clampf(camera.zoom.x * factor, 0.65, 1.8)

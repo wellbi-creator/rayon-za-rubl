@@ -15,6 +15,8 @@ var plot_description: Label
 var build_button: Button
 var status_label: Label
 var build_timer: Timer
+var control_root: Control
+var hint_label: Label
 
 func _ready() -> void:
 	world = DistrictWorldScript.new()
@@ -38,9 +40,12 @@ func _create_interface() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
+	control_root = root
+	root.resized.connect(_on_interface_resized)
 
 	var top_panel := PanelContainer.new()
-	top_panel.position = Vector2(22, 18)
+	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	top_panel.position = Vector2(18, 16)
 	top_panel.custom_minimum_size = Vector2(370, 66)
 	top_panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.92))
 	root.add_child(top_panel)
@@ -60,16 +65,19 @@ func _create_interface() -> void:
 	balance_label.add_theme_color_override("font_color", Color("#f4d98d"))
 	top_row.add_child(balance_label)
 
-	var hint := Label.new()
-	hint.text = "Перемещение: правая кнопка мыши / касание двумя пальцами   •   Колесо: масштаб"
-	hint.position = Vector2(24, 94)
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color("#f6f0d9"))
-	root.add_child(hint)
+	hint_label = Label.new()
+	hint_label.text = "ПК: правая кнопка — перемещение, колесо — масштаб  •  Телефон: перетаскивание и касание"
+	hint_label.position = Vector2(22, 92)
+	hint_label.add_theme_font_size_override("font_size", 13)
+	hint_label.add_theme_color_override("font_color", Color("#f6f0d9"))
+	root.add_child(hint_label)
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(930, 112)
-	panel.custom_minimum_size = Vector2(320, 310)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	panel.offset_left = -342
+	panel.offset_top = 104
+	panel.offset_right = -18
+	panel.offset_bottom = 414
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
 
@@ -118,6 +126,13 @@ func _create_interface() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color("#a9b8a3"))
 	content.add_child(footer)
+
+
+func _on_interface_resized() -> void:
+	if control_root == null or hint_label == null:
+		return
+	# Hide the long desktop hint on narrow landscape screens.
+	hint_label.visible = control_root.size.x >= 900.0
 
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
