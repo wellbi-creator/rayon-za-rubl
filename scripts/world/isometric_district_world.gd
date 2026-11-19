@@ -99,7 +99,9 @@ func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body
 func _get_traffic_route_length(route: Array) -> float:
 	var total_length := 0.0
 	for i in range(route.size() - 1):
-		total_length += (route[i] as Vector2).distance_to(route[i + 1])
+		var from_point: Vector2 = route[i]
+		var to_point: Vector2 = route[i + 1]
+		total_length += from_point.distance_to(to_point)
 	return total_length
 
 func _sample_traffic_route(route: Array, distance: float, lane_offset: float) -> Dictionary:
@@ -153,7 +155,7 @@ func _update_demo_traffic(delta: float) -> void:
 		_demo_transport_entries.append({
 			"position": vehicle_position,
 			"depth": vehicle_position.y + 5.0,
-			"rotation": float(sample["rotation"]),
+			"rotation": float(sample["rotation"]) + (PI if direction < 0 else 0.0),
 			"color": vehicle_color
 		})
 
