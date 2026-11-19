@@ -26,6 +26,9 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	_draw_ground()
+	if selected_cell.x >= 0:
+		var selected_center: Vector2 = Grid.grid_to_world(selected_cell, TILE)
+		_draw_diamond(selected_center, TILE * Vector2(0.92, 0.88), Color(\"#f1d77c\", 0.22), Color(\"#ffe49a\"), 3.0)
 	_draw_roads()
 	_draw_plots()
 	_draw_trees()
