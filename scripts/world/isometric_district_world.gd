@@ -24,6 +24,11 @@ var resident_groups: Array = []
 var transport_entries: Array[Dictionary] = []
 var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
+var _traffic_signal_timer := 0.0
+var _traffic_vertical_green := false
+const TRAFFIC_SIGNAL_PHASE_DURATION := 5.0
+const TRAFFIC_STOP_DISTANCE := 42.0
+const TRAFFIC_BRAKE_DISTANCE := 58.0
 var road_path_network: RoadPathNetwork
 var baba_home_repaired := false
 var construction_animation_time := 0.0
@@ -58,6 +63,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	construction_animation_time += delta
 	pedestrian_time += delta
+	_traffic_signal_timer += delta
+	if _traffic_signal_timer >= TRAFFIC_SIGNAL_PHASE_DURATION:
+		_traffic_signal_timer = fposmod(_traffic_signal_timer, TRAFFIC_SIGNAL_PHASE_DURATION)
+		_traffic_vertical_green = not _traffic_vertical_green
 	_update_demo_traffic(delta)
 	_update_keyboard_camera(delta)
 	_clamp_camera_target()
@@ -72,15 +81,16 @@ func _initialize_demo_traffic() -> void:
 	var horizontal_route := get_transport_route(Vector2i(0, 3), Vector2i(8, 3))
 	var vertical_route := get_transport_route(Vector2i(4, 0), Vector2i(4, 6))
 	if horizontal_route.size() >= 2:
-		_add_demo_vehicle(horizontal_route, 1, 48.0, Color("#c46f55"), 7.0, 0.0, 0)
-		_add_demo_vehicle(horizontal_route, -1, 44.0, Color("#5b8497"), 7.0, 1.2, 1)
+		_add_demo_vehicle(horizontal_route, 1, 48.0, Color("#c46f55"), 7.0, 0.0, 0, "horizontal")
+		_add_demo_vehicle(horizontal_route, -1, 44.0, Color("#5b8497"), 7.0, 1.2, 1, "horizontal")
 	if vertical_route.size() >= 2:
-		_add_demo_vehicle(vertical_route, 1, 42.0, Color("#d0a85e"), 7.0, 0.6, 2)
-		_add_demo_vehicle(vertical_route, -1, 40.0, Color("#71917a"), 7.0, 1.8, 3)
+		_add_demo_vehicle(vertical_route, 1, 42.0, Color("#d0a85e"), 7.0, 0.6, 2, "vertical")
+		_add_demo_vehicle(vertical_route, -1, 40.0, Color("#71917a"), 7.0, 1.8, 3, "vertical")
 	_update_demo_traffic(0.0)
 
-func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body_color: Color, lane_offset: float, spawn_delay: float, seed: int) -> void:
+func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body_color: Color, lane_offset: float, spawn_delay: float, seed: int, axis: String) -> void:
 	var route_length := _get_traffic_route_length(route)
+	var intersection_distance := _get_distance_to_route_point(route, Grid.grid_to_world(Vector2i(4, 3), TILE))
 	if route_length <= 0.001:
 		return
 	_traffic_vehicles.append({
@@ -89,12 +99,34 @@ func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body
 		"distance": 0.0 if direction > 0 else route_length,
 		"direction": direction,
 		"speed": speed,
+		"current_speed": speed,
+		"axis": axis,
+		"intersection_distance": intersection_distance,
 		"lane_offset": lane_offset,
 		"color": body_color,
 		"active": spawn_delay <= 0.0,
 		"respawn_timer": spawn_delay,
 		"spawn_seed": seed
 	})
+
+func _get_distance_to_route_point(route: Array, target: Vector2) -> float:
+	var best_distance := 0.0
+	var best_error := INF
+	var travelled := 0.0
+	for i in range(route.size() - 1):
+		var from_point: Vector2 = route[i]
+		var to_point: Vector2 = route[i + 1]
+		var segment := to_point - from_point
+		var segment_length := segment.length()
+		if segment_length <= 0.001:
+			continue
+		var along := clampf((target - from_point).dot(segment) / segment.length_squared(), 0.0, 1.0)
+		var error := from_point.lerp(to_point, along).distance_squared_to(target)
+		if error < best_error:
+			best_error = error
+			best_distance = travelled + segment_length * along
+		travelled += segment_length
+	return best_distance
 
 func _get_traffic_route_length(route: Array) -> float:
 	var total_length := 0.0
@@ -140,7 +172,25 @@ func _update_demo_traffic(delta: float) -> void:
 				vehicle["distance"] = 0.0 if direction > 0 else route_length
 			else:
 				continue
-		var distance := float(vehicle.get("distance", 0.0)) + float(vehicle.get("speed", 40.0)) * delta * float(direction)
+		var distance := float(vehicle.get("distance", 0.0))
+		var base_speed := float(vehicle.get("speed", 40.0))
+		var current_speed := float(vehicle.get("current_speed", base_speed))
+		var axis := str(vehicle.get("axis", "horizontal"))
+		var green_for_vehicle := (axis == "vertical") == _traffic_vertical_green
+		var stop_line := float(vehicle.get("intersection_distance", route_length * 0.5)) - TRAFFIC_STOP_DISTANCE * float(direction)
+		var distance_to_stop := (stop_line - distance) * float(direction)
+		var target_speed := base_speed
+		if not green_for_vehicle and distance_to_stop > 0.0:
+			target_speed = base_speed * clampf(distance_to_stop / TRAFFIC_BRAKE_DISTANCE, 0.0, 1.0)
+		current_speed = move_toward(current_speed, target_speed, (105.0 if target_speed < current_speed else 58.0) * delta)
+		var next_distance := distance + current_speed * delta * float(direction)
+		if not green_for_vehicle and distance_to_stop > 0.0 and (stop_line - next_distance) * float(direction) < 0.0:
+			next_distance = stop_line
+		if not green_for_vehicle and distance_to_stop >= -0.5 and distance_to_stop <= 1.0:
+			current_speed = 0.0
+			next_distance = stop_line
+		vehicle["current_speed"] = current_speed
+		distance = next_distance
 		if distance < 0.0 or distance > route_length:
 			vehicle["active"] = false
 			vehicle["distance"] = 0.0 if direction < 0 else route_length
@@ -163,6 +213,7 @@ func _draw() -> void:
 	_draw_ground()
 	_draw_roads()
 	_draw_environment()
+	_draw_traffic_signals()
 	_draw_depth_sorted_world_objects()
 	_draw_ambient_birds()
 
@@ -224,7 +275,7 @@ func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
 
 func _draw_transport_entry(entry: Dictionary) -> void:
-	# A compact data-driven vehicle sprite; actual traffic movement is a later stage.
+	# A compact data-driven vehicle sprite for the signal-controlled traffic demo.
 	var ground: Vector2 = entry.get("position", Vector2.ZERO)
 	var body_color: Color = entry.get("color", Color("#587b8a"))
 	var facing: float = float(entry.get("rotation", 0.0))
@@ -246,6 +297,21 @@ func _draw_transport_entry(entry: Dictionary) -> void:
 		ground + Vector2(5, -2).rotated(facing),
 		ground + Vector2(0, 1).rotated(facing)
 	]), Color("#b9d5d4"))
+
+func _draw_traffic_signals() -> void:
+	var center: Vector2 = Grid.grid_to_world(Vector2i(4, 3), TILE)
+	var horizontal_color := Color("#58c878") if not _traffic_vertical_green else Color("#df6258")
+	var vertical_color := Color("#58c878") if _traffic_vertical_green else Color("#df6258")
+	for offset in [Vector2(-30, -19), Vector2(30, 19)]:
+		var post := center + offset
+		draw_line(post + Vector2(0, 9), post + Vector2(0, -17), Color("#414b43"), 2.5)
+		draw_rect(Rect2(post + Vector2(-4, -29), Vector2(8, 14)), Color("#303a38"), true)
+		draw_circle(post + Vector2(0, -25), 2.5, horizontal_color)
+	for offset in [Vector2(30, -19), Vector2(-30, 19)]:
+		var post := center + offset
+		draw_line(post + Vector2(0, 9), post + Vector2(0, -17), Color("#414b43"), 2.5)
+		draw_rect(Rect2(post + Vector2(-4, -29), Vector2(8, 14)), Color("#303a38"), true)
+		draw_circle(post + Vector2(0, -25), 2.5, vertical_color)
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
