@@ -63,6 +63,9 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["activity"] = str(state.get("activity", "at_home"))
 	profile["activity_label"] = str(state.get("activity_label", "Дома"))
 	profile["autonomy_enabled"] = bool(state.get("autonomy_enabled", true))
+	profile["last_action_label"] = str(state.get("last_action_label", "Пока действий не было"))
+	profile["last_action_source"] = str(state.get("last_action_source", ""))
+	profile["last_action_minute"] = int(state.get("last_action_minute", -1))
 	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	return profile
 
@@ -86,6 +89,9 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"activity": str(schedule["activity"]),
 		"activity_label": str(schedule["label"]),
 		"autonomy_enabled": true,
+		"last_action_label": "Пока действий не было",
+		"last_action_source": "",
+		"last_action_minute": -1,
 		"needs": NEED_DEFAULTS.duplicate(true)
 	}
 	last_simulated_total_minute = _get_total_game_minutes()
@@ -177,7 +183,7 @@ func apply_household_action(plot_id: int, action_id: String) -> bool:
 	residents_changed.emit(plot_id)
 	return true
 
-func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: int, activity: String) -> bool:
+func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: int, activity: String, source: String = "player") -> bool:
 	if not HOUSEHOLD_ACTIONS.has(action_id):
 		return false
 	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
@@ -194,6 +200,9 @@ func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: 
 	state["needs"] = needs
 	cooldowns[action_id] = total_minute
 	state["action_cooldowns"] = cooldowns
+	state["last_action_label"] = str(action["label"])
+	state["last_action_source"] = source
+	state["last_action_minute"] = total_minute
 	return true
 
 func set_autonomy_enabled(plot_id: int, enabled: bool) -> bool:
@@ -231,7 +240,7 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 	elif activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
 		candidates.append("leisure")
 	for action_id in candidates:
-		if _apply_action_to_state(state, str(action_id), total_minute, activity):
+		if _apply_action_to_state(state, str(action_id), total_minute, activity, "autonomous"):
 			return
 
 func get_household_action_cooldown(plot_id: int, action_id: String) -> int:
