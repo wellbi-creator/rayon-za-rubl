@@ -352,7 +352,16 @@ func _on_plot_selected(plot_id: int) -> void:
 		var current_family := resident_service.get_family_at_plot(plot_id)
 		if not current_family.is_empty():
 			plot_description.text = "Дом заселён: здесь живёт %s." % str(current_family["title"])
-			status_label.text = "Дом заселён • жителей: %d" % int(current_family["members_count"])
+			var needs: Dictionary = current_family.get("needs", {})
+			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%" % [
+				int(current_family["members_count"]),
+				str(current_family.get("activity_label", "Дома")),
+				int(needs.get("energy", 75.0)),
+				int(needs.get("hunger", 80.0)),
+				int(needs.get("hygiene", 80.0)),
+				int(needs.get("leisure", 75.0)),
+				int(needs.get("home_comfort", 75.0))
+			]
 			build_button.text = "Дом заселён"
 		else:
 			plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
