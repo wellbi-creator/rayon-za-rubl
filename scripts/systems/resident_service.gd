@@ -95,8 +95,7 @@ func _record_relationship_milestones(state: Dictionary, first_id: String, second
 	var thresholds := [
 		{"value": 70, "direction": "up", "description": "отношения стали хорошими"},
 		{"value": 85, "direction": "up", "description": "отношения стали очень хорошими"},
-		{"value": 45, "direction": "down", "description": "отношения стали напряжёнными"},
-		{"value": 35, "direction": "down", "description": "отношения стали очень напряжёнными"}
+		{"value": 45, "direction": "down", "description": "отношения стали напряжёнными"}
 	]
 	var first_name := first_id
 	var second_name := second_id
