@@ -253,6 +253,30 @@ func _select_at(world_position: Vector2) -> void:
 			queue_redraw()
 			return
 
+func get_save_data() -> Dictionary:
+	return {
+		"plot_states": plot_states.duplicate(true),
+		"baba_home_repaired": baba_home_repaired
+	}
+
+func load_save_data(data: Dictionary) -> void:
+	var saved_plots: Variant = data.get("plot_states", [])
+	if saved_plots is Array and saved_plots.size() == PLOT_RECTS.size():
+		plot_states.clear()
+		for entry in saved_plots:
+			if entry is Dictionary:
+				var kind := str(entry.get("kind", "empty"))
+				if kind not in ["home", "empty", "building", "built"]:
+					kind = "empty"
+				plot_states.append({
+					"kind": kind,
+					"progress": clampf(float(entry.get("progress", 0.0)), 0.0, 1.0)
+				})
+			else:
+				plot_states.append({"kind": "empty", "progress": 0.0})
+	baba_home_repaired = bool(data.get("baba_home_repaired", false))
+	queue_redraw()
+
 func set_baba_home_repaired(repaired: bool) -> void:
 	baba_home_repaired = repaired
 	queue_redraw()
