@@ -80,8 +80,13 @@ func _ready() -> void:
 	_show_empty_selection()
 
 func _process(_delta: float) -> void:
-	if render_diagnostic_label != null and world != null:
-		render_diagnostic_label.text = world.get_render_diagnostic_text()
+	if render_diagnostic_label == null:
+		return
+	var frame_info := "MAIN PROCESS ACTIVE  frame=%d  ticks=%d" % [Engine.get_process_frames(), Time.get_ticks_msec()]
+	if world != null:
+		render_diagnostic_label.text = frame_info + "\n" + world.get_render_diagnostic_text()
+	else:
+		render_diagnostic_label.text = frame_info + "\nWORLD NODE IS NULL"
 
 func _create_save_timer() -> void:
 	save_timer = Timer.new()
