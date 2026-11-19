@@ -5,6 +5,7 @@ const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
 const ConstructionServiceScript = preload("res://scripts/systems/construction_service.gd")
 const MoveInServiceScript = preload("res://scripts/systems/move_in_service.gd")
+const ResidentServiceScript = preload("res://scripts/systems/resident_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -13,6 +14,9 @@ var world: DistrictWorld
 var selected_plot_id: int = -1
 var construction_service: ConstructionService
 var move_in_service: MoveInService
+var resident_service: ResidentService
+var resident_label: Label
+var resident_button: Button
 var readiness_selector: OptionButton
 var readiness_button: Button
 var readiness_label: Label
@@ -41,6 +45,9 @@ func _ready() -> void:
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
+	resident_service = ResidentServiceScript.new()
+	add_child(resident_service)
+	resident_service.residents_changed.connect(_on_residents_changed)
 	move_in_service = MoveInServiceScript.new()
 	add_child(move_in_service)
 	move_in_service.readiness_updated.connect(_on_readiness_updated)
@@ -109,7 +116,7 @@ func _create_interface() -> void:
 	panel.offset_left = -342
 	panel.offset_top = 104
 	panel.offset_right = -18
-	panel.offset_bottom = 620
+	panel.offset_bottom = 680
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
 
@@ -198,6 +205,21 @@ func _create_interface() -> void:
 	readiness_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 	content.add_child(readiness_button)
 
+	resident_label = Label.new()
+	resident_label.text = "Жители появятся после подготовки дома."
+	resident_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	resident_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+	resident_label.visible = false
+	content.add_child(resident_label)
+
+	resident_button = Button.new()
+	resident_button.text = "Заселить семью"
+	resident_button.custom_minimum_size = Vector2(0, 40)
+	resident_button.visible = false
+	resident_button.pressed.connect(_on_resident_button_pressed)
+	resident_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+	content.add_child(resident_button)
+
 	var footer := Label.new()
 	footer.text = "Глава 1  •  Возвращение жизни"
 	footer.add_theme_font_size_override("font_size", 12)
@@ -259,6 +281,8 @@ func _show_empty_selection() -> void:
 	readiness_selector.visible = false
 	readiness_note.visible = false
 	readiness_button.visible = false
+	resident_label.visible = false
+	resident_button.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
@@ -273,6 +297,8 @@ func _on_plot_selected(plot_id: int) -> void:
 	readiness_selector.visible = false
 	readiness_note.visible = false
 	readiness_button.visible = false
+	resident_label.visible = false
+	resident_button.visible = false
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
@@ -305,9 +331,15 @@ func _on_plot_selected(plot_id: int) -> void:
 	else:
 		var ready_count := move_in_service.get_completed_count(plot_id)
 		var ready := move_in_service.is_ready(plot_id)
-		plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
-		status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
-		build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
+		var current_family := resident_service.get_family_at_plot(plot_id)
+		if not current_family.is_empty():
+			plot_description.text = "Дом заселён: здесь живёт %s." % str(current_family["title"])
+			status_label.text = "Дом заселён • жителей: %d" % int(current_family["members_count"])
+			build_button.text = "Дом заселён"
+		else:
+			plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
+			status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
+			build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
 		build_button.disabled = true
 		readiness_heading.visible = true
 		readiness_label.visible = true
@@ -327,6 +359,42 @@ func _on_plot_selected(plot_id: int) -> void:
 			if bool(checklist.get(selected_req, false)):
 				readiness_button.text = "Этап уже выполнен"
 				readiness_button.disabled = true
+
+		if ready:
+			var resident_family := current_family
+			if not resident_family.is_empty():
+				resident_label.text = "%s уже живёт здесь. Жителей: %d. Настроение: %d%% • Удовлетворённость: %d%%" % [resident_family["title"], int(resident_family["members_count"]), int(resident_family["mood"]), int(resident_family["satisfaction"])]
+				resident_button.visible = false
+			else:
+				var available_families := resident_service.get_available_families()
+				if not available_families.is_empty():
+					var next_family: Dictionary = available_families[0]
+					resident_label.text = "%s ищут новый дом. Состав семьи: %d человека." % [next_family["title"], int(next_family["members_count"])]
+					resident_button.text = "Заселить: %s" % str(next_family["title"])
+					resident_button.visible = true
+					resident_button.disabled = false
+				else:
+					resident_label.text = "Все доступные семьи уже получили жильё."
+					resident_button.visible = false
+			resident_label.visible = true
+
+func _on_resident_button_pressed() -> void:
+	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
+		return
+	if not move_in_service.is_ready(selected_plot_id) or resident_service.is_plot_occupied(selected_plot_id):
+		return
+	var available_families := resident_service.get_available_families()
+	if available_families.is_empty():
+		return
+	var family_id := str(available_families[0]["id"])
+	if resident_service.move_family_in(family_id, selected_plot_id, move_in_service.is_ready(selected_plot_id)):
+		_on_plot_selected(selected_plot_id)
+		status_label.text = "Семья заселилась! В районе появились первые соседи."
+		_save_game()
+
+func _on_residents_changed(plot_id: int) -> void:
+	if selected_plot_id == plot_id:
+		_on_plot_selected(plot_id)
 
 func _on_readiness_option_selected(_index: int) -> void:
 	if selected_plot_id >= 1 and world.get_plot_kind(selected_plot_id) == "built":
@@ -428,7 +496,8 @@ func _save_game() -> void:
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
 		"construction": construction_service.get_save_data(),
-		"move_in": move_in_service.get_save_data()
+		"move_in": move_in_service.get_save_data(),
+		"residents": resident_service.get_save_data()
 	}
 	save_service.save_game(data)
 
@@ -445,6 +514,9 @@ func _load_game() -> void:
 	var move_in_data: Variant = data.get("move_in", {})
 	if move_in_data is Dictionary:
 		move_in_service.load_save_data(move_in_data)
+	var residents_data: Variant = data.get("residents", {})
+	if residents_data is Dictionary:
+		resident_service.load_save_data(residents_data)
 	var saved_at := int(data.get("saved_at", 0))
 	var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
 	var construction_data: Variant = data.get("construction", {})
