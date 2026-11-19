@@ -62,6 +62,7 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["relationship"] = int(state.get("relationship", 0))
 	profile["activity"] = str(state.get("activity", "at_home"))
 	profile["activity_label"] = str(state.get("activity_label", "Дома"))
+	profile["autonomy_enabled"] = bool(state.get("autonomy_enabled", true))
 	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	return profile
 
@@ -84,6 +85,7 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"moved_in_at": int(Time.get_unix_time_from_system()),
 		"activity": str(schedule["activity"]),
 		"activity_label": str(schedule["label"]),
+		"autonomy_enabled": true,
 		"needs": NEED_DEFAULTS.duplicate(true)
 	}
 	last_simulated_total_minute = _get_total_game_minutes()
@@ -311,6 +313,7 @@ func load_save_data(data: Dictionary) -> void:
 			var saved_profile: Variant = saved_families[family_id]
 			if FAMILY_CATALOG.has(str(family_id)) and saved_profile is Dictionary:
 				var restored: Dictionary = saved_profile.duplicate(true)
+				restored["autonomy_enabled"] = bool(restored.get("autonomy_enabled", true))
 				if not restored.has("needs") or not restored["needs"] is Dictionary:
 					restored["needs"] = NEED_DEFAULTS.duplicate(true)
 				else:
