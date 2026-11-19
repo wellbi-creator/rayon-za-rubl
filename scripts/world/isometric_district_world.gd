@@ -22,6 +22,8 @@ var selected_plot: int = -1
 var camera: Camera2D
 var resident_groups: Array = []
 var transport_entries: Array[Dictionary] = []
+var _demo_transport_entries: Array[Dictionary] = []
+var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
 var baba_home_repaired := false
 var construction_animation_time := 0.0
@@ -50,11 +52,13 @@ func _ready() -> void:
 	camera.zoom = Vector2(camera_target_zoom, camera_target_zoom)
 	add_child(camera)
 	camera.make_current()
+	_initialize_demo_traffic()
 	queue_redraw()
 
 func _process(delta: float) -> void:
 	construction_animation_time += delta
 	pedestrian_time += delta
+	_update_demo_traffic(delta)
 	_update_keyboard_camera(delta)
 	_clamp_camera_target()
 	var weight := 1.0 - exp(-camera_smoothing * delta)
@@ -62,6 +66,80 @@ func _process(delta: float) -> void:
 	var zoom_value := lerpf(camera.zoom.x, camera_target_zoom, weight)
 	camera.zoom = Vector2(zoom_value, zoom_value)
 	queue_redraw()
+
+func _initialize_demo_traffic() -> void:
+	# Temporary showcase traffic uses the existing road graph only. It does not
+	# alter resident schedules, economy, save data, or the road network.
+	var horizontal_route := get_transport_route(Vector2i(0, 3), Vector2i(8, 3))
+	var vertical_route := get_transport_route(Vector2i(4, 0), Vector2i(4, 6))
+	if horizontal_route.size() >= 2:
+		_traffic_vehicles.append({
+			"route": horizontal_route,
+			"route_index": 1,
+			"direction": 1,
+			"segment_progress": 0.0,
+			"speed": 48.0,
+			"color": Color("#c46f55")
+		})
+	if vertical_route.size() >= 2:
+		_traffic_vehicles.append({
+			"route": vertical_route,
+			"route_index": 1,
+			"direction": 1,
+			"segment_progress": 0.0,
+			"speed": 42.0,
+			"color": Color("#5b8497")
+		})
+	_update_demo_traffic(0.0)
+
+func _update_demo_traffic(delta: float) -> void:
+	_demo_transport_entries.clear()
+	for vehicle in _traffic_vehicles:
+		var route: Array = vehicle.get("route", [])
+		if route.size() < 2:
+			continue
+		var route_index := int(vehicle.get("route_index", 0))
+		var direction := int(vehicle.get("direction", 1))
+		var segment_progress := float(vehicle.get("segment_progress", 0.0))
+		var remaining_distance := maxf(0.0, float(vehicle.get("speed", 40.0)) * delta)
+		var safety_steps := 0
+		while remaining_distance > 0.0 and safety_steps < 32:
+			safety_steps += 1
+			var next_index := route_index + direction
+			if next_index < 0 or next_index >= route.size():
+				direction *= -1
+				next_index = route_index + direction
+			var from_point: Vector2 = route[route_index]
+			var to_point: Vector2 = route[next_index]
+			var segment_length := from_point.distance_to(to_point)
+			if segment_length <= 0.001:
+				route_index = next_index
+				segment_progress = 0.0
+				continue
+			var available := segment_length - segment_progress
+			if remaining_distance < available:
+				segment_progress += remaining_distance
+				remaining_distance = 0.0
+			else:
+				remaining_distance -= available
+				route_index = next_index
+				segment_progress = 0.0
+		var target_index := clampi(route_index + direction, 0, route.size() - 1)
+		var segment_start: Vector2 = route[route_index]
+		var segment_end: Vector2 = route[target_index]
+		var segment_length := segment_start.distance_to(segment_end)
+		var ratio := 0.0 if segment_length <= 0.001 else clampf(segment_progress / segment_length, 0.0, 1.0)
+		var vehicle_position := segment_start.lerp(segment_end, ratio)
+		var facing := (segment_end - segment_start).angle()
+		vehicle["route_index"] = route_index
+		vehicle["direction"] = direction
+		vehicle["segment_progress"] = segment_progress
+		_demo_transport_entries.append({
+			"position": vehicle_position,
+			"depth": vehicle_position.y + 5.0,
+			"rotation": facing,
+			"color": vehicle.get("color", Color("#587b8a"))
+		})
 
 func _draw() -> void:
 	_draw_ground()
@@ -80,7 +158,7 @@ func _draw_depth_sorted_world_objects() -> void:
 	for plot_id in PLOT_CELLS.size():
 		var plot_pos: Vector2 = Grid.grid_to_world(PLOT_CELLS[plot_id], TILE)
 		entries.append({"kind": "plot", "plot_id": plot_id, "position": plot_pos, "depth": plot_pos.y})
-	for transport in transport_entries:
+	for transport in transport_entries + _demo_transport_entries:
 		if not transport is Dictionary:
 			continue
 		var transport_position: Vector2 = transport.get("position", Vector2.ZERO)
