@@ -2,6 +2,7 @@ extends Node2D
 
 const DistrictWorldScript = preload("res://scripts/world/district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
+const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
 const BUILD_SECONDS := 600.0
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -11,6 +12,8 @@ var selected_plot_id: int = -1
 var construction_plot_id: int = -1
 var construction_elapsed: float = 0.0
 var economy: EconomyService
+var save_service: SaveService
+var save_timer: Timer
 var baba_notebook_opened: bool = false
 var baba_wiring_repaired: bool = false
 
@@ -27,13 +30,24 @@ func _ready() -> void:
 	economy = EconomyServiceScript.new()
 	add_child(economy)
 	economy.balance_changed.connect(_on_balance_changed)
+	save_service = SaveServiceScript.new()
+	add_child(save_service)
 	world = DistrictWorldScript.new()
 	add_child(world)
 	world.plot_selected.connect(_on_plot_selected)
 	_create_interface()
 	_create_timer()
+	_create_save_timer()
+	_load_game()
 	_update_balance()
 	_show_empty_selection()
+
+func _create_save_timer() -> void:
+	save_timer = Timer.new()
+	save_timer.wait_time = 5.0
+	save_timer.timeout.connect(_save_game)
+	add_child(save_timer)
+	save_timer.start()
 
 func _create_timer() -> void:
 	build_timer = Timer.new()
@@ -173,6 +187,7 @@ func _update_balance() -> void:
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
+	_save_game()
 
 func _format_money(value: int) -> String:
 	var raw := str(value)
@@ -230,6 +245,7 @@ func _on_context_action_pressed() -> void:
 	if selected_plot_id == 0:
 		if not baba_notebook_opened:
 			baba_notebook_opened = true
+			_save_game()
 			_on_plot_selected(0)
 			status_label.text = "Баба Зина доверила тебе своё первое поручение."
 			return
@@ -242,6 +258,7 @@ func _on_context_action_pressed() -> void:
 			economy.add_money(BABA_QUEST_REWARD, "Награда за помощь Бабе Зине")
 			_on_plot_selected(0)
 			status_label.text = "Проводка восстановлена! Баба Зина вручает награду: 150 000 ₽."
+			_save_game()
 			return
 		return
 	_on_build_pressed()
@@ -260,11 +277,56 @@ func _on_build_pressed() -> void:
 	build_button.disabled = true
 	build_timer.start()
 	_on_plot_selected(selected_plot_id)
+	_save_game()
+
+func _save_game() -> void:
+	if save_service == null or economy == null or world == null:
+		return
+	var data := {
+		"balance": economy.balance,
+		"baba_notebook_opened": baba_notebook_opened,
+		"baba_wiring_repaired": baba_wiring_repaired,
+		"world": world.get_save_data(),
+		"construction_plot_id": construction_plot_id,
+		"construction_elapsed": construction_elapsed
+	}
+	save_service.save_game(data)
+
+func _load_game() -> void:
+	var data := save_service.load_game()
+	if data.is_empty():
+		return
+	economy.set_balance(int(data.get("balance", 1000000)))
+	baba_notebook_opened = bool(data.get("baba_notebook_opened", false))
+	baba_wiring_repaired = bool(data.get("baba_wiring_repaired", false))
+	var world_data: Variant = data.get("world", {})
+	if world_data is Dictionary:
+		world.load_save_data(world_data)
+	var saved_plot := int(data.get("construction_plot_id", -1))
+	var saved_elapsed := float(data.get("construction_elapsed", 0.0))
+	if saved_plot >= 1 and saved_plot < world.plot_states.size() and world.get_plot_kind(saved_plot) == "building":
+		var saved_at := int(data.get("saved_at", 0))
+		var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
+		construction_plot_id = saved_plot
+		construction_elapsed = minf(BUILD_SECONDS, saved_elapsed + float(offline_seconds))
+		if construction_elapsed >= BUILD_SECONDS:
+			world.finish_plot(construction_plot_id)
+			construction_plot_id = -1
+			construction_elapsed = 0.0
+		else:
+			world.set_plot_building(construction_plot_id, construction_elapsed / BUILD_SECONDS)
+			build_timer.start()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE:
+		_save_game()
 
 func _on_build_tick() -> void:
 	construction_elapsed += 1.0
 	var progress := construction_elapsed / BUILD_SECONDS
 	world.set_plot_building(construction_plot_id, progress)
+	if int(construction_elapsed) % 5 == 0:
+		_save_game()
 	if selected_plot_id == construction_plot_id:
 		status_label.text = "Строительство: %d%%  •  Осталось %d сек." % [
 			int(progress * 100.0), int(BUILD_SECONDS - construction_elapsed)
@@ -275,3 +337,5 @@ func _on_build_tick() -> void:
 		if selected_plot_id == construction_plot_id:
 			status_label.text = "Дом готов! Следующий этап — подготовка к заселению."
 		construction_plot_id = -1
+		construction_elapsed = 0.0
+		_save_game()
