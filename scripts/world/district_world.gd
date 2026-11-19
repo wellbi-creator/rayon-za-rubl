@@ -26,6 +26,7 @@ var touch_moved: bool = false
 var traffic_time: float = 0.0
 var car_positions: Array[float] = [80.0, 880.0]
 var baba_home_repaired: bool = false
+var construction_animation_time: float = 0.0
 
 func _ready() -> void:
 	for i in PLOT_RECTS.size():
@@ -39,6 +40,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	traffic_time += delta
+	construction_animation_time += delta
 	car_positions[0] = wrapf(car_positions[0] + delta * 72.0, -150.0, 1450.0)
 	car_positions[1] = wrapf(car_positions[1] - delta * 54.0, -150.0, 1450.0)
 	queue_redraw()
@@ -135,13 +137,96 @@ func _draw_house(pos: Vector2, finished: bool, progress: float) -> void:
 		draw_rect(Rect2(pos + Vector2(101, 55), Vector2(24, 23)), Color("#f4d77b"))
 
 func _draw_construction(rect: Rect2, progress: float) -> void:
-	var base := rect.position + Vector2(25, 25)
-	draw_rect(Rect2(base, Vector2(140, 105)), Color("#b99a6d"))
-	draw_rect(Rect2(base + Vector2(8, 8), Vector2(124, 89)), Color("#d0b184"))
-	var wall_height := lerp(12.0, 64.0, clampf(progress, 0.0, 1.0))
-	draw_rect(Rect2(base + Vector2(25, 72 - wall_height), Vector2(90, wall_height)), Color("#d9c39b"))
-	draw_line(base + Vector2(12, 12), base + Vector2(130, 12), Color("#8d6246"), 5.0)
-	draw_rect(Rect2(base + Vector2(10, 96), Vector2(120, 5)), Color("#8d6246"))
+	var p := clampf(progress, 0.0, 1.0)
+	var base := rect.position + Vector2(25, 24)
+	var phase := 0
+	if p >= 0.96:
+		phase = 6
+	elif p >= 0.86:
+		phase = 5
+	elif p >= 0.72:
+		phase = 4
+	elif p >= 0.55:
+		phase = 3
+	elif p >= 0.28:
+		phase = 2
+	elif p >= 0.12:
+		phase = 1
+
+	# Site boundary, soil and a compact materials staging area.
+	draw_rect(Rect2(base - Vector2(8, 5), Vector2(156, 116)), Color("#9a805e"))
+	draw_rect(Rect2(base - Vector2(3, 1), Vector2(146, 108)), Color("#c7ad7e"))
+	draw_rect(Rect2(base + Vector2(112, 76), Vector2(28, 22)), Color("#8b6849"))
+	for i in 4:
+		draw_line(base + Vector2(114, 80 + i * 5), base + Vector2(137, 80 + i * 5), Color("#e2c18a"), 2.0)
+
+	# Survey stakes and safety tape remain visible during the early phases.
+	if phase <= 1:
+		for point in [Vector2(8, 8), Vector2(132, 8), Vector2(8, 92), Vector2(132, 92)]:
+			draw_line(base + point, base + point + Vector2(0, -15), Color("#79543a"), 3.0)
+			draw_circle(base + point + Vector2(0, -15), 3, Color("#f0d27e"))
+		draw_line(base + Vector2(8, 15), base + Vector2(132, 15), Color("#e4c66f"), 2.0)
+		draw_line(base + Vector2(8, 86), base + Vector2(132, 86), Color("#e4c66f"), 2.0)
+
+	# Foundation slab and footing trenches.
+	if phase >= 1:
+		draw_rect(Rect2(base + Vector2(17, 25), Vector2(108, 68)), Color("#777d75"))
+		draw_rect(Rect2(base + Vector2(22, 30), Vector2(98, 58)), Color("#b8b7a7"))
+		for x in range(25, 120, 18):
+			draw_line(base + Vector2(x, 31), base + Vector2(x, 87), Color("#92988d"), 1.0)
+
+	# Brick walls rise in sections; scaffolding is added as the shell grows.
+	if phase >= 2:
+		var wall_progress := clampf((p - 0.28) / 0.27, 0.0, 1.0)
+		var wall_height := lerpf(8.0, 55.0, wall_progress)
+		draw_rect(Rect2(base + Vector2(28, 82 - wall_height), Vector2(86, wall_height)), Color("#c99a70"))
+		for y in range(0, int(wall_height), 9):
+			draw_line(base + Vector2(28, 82 - float(y)), base + Vector2(114, 82 - float(y)), Color("#a9785b"), 1.0)
+		for x in [28.0, 114.0]:
+			draw_line(base + Vector2(x, 23), base + Vector2(x, 87), Color("#8b6748"), 3.0)
+			draw_line(base + Vector2(x - 7, 38), base + Vector2(x + 7, 38), Color("#8b6748"), 2.0)
+			draw_line(base + Vector2(x - 7, 62), base + Vector2(x + 7, 62), Color("#8b6748"), 2.0)
+
+	# Roof frame, then finished roof planes.
+	if phase >= 3:
+		var roof_progress := clampf((p - 0.55) / 0.17, 0.0, 1.0)
+		var roof_color := Color("#875647").lerp(Color("#70443b"), roof_progress)
+		draw_colored_polygon(PackedVector2Array([
+			base + Vector2(18, 32), base + Vector2(71, 4), base + Vector2(124, 32)
+		]), roof_color)
+		draw_line(base + Vector2(71, 5), base + Vector2(71, 31), Color("#d0a17b"), 3.0)
+		for x in [43.0, 58.0, 84.0, 99.0]:
+			draw_line(base + Vector2(x, 22), base + Vector2(x, 34), Color("#c08a68"), 2.0)
+
+	# Windows and door appear after the roof is in place.
+	if phase >= 4:
+		draw_rect(Rect2(base + Vector2(39, 49), Vector2(19, 18)), Color("#e9d7b7"))
+		draw_rect(Rect2(base + Vector2(91, 49), Vector2(19, 18)), Color("#e9d7b7"))
+		draw_rect(Rect2(base + Vector2(41, 51), Vector2(15, 14)), Color("#91b8bd"))
+		draw_rect(Rect2(base + Vector2(93, 51), Vector2(15, 14)), Color("#91b8bd"))
+		draw_rect(Rect2(base + Vector2(66, 62), Vector2(13, 27)), Color("#76513d"))
+		draw_rect(Rect2(base + Vector2(66, 62), Vector2(13, 27)), Color("#76513d"), false, 2.0)
+
+	# Utility work: cable, water pipe and a small service trench.
+	if phase >= 5:
+		draw_line(base + Vector2(12, 99), base + Vector2(139, 99), Color("#477b9a"), 4.0)
+		draw_line(base + Vector2(12, 104), base + Vector2(139, 104), Color("#c5a34f"), 3.0)
+		draw_circle(base + Vector2(20, 99), 4, Color("#d5e1d9"))
+		draw_circle(base + Vector2(130, 104), 4, Color("#e6d39a"))
+
+	# Final facade, yard path and warm illuminated windows.
+	if phase >= 6:
+		draw_rect(Rect2(base + Vector2(39, 49), Vector2(19, 18)), Color("#f3d47b"))
+		draw_rect(Rect2(base + Vector2(91, 49), Vector2(19, 18)), Color("#f3d47b"))
+		draw_rect(Rect2(base + Vector2(8, 91), Vector2(128, 13)), Color("#83a16e"))
+		draw_rect(Rect2(base + Vector2(69, 89), Vector2(9, 15)), Color("#d4c09b"))
+		_draw_bush(base + Vector2(20, 93))
+		_draw_bush(base + Vector2(125, 93))
+
+	# A gently pulsing site beacon makes active construction feel alive.
+	var pulse := 0.5 + 0.5 * sin(construction_animation_time * 3.2)
+	draw_circle(base + Vector2(143, 4), 5.0 + pulse * 2.0, Color("#f4d47a", 0.18 + pulse * 0.18))
+	draw_circle(base + Vector2(143, 4), 3.0, Color("#f4d47a"))
 
 func _draw_tree(pos: Vector2) -> void:
 	draw_ellipse(pos + Vector2(3, 17), Vector2(22, 8), Color("#526d4e", 0.45))
