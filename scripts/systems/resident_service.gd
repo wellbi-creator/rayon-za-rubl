@@ -12,6 +12,17 @@ const DAILY_SCHEDULE := [
 	{"start_minute": 1200, "end_minute": 1320, "activity": "at_home", "label": "Дома, отдыхают"},
 	{"start_minute": 1320, "end_minute": 1440, "activity": "sleeping", "label": "Спят"}
 ]
+const MEMBER_SCHEDULES := {
+	"child_one": [
+		{"start_minute": 0, "end_minute": 420, "activity": "sleeping", "label": "Спит"},
+		{"start_minute": 420, "end_minute": 480, "activity": "at_home", "label": "Дома, собирается"},
+		{"start_minute": 480, "end_minute": 840, "activity": "at_school", "label": "На занятиях"},
+		{"start_minute": 840, "end_minute": 1020, "activity": "at_home", "label": "Дома"},
+		{"start_minute": 1020, "end_minute": 1200, "activity": "walking", "label": "Гуляет"},
+		{"start_minute": 1200, "end_minute": 1320, "activity": "at_home", "label": "Дома, отдыхает"},
+		{"start_minute": 1320, "end_minute": 1440, "activity": "sleeping", "label": "Спит"}
+	]
+}
 const FAMILY_CATALOG := {
 	"first_neighbors": {
 		"id": "first_neighbors",
@@ -64,7 +75,9 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"autonomy_enabled": true,
 			"action_cooldowns": {},
 			"last_action_label": "Пока действий не было",
-			"last_action_minute": -1
+			"last_action_minute": -1,
+			"activity": str(_get_member_schedule_entry(str(template.get("id", "")), current_minute_of_day)["activity"]),
+			"activity_label": str(_get_member_schedule_entry(str(template.get("id", "")), current_minute_of_day)["label"])
 		})
 	return result
 
@@ -90,6 +103,9 @@ func _normalize_member_states(state: Dictionary) -> void:
 		member["action_cooldowns"] = member.get("action_cooldowns", {}).duplicate(true)
 		member["last_action_label"] = str(member.get("last_action_label", "Пока действий не было"))
 		member["last_action_minute"] = int(member.get("last_action_minute", -1))
+		var member_schedule := _get_member_schedule_entry(str(member.get("id", "")), current_minute_of_day)
+		member["activity"] = str(member.get("activity", member_schedule["activity"]))
+		member["activity_label"] = str(member.get("activity_label", member_schedule["label"]))
 	state["members"] = members
 
 
@@ -135,7 +151,9 @@ func _get_member_display_data(state: Dictionary) -> Array:
 			"satisfaction": int(member.get("satisfaction", 75)),
 			"autonomy_enabled": bool(member.get("autonomy_enabled", true)),
 			"last_action_label": str(member.get("last_action_label", "Пока действий не было")),
-			"last_action_minute": int(member.get("last_action_minute", -1))
+			"last_action_minute": int(member.get("last_action_minute", -1)),
+			"activity": str(member.get("activity", "at_home")),
+			"activity_label": str(member.get("activity_label", "Дома"))
 		})
 	return result
 
@@ -229,8 +247,6 @@ func _get_total_game_minutes() -> int:
 
 func _simulate_needs_minute(total_minute: int) -> void:
 	var minute_of_day := posmod(total_minute, 1440)
-	var schedule := _get_schedule_entry(minute_of_day)
-	var sleeping := str(schedule["activity"]) == "sleeping"
 	for family_id in moved_families:
 		var state: Dictionary = moved_families[family_id]
 		var members: Array = state.get("members", [])
@@ -238,6 +254,11 @@ func _simulate_needs_minute(total_minute: int) -> void:
 			if not member_value is Dictionary:
 				continue
 			var member: Dictionary = member_value
+			var schedule := _get_member_schedule_entry(str(member.get("id", "")), minute_of_day)
+			var member_activity := str(schedule["activity"])
+			member["activity"] = member_activity
+			member["activity_label"] = str(schedule["label"])
+			var sleeping := member_activity == "sleeping"
 			var needs: Dictionary = member.get("needs", NEED_DEFAULTS).duplicate(true)
 			var rates: Dictionary = member.get("need_rates", {})
 			needs["hunger"] = clampf(float(needs.get("hunger", 80.0)) - 0.10 * float(rates.get("hunger", 1.0)), 0.0, 100.0)
@@ -249,8 +270,8 @@ func _simulate_needs_minute(total_minute: int) -> void:
 				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			member["needs"] = needs
 		state["members"] = members
-		var activity := str(schedule["activity"])
-		_run_autonomous_action(state, total_minute, activity)
+		state["members"] = members
+		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
 		if minute_of_day % 60 == 0:
 			members = state.get("members", [])
 			for member_value in members:
@@ -357,8 +378,9 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 		if not bool(member.get("autonomy_enabled", true)):
 			continue
 		var needs: Dictionary = member.get("needs", NEED_DEFAULTS)
+		var member_activity := str(member.get("activity", activity))
 		var candidates: Array = []
-		if activity == "at_home":
+		if member_activity == "at_home":
 			if float(needs.get("hunger", 100.0)) < 55.0:
 				candidates.append("meal")
 			if float(needs.get("hygiene", 100.0)) < 45.0:
@@ -367,10 +389,10 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 				candidates.append("rest")
 			if float(needs.get("leisure", 100.0)) < 45.0:
 				candidates.append("leisure")
-		elif activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
+		elif member_activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
 			candidates.append("leisure")
 		for action_id in candidates:
-			if _apply_action_to_member(member, str(action_id), total_minute, activity):
+			if _apply_action_to_member(member, str(action_id), total_minute, member_activity):
 				state["last_action_label"] = "%s: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])]
 				state["last_action_source"] = "autonomous"
 				state["last_action_minute"] = total_minute
@@ -433,16 +455,36 @@ func get_household_action_label(action_id: String) -> String:
 	return str(HOUSEHOLD_ACTIONS[action_id]["label"])
 
 func _update_activities() -> void:
-	var schedule := _get_schedule_entry(current_minute_of_day)
+	var family_schedule := _get_schedule_entry(current_minute_of_day)
 	for family_id in moved_families:
 		var state: Dictionary = moved_families[family_id]
-		var next_activity := str(schedule["activity"])
-		if str(state.get("activity", "")) == next_activity:
-			continue
-		state["activity"] = next_activity
-		state["activity_label"] = str(schedule["label"])
-		state["last_schedule_day"] = current_day
-		residents_changed.emit(int(state.get("plot_id", -1)))
+		var changed := false
+		var next_activity := str(family_schedule["activity"])
+		if str(state.get("activity", "")) != next_activity:
+			state["activity"] = next_activity
+			state["activity_label"] = str(family_schedule["label"])
+			state["last_schedule_day"] = current_day
+			changed = true
+		var members: Array = state.get("members", [])
+		for member_value in members:
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			var member_schedule := _get_member_schedule_entry(str(member.get("id", "")), current_minute_of_day)
+			if str(member.get("activity", "")) != str(member_schedule["activity"]):
+				member["activity"] = str(member_schedule["activity"])
+				member["activity_label"] = str(member_schedule["label"])
+				changed = true
+		state["members"] = members
+		if changed:
+			residents_changed.emit(int(state.get("plot_id", -1)))
+
+func _get_member_schedule_entry(member_id: String, minute_of_day: int) -> Dictionary:
+	var schedule: Array = MEMBER_SCHEDULES.get(member_id, DAILY_SCHEDULE)
+	for entry in schedule:
+		if minute_of_day >= int(entry["start_minute"]) and minute_of_day < int(entry["end_minute"]):
+			return entry
+	return schedule[0]
 
 func _get_schedule_entry(minute_of_day: int) -> Dictionary:
 	for entry in DAILY_SCHEDULE:
