@@ -46,6 +46,7 @@ var build_button: Button
 var status_label: Label
 var control_root: Control
 var hint_label: Label
+var render_diagnostic_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -78,6 +79,10 @@ func _ready() -> void:
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
 
+func _process(_delta: float) -> void:
+	if render_diagnostic_label != null and world != null:
+		render_diagnostic_label.text = world.get_render_diagnostic_text()
+
 func _create_save_timer() -> void:
 	save_timer = Timer.new()
 	save_timer.wait_time = 5.0
@@ -94,6 +99,18 @@ func _create_interface() -> void:
 	layer.add_child(root)
 	control_root = root
 	root.resized.connect(_on_interface_resized)
+
+	# Temporary on-screen diagnostics for the blank-world report on mobile Web.
+	render_diagnostic_label = Label.new()
+	render_diagnostic_label.position = Vector2(18, -42)
+	render_diagnostic_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	render_diagnostic_label.custom_minimum_size = Vector2(620, 30)
+	render_diagnostic_label.add_theme_font_size_override("font_size", 12)
+	render_diagnostic_label.add_theme_color_override("font_color", Color("#fff1a8"))
+	render_diagnostic_label.add_theme_color_override("font_outline_color", Color("#17251f"))
+	render_diagnostic_label.add_theme_constant_override("outline_size", 4)
+	render_diagnostic_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(render_diagnostic_label)
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
