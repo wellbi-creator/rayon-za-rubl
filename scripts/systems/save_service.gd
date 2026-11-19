@@ -36,7 +36,9 @@ func load_game() -> Dictionary:
 	var game: Variant = parsed.get("game", {})
 	if not game is Dictionary:
 		return {}
-	return game
+	var restored: Dictionary = game.duplicate(true)
+	restored["saved_at"] = int(parsed.get("saved_at", 0))
+	return restored
 
 func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
