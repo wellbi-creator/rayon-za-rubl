@@ -127,8 +127,8 @@ func _update_demo_traffic(delta: float) -> void:
 		var target_index := clampi(route_index + direction, 0, route.size() - 1)
 		var segment_start: Vector2 = route[route_index]
 		var segment_end: Vector2 = route[target_index]
-		var segment_length := segment_start.distance_to(segment_end)
-		var ratio := 0.0 if segment_length <= 0.001 else clampf(segment_progress / segment_length, 0.0, 1.0)
+		var current_segment_length := segment_start.distance_to(segment_end)
+		var ratio := 0.0 if current_segment_length <= 0.001 else clampf(segment_progress / current_segment_length, 0.0, 1.0)
 		var vehicle_position := segment_start.lerp(segment_end, ratio)
 		var facing := (segment_end - segment_start).angle()
 		vehicle["route_index"] = route_index
