@@ -25,6 +25,7 @@ var touch_start_position: Vector2 = Vector2.ZERO
 var touch_moved: bool = false
 var traffic_time: float = 0.0
 var car_positions: Array[float] = [80.0, 880.0]
+var baba_home_repaired: bool = false
 
 func _ready() -> void:
 	for i in PLOT_RECTS.size():
@@ -93,6 +94,8 @@ func _draw_plot(plot_id: int) -> void:
 
 	if state["kind"] == "home":
 		_draw_house(rect.position + Vector2(27, 16), false, 0.0)
+		if plot_id == 0 and baba_home_repaired:
+			_draw_repaired_home_lights(rect.position + Vector2(27, 16))
 	elif state["kind"] == "building":
 		_draw_construction(rect, float(state["progress"]))
 	elif state["kind"] == "built":
@@ -249,6 +252,19 @@ func _select_at(world_position: Vector2) -> void:
 			plot_selected.emit(i)
 			queue_redraw()
 			return
+
+func set_baba_home_repaired(repaired: bool) -> void:
+	baba_home_repaired = repaired
+	queue_redraw()
+
+func _draw_repaired_home_lights(pos: Vector2) -> void:
+	# A small visual reward: the repaired home now glows warmly from within.
+	draw_circle(pos + Vector2(48, 66), 17, Color("#f5d77c", 0.12))
+	draw_circle(pos + Vector2(113, 66), 17, Color("#f5d77c", 0.12))
+	draw_rect(Rect2(pos + Vector2(36, 55), Vector2(24, 23)), Color("#f6d77e"))
+	draw_rect(Rect2(pos + Vector2(101, 55), Vector2(24, 23)), Color("#f6d77e"))
+	draw_line(pos + Vector2(48, 55), pos + Vector2(48, 78), Color("#8d7650"), 2.0)
+	draw_line(pos + Vector2(113, 55), pos + Vector2(113, 78), Color("#8d7650"), 2.0)
 
 func set_plot_building(plot_id: int, progress: float) -> void:
 	if plot_id < 0 or plot_id >= plot_states.size():
