@@ -401,7 +401,22 @@ func _on_plot_selected(plot_id: int) -> void:
 			var last_action := str(current_family.get("last_action_label", "Пока действий не было"))
 			var action_source := str(current_family.get("last_action_source", ""))
 			var action_source_label := "Автономия" if action_source == "autonomous" else ("Игрок" if action_source == "player" else "История")
-			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s" % [
+			var member_lines := PackedStringArray()
+			for member_value in current_family.get("members", []):
+				if not member_value is Dictionary:
+					continue
+				var member: Dictionary = member_value
+				var member_needs: Dictionary = member.get("needs", {})
+				member_lines.append("%s — Энергия %d%% • Еда %d%% • Гигиена %d%% • Досуг %d%% • Настроение %d%%" % [
+					str(member.get("name", "Житель")),
+					int(member_needs.get("energy", 75.0)),
+					int(member_needs.get("hunger", 80.0)),
+					int(member_needs.get("hygiene", 80.0)),
+					int(member_needs.get("leisure", 75.0)),
+					int(member.get("mood", 75))
+				])
+			var member_summary := "\n".join(member_lines)
+			status_label.text = "Жителей: %d • %s\nСреднее по семье — Энергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s\n\nПо каждому жителю:\n%s" % [
 				int(current_family["members_count"]),
 				str(current_family.get("activity_label", "Дома")),
 				int(needs.get("energy", 75.0)),
@@ -412,7 +427,8 @@ func _on_plot_selected(plot_id: int) -> void:
 				int(current_family.get("mood", 75)),
 				int(current_family.get("satisfaction", 75)),
 				action_source_label,
-				last_action
+				last_action,
+				member_summary
 			]
 			build_button.text = "Дом заселён"
 		else:

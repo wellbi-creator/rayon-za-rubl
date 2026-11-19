@@ -23,6 +23,13 @@ const FAMILY_CATALOG := {
 	}
 }
 const NEED_DEFAULTS := {"energy": 75.0, "hunger": 80.0, "hygiene": 80.0, "leisure": 75.0, "home_comfort": 75.0}
+const MEMBER_TEMPLATES := {
+	"first_neighbors": [
+		{"id": "adult_one", "name": "Взрослый 1", "role": "Взрослый", "need_rates": {"energy": 1.0, "hunger": 1.0, "hygiene": 1.0, "leisure": 1.0}},
+		{"id": "adult_two", "name": "Взрослый 2", "role": "Взрослый", "need_rates": {"energy": 0.9, "hunger": 1.05, "hygiene": 0.95, "leisure": 1.1}},
+		{"id": "child_one", "name": "Ребёнок", "role": "Ребёнок", "need_rates": {"energy": 1.15, "hunger": 1.2, "hygiene": 1.0, "leisure": 1.25}}
+	]
+}
 const MAX_SIMULATION_MINUTES := 10080
 
 const HOUSEHOLD_ACTIONS := {
@@ -37,6 +44,89 @@ var moved_families: Dictionary = {}
 var current_minute_of_day: int = 480
 var current_day: int = 1
 var last_simulated_total_minute: int = -1
+
+
+func _create_member_states(family_id: String, starting_needs: Dictionary) -> Array:
+	var result: Array = []
+	var templates: Array = MEMBER_TEMPLATES.get(family_id, [])
+	for template_value in templates:
+		if not template_value is Dictionary:
+			continue
+		var template: Dictionary = template_value
+		result.append({
+			"id": str(template.get("id", "resident_%d" % result.size())),
+			"name": str(template.get("name", "Житель")),
+			"role": str(template.get("role", "Житель")),
+			"need_rates": template.get("need_rates", {}).duplicate(true),
+			"needs": starting_needs.duplicate(true),
+			"mood": 75,
+			"satisfaction": 75
+		})
+	return result
+
+
+func _normalize_member_states(state: Dictionary) -> void:
+	var members: Array = state.get("members", [])
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if not member.get("needs", {}) is Dictionary:
+			member["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
+		else:
+			var member_needs: Dictionary = member["needs"]
+			for key in NEED_DEFAULTS:
+				if not member_needs.has(key):
+					member_needs[key] = NEED_DEFAULTS[key]
+			member["needs"] = member_needs
+		member["mood"] = clampi(int(member.get("mood", state.get("mood", 75))), 0, 100)
+		member["satisfaction"] = clampi(int(member.get("satisfaction", state.get("satisfaction", 75))), 0, 100)
+		member["need_rates"] = member.get("need_rates", {}).duplicate(true)
+	state["members"] = members
+
+
+func _refresh_family_aggregates(state: Dictionary) -> void:
+	var members: Array = state.get("members", [])
+	if members.is_empty():
+		return
+	var totals := {"energy": 0.0, "hunger": 0.0, "hygiene": 0.0, "leisure": 0.0, "home_comfort": 0.0}
+	var mood_total := 0
+	var satisfaction_total := 0
+	var count := 0
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		var needs: Dictionary = member.get("needs", NEED_DEFAULTS)
+		for key in totals:
+			totals[key] = float(totals[key]) + float(needs.get(key, NEED_DEFAULTS[key]))
+		mood_total += int(member.get("mood", 75))
+		satisfaction_total += int(member.get("satisfaction", 75))
+		count += 1
+	if count == 0:
+		return
+	for key in totals:
+		totals[key] = float(totals[key]) / count
+	state["needs"] = totals
+	state["mood"] = roundi(float(mood_total) / count)
+	state["satisfaction"] = roundi(float(satisfaction_total) / count)
+
+
+func _get_member_display_data(state: Dictionary) -> Array:
+	var result: Array = []
+	for member_value in state.get("members", []):
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		result.append({
+			"id": str(member.get("id", "")),
+			"name": str(member.get("name", "Житель")),
+			"role": str(member.get("role", "Житель")),
+			"needs": member.get("needs", NEED_DEFAULTS).duplicate(true),
+			"mood": int(member.get("mood", 75)),
+			"satisfaction": int(member.get("satisfaction", 75))
+		})
+	return result
 
 func get_family_catalog() -> Array:
 	var result: Array = []
@@ -67,6 +157,7 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["last_action_source"] = str(state.get("last_action_source", ""))
 	profile["last_action_minute"] = int(state.get("last_action_minute", -1))
 	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
+	profile["members"] = _get_member_display_data(state)
 	return profile
 
 func is_plot_occupied(plot_id: int) -> bool:
@@ -92,7 +183,8 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"last_action_label": "Пока действий не было",
 		"last_action_source": "",
 		"last_action_minute": -1,
-		"needs": NEED_DEFAULTS.duplicate(true)
+		"needs": NEED_DEFAULTS.duplicate(true),
+		"members": _create_member_states(family_id, NEED_DEFAULTS)
 	}
 	last_simulated_total_minute = _get_total_game_minutes()
 	residents_changed.emit(plot_id)
@@ -130,19 +222,28 @@ func _simulate_needs_minute(total_minute: int) -> void:
 	var sleeping := str(schedule["activity"]) == "sleeping"
 	for family_id in moved_families:
 		var state: Dictionary = moved_families[family_id]
-		var needs: Dictionary = state.get("needs", NEED_DEFAULTS).duplicate(true)
-		needs["hunger"] = clampf(float(needs.get("hunger", 80.0)) - 0.10, 0.0, 100.0)
-		needs["hygiene"] = clampf(float(needs.get("hygiene", 80.0)) - 0.045, 0.0, 100.0)
-		needs["leisure"] = clampf(float(needs.get("leisure", 75.0)) - 0.035, 0.0, 100.0)
-		if sleeping:
-			needs["energy"] = clampf(float(needs.get("energy", 75.0)) + 0.35, 0.0, 100.0)
-		else:
-			needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055, 0.0, 100.0)
-		state["needs"] = needs
+		var members: Array = state.get("members", [])
+		for member_value in members:
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			var needs: Dictionary = member.get("needs", NEED_DEFAULTS).duplicate(true)
+			var rates: Dictionary = member.get("need_rates", {})
+			needs["hunger"] = clampf(float(needs.get("hunger", 80.0)) - 0.10 * float(rates.get("hunger", 1.0)), 0.0, 100.0)
+			needs["hygiene"] = clampf(float(needs.get("hygiene", 80.0)) - 0.045 * float(rates.get("hygiene", 1.0)), 0.0, 100.0)
+			needs["leisure"] = clampf(float(needs.get("leisure", 75.0)) - 0.035 * float(rates.get("leisure", 1.0)), 0.0, 100.0)
+			if sleeping:
+				needs["energy"] = clampf(float(needs.get("energy", 75.0)) + 0.35 * float(rates.get("energy", 1.0)), 0.0, 100.0)
+			else:
+				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
+			member["needs"] = needs
+			_update_mood_and_satisfaction(member, needs)
+		state["members"] = members
+		_refresh_family_aggregates(state)
 		var activity := str(schedule["activity"])
 		_run_autonomous_action(state, total_minute, activity)
 		if minute_of_day % 60 == 0:
-			var updated_needs: Dictionary = state.get("needs", needs)
+			var updated_needs: Dictionary = state.get("needs", NEED_DEFAULTS)
 			_update_mood_and_satisfaction(state, updated_needs)
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
@@ -194,10 +295,17 @@ func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: 
 	var last_used := int(cooldowns.get(action_id, -1000000))
 	if total_minute - last_used < int(action["cooldown"]):
 		return false
-	var needs: Dictionary = state.get("needs", NEED_DEFAULTS).duplicate(true)
+	var members: Array = state.get("members", [])
 	var need_key := str(action["need"])
-	needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
-	state["needs"] = needs
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		var needs: Dictionary = member.get("needs", NEED_DEFAULTS).duplicate(true)
+		needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
+		member["needs"] = needs
+	state["members"] = members
+	_refresh_family_aggregates(state)
 	cooldowns[action_id] = total_minute
 	state["action_cooldowns"] = cooldowns
 	state["last_action_label"] = str(action["label"])
@@ -331,5 +439,10 @@ func load_save_data(data: Dictionary) -> void:
 					for need_key in NEED_DEFAULTS:
 						if not restored["needs"].has(need_key):
 							restored["needs"][need_key] = NEED_DEFAULTS[need_key]
+				if not restored.has("members") or not restored["members"] is Array or restored["members"].is_empty():
+					restored["members"] = _create_member_states(str(family_id), restored["needs"])
+				else:
+					_normalize_member_states(restored)
+				_refresh_family_aggregates(restored)
 				moved_families[str(family_id)] = restored
 	last_simulated_total_minute = int(data.get("last_simulated_total_minute", -1))
