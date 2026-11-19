@@ -409,6 +409,8 @@ func _simulate_needs_minute(total_minute: int) -> void:
 			member["needs"] = needs
 		state["members"] = members
 		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
+		if posmod(total_minute, 60) == 0:
+			_run_autonomous_social_interaction(state, total_minute)
 		if minute_of_day % 60 == 0:
 			_update_relationships(state)
 			members = state.get("members", [])
@@ -606,6 +608,55 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 				break
 	state["members"] = members
 	_refresh_family_aggregates(state)
+
+
+func _run_autonomous_social_interaction(state: Dictionary, total_minute: int) -> void:
+	if not bool(state.get("autonomy_enabled", true)):
+		return
+	var members: Array = state.get("members", [])
+	if members.size() < 2:
+		return
+	var start_index := posmod(int(total_minute / 60), members.size())
+	for offset in range(members.size()):
+		var candidate_value: Variant = members[posmod(start_index + offset, members.size())]
+		if not candidate_value is Dictionary:
+			continue
+		var speaker: Dictionary = candidate_value
+		var speaker_id := str(speaker.get("id", ""))
+		if not bool(speaker.get("autonomy_enabled", true)):
+			continue
+		if total_minute < int(speaker.get("social_cooldown_until", -1)):
+			continue
+		if str(speaker.get("activity", "")) not in ["at_home", "walking"]:
+			continue
+		var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+		var participants := 0
+		for other_value in members:
+			if not other_value is Dictionary:
+				continue
+			var other: Dictionary = other_value
+			var other_id := str(other.get("id", ""))
+			if other_id == speaker_id or str(other.get("activity", "")) not in ["at_home", "walking"]:
+				continue
+			var key := _relationship_key(speaker_id, other_id)
+			relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)) + 1, 0, 100)
+			other["mood"] = clampi(int(other.get("mood", 75)) + 1, 0, 100)
+			other["satisfaction"] = clampi(int(other.get("satisfaction", 75)) + 1, 0, 100)
+			participants += 1
+		if participants == 0:
+			continue
+		speaker["mood"] = clampi(int(speaker.get("mood", 75)) + 1, 0, 100)
+		speaker["satisfaction"] = clampi(int(speaker.get("satisfaction", 75)) + 1, 0, 100)
+		speaker["social_cooldown_until"] = total_minute + 120
+		speaker["last_action_label"] = "Самостоятельно поговорил(а) с семьёй"
+		speaker["last_action_minute"] = total_minute
+		state["relationships"] = relationships
+		state["members"] = members
+		state["last_action_label"] = "%s: разговор с семьёй" % str(speaker.get("name", "Житель"))
+		state["last_action_source"] = "autonomous"
+		state["last_action_minute"] = total_minute
+		_refresh_family_aggregates(state)
+		return
 
 
 func _apply_action_to_member(member: Dictionary, action_id: String, total_minute: int, activity: String) -> bool:
