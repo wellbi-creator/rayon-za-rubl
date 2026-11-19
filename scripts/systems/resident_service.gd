@@ -4,7 +4,6 @@ class_name ResidentService
 signal residents_changed(plot_id: int)
 signal family_moved_in(plot_id: int, family_id: String)
 
-# Daily routine is deliberately data-driven so later families can have individual schedules.
 const DAILY_SCHEDULE := [
 	{"start_minute": 0, "end_minute": 360, "activity": "sleeping", "label": "Спят"},
 	{"start_minute": 360, "end_minute": 480, "activity": "at_home", "label": "Дома, собираются"},
@@ -13,7 +12,6 @@ const DAILY_SCHEDULE := [
 	{"start_minute": 1200, "end_minute": 1320, "activity": "at_home", "label": "Дома, отдыхают"},
 	{"start_minute": 1320, "end_minute": 1440, "activity": "sleeping", "label": "Спят"}
 ]
-
 const FAMILY_CATALOG := {
 	"first_neighbors": {
 		"id": "first_neighbors",
@@ -24,11 +22,14 @@ const FAMILY_CATALOG := {
 		"initial_satisfaction": 75
 	}
 }
+const NEED_DEFAULTS := {"energy": 75.0, "hunger": 80.0, "hygiene": 80.0, "leisure": 75.0, "home_comfort": 75.0}
+const MAX_SIMULATION_MINUTES := 10080
 
 var occupied_homes: Dictionary = {}
 var moved_families: Dictionary = {}
 var current_minute_of_day: int = 480
 var current_day: int = 1
+var last_simulated_total_minute: int = -1
 
 func get_family_catalog() -> Array:
 	var result: Array = []
@@ -54,6 +55,7 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["relationship"] = int(state.get("relationship", 0))
 	profile["activity"] = str(state.get("activity", "at_home"))
 	profile["activity_label"] = str(state.get("activity_label", "Дома"))
+	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	return profile
 
 func is_plot_occupied(plot_id: int) -> bool:
@@ -74,8 +76,10 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"relationship": 0,
 		"moved_in_at": int(Time.get_unix_time_from_system()),
 		"activity": str(schedule["activity"]),
-		"activity_label": str(schedule["label"])
+		"activity_label": str(schedule["label"]),
+		"needs": NEED_DEFAULTS.duplicate(true)
 	}
+	last_simulated_total_minute = _get_total_game_minutes()
 	residents_changed.emit(plot_id)
 	family_moved_in.emit(plot_id, family_id)
 	return true
@@ -83,6 +87,68 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 func update_time(hour: int, minute: int, day: int) -> void:
 	current_minute_of_day = posmod(hour * 60 + minute, 1440)
 	current_day = maxi(1, day)
+	var total_minutes := _get_total_game_minutes()
+	if last_simulated_total_minute < 0:
+		last_simulated_total_minute = total_minutes
+		_update_activities()
+		return
+	var elapsed := maxi(0, total_minutes - last_simulated_total_minute)
+	var simulated := mini(elapsed, MAX_SIMULATION_MINUTES)
+	if elapsed > MAX_SIMULATION_MINUTES:
+		last_simulated_total_minute = total_minutes - MAX_SIMULATION_MINUTES
+	for _minute in simulated:
+		last_simulated_total_minute += 1
+		_simulate_needs_minute(last_simulated_total_minute)
+	last_simulated_total_minute = total_minutes
+	_update_activities()
+	if simulated > 0:
+		for family_id in moved_families:
+			var state: Dictionary = moved_families[family_id]
+			residents_changed.emit(int(state.get("plot_id", -1)))
+
+func _get_total_game_minutes() -> int:
+	return current_day * 1440 + current_minute_of_day
+
+func _simulate_needs_minute(total_minute: int) -> void:
+	var minute_of_day := posmod(total_minute, 1440)
+	var schedule := _get_schedule_entry(minute_of_day)
+	var sleeping := str(schedule["activity"]) == "sleeping"
+	for family_id in moved_families:
+		var state: Dictionary = moved_families[family_id]
+		var needs: Dictionary = state.get("needs", NEED_DEFAULTS).duplicate(true)
+		needs["hunger"] = clampf(float(needs.get("hunger", 80.0)) - 0.10, 0.0, 100.0)
+		needs["hygiene"] = clampf(float(needs.get("hygiene", 80.0)) - 0.045, 0.0, 100.0)
+		needs["leisure"] = clampf(float(needs.get("leisure", 75.0)) - 0.035, 0.0, 100.0)
+		if sleeping:
+			needs["energy"] = clampf(float(needs.get("energy", 75.0)) + 0.35, 0.0, 100.0)
+		else:
+			needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055, 0.0, 100.0)
+		state["needs"] = needs
+		if minute_of_day % 60 == 0:
+			_update_mood_and_satisfaction(state, needs)
+
+func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
+	var critical_count := 0
+	var total := 0.0
+	for key in ["energy", "hunger", "hygiene", "leisure", "home_comfort"]:
+		var value := float(needs.get(key, 75.0))
+		total += value
+		if value < 30.0:
+			critical_count += 1
+	var mood := int(state.get("mood", 75))
+	if critical_count > 0:
+		mood -= mini(2, critical_count)
+	elif total / 5.0 >= 65.0:
+		mood += 1
+	state["mood"] = clampi(mood, 0, 100)
+	var satisfaction := int(state.get("satisfaction", 75))
+	if float(needs.get("home_comfort", 75.0)) < 35.0:
+		satisfaction -= 1
+	elif total / 5.0 >= 70.0:
+		satisfaction += 1
+	state["satisfaction"] = clampi(satisfaction, 0, 100)
+
+func _update_activities() -> void:
 	var schedule := _get_schedule_entry(current_minute_of_day)
 	for family_id in moved_families:
 		var state: Dictionary = moved_families[family_id]
@@ -130,7 +196,8 @@ func get_total_resident_count() -> int:
 func get_save_data() -> Dictionary:
 	return {
 		"occupied_homes": occupied_homes.duplicate(true),
-		"moved_families": moved_families.duplicate(true)
+		"moved_families": moved_families.duplicate(true),
+		"last_simulated_total_minute": last_simulated_total_minute
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -147,4 +214,12 @@ func load_save_data(data: Dictionary) -> void:
 		for family_id in saved_families:
 			var saved_profile: Variant = saved_families[family_id]
 			if FAMILY_CATALOG.has(str(family_id)) and saved_profile is Dictionary:
-				moved_families[str(family_id)] = saved_profile.duplicate(true)
+				var restored: Dictionary = saved_profile.duplicate(true)
+				if not restored.has("needs") or not restored["needs"] is Dictionary:
+					restored["needs"] = NEED_DEFAULTS.duplicate(true)
+				else:
+					for need_key in NEED_DEFAULTS:
+						if not restored["needs"].has(need_key):
+							restored["needs"][need_key] = NEED_DEFAULTS[need_key]
+				moved_families[str(family_id)] = restored
+	last_simulated_total_minute = int(data.get("last_simulated_total_minute", -1))
