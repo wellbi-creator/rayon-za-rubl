@@ -101,9 +101,18 @@ func _draw_residents() -> void:
 		var plot_id := int(group.get("plot_id", -1))
 		if plot_id < 1 or plot_id >= PLOT_RECTS.size():
 			continue
+		var activity := str(group.get("activity", "at_home"))
+		# Sleeping and work hours intentionally keep residents off the visible street.
+		if activity == "sleeping" or activity == "at_work":
+			continue
 		var members := clampi(int(group.get("members_count", 0)), 0, 8)
 		var home_x := PLOT_RECTS[plot_id].position.x + 108.0
 		var home_y := PLOT_RECTS[plot_id].position.y + 106.0
+		if activity == "at_home":
+			for member_index in members:
+				var home_position := Vector2(home_x + float(member_index - 1) * 12.0, home_y + 14.0)
+				_draw_pedestrian(home_position, member_index)
+			continue
 		var sidewalk_y := 325.0 if plot_id < 4 else 430.0
 		var route := PackedVector2Array([
 			Vector2(home_x, home_y),
