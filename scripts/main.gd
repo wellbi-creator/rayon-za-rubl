@@ -318,6 +318,8 @@ func _update_balance() -> void:
 func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if game_time_label != null:
 		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
+	if world != null:
+		world.set_time_of_day(hour, minute)
 	if resident_service != null:
 		resident_service.update_time(hour, minute, day)
 
