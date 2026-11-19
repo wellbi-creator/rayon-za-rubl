@@ -270,7 +270,6 @@ func _simulate_needs_minute(total_minute: int) -> void:
 				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			member["needs"] = needs
 		state["members"] = members
-		state["members"] = members
 		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
 		if minute_of_day % 60 == 0:
 			members = state.get("members", [])
