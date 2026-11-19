@@ -25,6 +25,13 @@ const FAMILY_CATALOG := {
 const NEED_DEFAULTS := {"energy": 75.0, "hunger": 80.0, "hygiene": 80.0, "leisure": 75.0, "home_comfort": 75.0}
 const MAX_SIMULATION_MINUTES := 10080
 
+const HOUSEHOLD_ACTIONS := {
+	"meal": {"label": "Приготовить еду", "need": "hunger", "gain": 35.0, "cooldown": 180, "allowed": ["at_home"]},
+	"shower": {"label": "Принять душ", "need": "hygiene", "gain": 45.0, "cooldown": 240, "allowed": ["at_home"]},
+	"rest": {"label": "Отдохнуть", "need": "energy", "gain": 30.0, "cooldown": 180, "allowed": ["at_home", "sleeping"]},
+	"leisure": {"label": "Досуг", "need": "leisure", "gain": 35.0, "cooldown": 180, "allowed": ["at_home", "walking"]}
+}
+
 var occupied_homes: Dictionary = {}
 var moved_families: Dictionary = {}
 var current_minute_of_day: int = 480
@@ -147,6 +154,47 @@ func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void
 	elif total / 5.0 >= 70.0:
 		satisfaction += 1
 	state["satisfaction"] = clampi(satisfaction, 0, 100)
+
+
+func apply_household_action(plot_id: int, action_id: String) -> bool:
+	if not occupied_homes.has(plot_id) or not HOUSEHOLD_ACTIONS.has(action_id):
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	if not moved_families.has(family_id):
+		return false
+	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
+	var state: Dictionary = moved_families[family_id]
+	var activity := str(state.get("activity", "at_home"))
+	if not (action["allowed"] as Array).has(activity):
+		return false
+	var now := _get_total_game_minutes()
+	var cooldowns: Dictionary = state.get("action_cooldowns", {}).duplicate(true)
+	var last_used := int(cooldowns.get(action_id, -1000000))
+	if now - last_used < int(action["cooldown"]):
+		return false
+	var needs: Dictionary = state.get("needs", NEED_DEFAULTS).duplicate(true)
+	var need_key := str(action["need"])
+	needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
+	state["needs"] = needs
+	cooldowns[action_id] = now
+	state["action_cooldowns"] = cooldowns
+	_update_mood_and_satisfaction(state, needs)
+	residents_changed.emit(plot_id)
+	return true
+
+func get_household_action_cooldown(plot_id: int, action_id: String) -> int:
+	if not occupied_homes.has(plot_id) or not HOUSEHOLD_ACTIONS.has(action_id):
+		return -1
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	var cooldowns: Dictionary = state.get("action_cooldowns", {})
+	var last_used := int(cooldowns.get(action_id, -1000000))
+	return maxi(0, int(HOUSEHOLD_ACTIONS[action_id]["cooldown"]) - (_get_total_game_minutes() - last_used))
+
+func get_household_action_label(action_id: String) -> String:
+	if not HOUSEHOLD_ACTIONS.has(action_id):
+		return ""
+	return str(HOUSEHOLD_ACTIONS[action_id]["label"])
 
 func _update_activities() -> void:
 	var schedule := _get_schedule_entry(current_minute_of_day)
