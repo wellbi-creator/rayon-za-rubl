@@ -474,6 +474,17 @@ func _on_plot_selected(plot_id: int) -> void:
 					talk_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
 					talk_button.pressed.connect(_on_resident_talk_to_member_pressed.bind(str(member.get("id", "")), target_id))
 					member_autonomy_container.add_child(talk_button)
+					var shared_remaining := resident_service.get_shared_time_cooldown_remaining(selected_plot_id, str(member.get("id", "")), target_id)
+					var shared_button := Button.new()
+					shared_button.text = "%s → провести время с %s" % [str(member.get("name", "Житель")), str(target_member.get("name", "родственником"))]
+					if shared_remaining > 0:
+						shared_button.text += " • через %d мин." % shared_remaining
+					shared_button.custom_minimum_size = Vector2(0, 34)
+					shared_button.disabled = not pair_available or shared_remaining > 0
+					shared_button.add_theme_font_size_override("font_size", 11)
+					shared_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cfca")))
+					shared_button.pressed.connect(_on_resident_shared_time_pressed.bind(str(member.get("id", "")), target_id))
+					member_autonomy_container.add_child(shared_button)
 			var member_summary := "\n".join(member_lines)
 			var history_lines := PackedStringArray()
 			var activity_history: Array = current_family.get("activity_history", [])
@@ -604,6 +615,31 @@ func _on_resident_talk_to_member_pressed(speaker_id: String, target_id: String) 
 			status_label.text = "Следующий разговор между этими жителями будет доступен через %d игровых минут." % remaining
 		else:
 			status_label.text = "Для разговора оба жителя должны быть дома или на прогулке."
+
+
+func _on_resident_shared_time_pressed(speaker_id: String, target_id: String) -> void:
+	if selected_plot_id < 1 or speaker_id.is_empty() or target_id.is_empty():
+		return
+	if resident_service.spend_time_with_member(selected_plot_id, speaker_id, target_id):
+		_save_game()
+		var family := resident_service.get_family_at_plot(selected_plot_id)
+		var speaker_name := speaker_id
+		var target_name := target_id
+		for member_value in family.get("members", []):
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			if str(member.get("id", "")) == speaker_id:
+				speaker_name = str(member.get("name", speaker_id))
+			elif str(member.get("id", "")) == target_id:
+				target_name = str(member.get("name", target_id))
+		status_label.text = "%s провёл(а) время с %s. Их отношения и настроение улучшились!" % [speaker_name, target_name]
+	else:
+		var remaining := resident_service.get_shared_time_cooldown_remaining(selected_plot_id, speaker_id, target_id)
+		if remaining > 0:
+			status_label.text = "Совместное время для этой пары будет доступно через %d игровых минут." % remaining
+		else:
+			status_label.text = "Оба жителя должны быть дома или на прогулке."
 
 
 func _on_household_action_pressed(action_id: String) -> void:
