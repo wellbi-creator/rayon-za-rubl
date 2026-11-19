@@ -516,6 +516,65 @@ func talk_to_family(plot_id: int, member_id: String) -> bool:
 	return true
 
 
+func talk_to_member(plot_id: int, speaker_id: String, target_id: String) -> bool:
+	if not occupied_homes.has(plot_id) or speaker_id == target_id:
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	if state.is_empty():
+		return false
+	var members: Array = state.get("members", [])
+	var speaker: Dictionary = {}
+	var target: Dictionary = {}
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if str(member.get("id", "")) == speaker_id:
+			speaker = member
+		elif str(member.get("id", "")) == target_id:
+			target = member
+	if speaker.is_empty() or target.is_empty():
+		return false
+	if str(speaker.get("activity", "")) not in ["at_home", "walking"] or str(target.get("activity", "")) not in ["at_home", "walking"]:
+		return false
+	var total_minute := _get_total_game_minutes()
+	var cooldowns: Dictionary = speaker.get("targeted_social_cooldowns", {}).duplicate(true)
+	if total_minute < int(cooldowns.get(target_id, -1)):
+		return false
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	var key := _relationship_key(speaker_id, target_id)
+	relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)) + 3, 0, 100)
+	speaker["mood"] = clampi(int(speaker.get("mood", 75)) + 1, 0, 100)
+	speaker["satisfaction"] = clampi(int(speaker.get("satisfaction", 75)) + 1, 0, 100)
+	target["mood"] = clampi(int(target.get("mood", 75)) + 1, 0, 100)
+	target["satisfaction"] = clampi(int(target.get("satisfaction", 75)) + 1, 0, 100)
+	cooldowns[target_id] = total_minute + 60
+	speaker["targeted_social_cooldowns"] = cooldowns
+	speaker["last_action_label"] = "Поговорил(а) с %s" % str(target.get("name", "родственником"))
+	speaker["last_action_minute"] = total_minute
+	target["last_action_label"] = "Поговорил(а) с %s" % str(speaker.get("name", "родственником"))
+	target["last_action_minute"] = total_minute
+	state["relationships"] = relationships
+	state["members"] = members
+	_record_family_event(state, "%s поговорил(а) с %s" % [str(speaker.get("name", "Житель")), str(target.get("name", "родственником"))], "player", total_minute)
+	_refresh_family_aggregates(state)
+	residents_changed.emit(plot_id)
+	return true
+
+
+func get_targeted_social_cooldown_remaining(plot_id: int, speaker_id: String, target_id: String) -> int:
+	if not occupied_homes.has(plot_id):
+		return -1
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	for member_value in state.get("members", []):
+		if member_value is Dictionary and str(member_value.get("id", "")) == speaker_id:
+			var cooldowns: Dictionary = member_value.get("targeted_social_cooldowns", {})
+			return maxi(0, int(cooldowns.get(target_id, -1)) - _get_total_game_minutes())
+	return -1
+
+
 func get_social_cooldown_remaining(plot_id: int, member_id: String) -> int:
 	if not occupied_homes.has(plot_id):
 		return -1
