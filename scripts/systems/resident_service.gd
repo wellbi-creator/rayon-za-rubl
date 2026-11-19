@@ -193,6 +193,7 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"satisfaction": 75,
 			"autonomy_enabled": true,
 			"action_cooldowns": {},
+			"social_cooldown_until": -1,
 			"last_action_label": "Пока действий не было",
 			"last_action_minute": -1,
 			"activity": str(_get_member_schedule_entry(str(template.get("id", "")), current_minute_of_day)["activity"]),
@@ -218,6 +219,7 @@ func _normalize_member_states(state: Dictionary) -> void:
 		member["mood"] = clampi(int(member.get("mood", state.get("mood", 75))), 0, 100)
 		member["satisfaction"] = clampi(int(member.get("satisfaction", state.get("satisfaction", 75))), 0, 100)
 		member["need_rates"] = member.get("need_rates", {}).duplicate(true)
+		member["social_cooldown_until"] = int(member.get("social_cooldown_until", -1))
 		var preferences: Dictionary = member.get("preferences", {"favorite_activity": "walking", "favorite_action": "leisure"}).duplicate(true)
 		if not PREFERENCE_LABELS.has(str(preferences.get("favorite_activity", ""))):
 			preferences["favorite_activity"] = "walking"
@@ -443,6 +445,65 @@ func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void
 	if not favorite_activity.is_empty() and str(state.get("activity", "")) == favorite_activity and total / 5.0 >= 60.0:
 		satisfaction += 1
 	state["satisfaction"] = clampi(satisfaction, 0, 100)
+
+
+func talk_to_family(plot_id: int, member_id: String) -> bool:
+	if not occupied_homes.has(plot_id):
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	if state.is_empty():
+		return false
+	var members: Array = state.get("members", [])
+	var speaker: Dictionary = {}
+	for member_value in members:
+		if member_value is Dictionary and str(member_value.get("id", "")) == member_id:
+			speaker = member_value
+			break
+	if speaker.is_empty():
+		return false
+	var total_minute := _get_total_game_minutes()
+	if total_minute < int(speaker.get("social_cooldown_until", -1)):
+		return false
+	if str(speaker.get("activity", "")) not in ["at_home", "walking"]:
+		return false
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	var interacted := false
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var other: Dictionary = member_value
+		var other_id := str(other.get("id", ""))
+		if other_id == member_id or str(other.get("activity", "")) not in ["at_home", "walking"]:
+			continue
+		var key := _relationship_key(member_id, other_id)
+		relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)) + 5, 0, 100)
+		other["mood"] = clampi(int(other.get("mood", 75)) + 1, 0, 100)
+		other["satisfaction"] = clampi(int(other.get("satisfaction", 75)) + 1, 0, 100)
+		interacted = true
+	if not interacted:
+		return false
+	speaker["mood"] = clampi(int(speaker.get("mood", 75)) + 1, 0, 100)
+	speaker["satisfaction"] = clampi(int(speaker.get("satisfaction", 75)) + 1, 0, 100)
+	speaker["social_cooldown_until"] = total_minute + 120
+	speaker["last_action_label"] = "Поговорил(а) с семьёй"
+	speaker["last_action_minute"] = total_minute
+	state["relationships"] = relationships
+	state["members"] = members
+	_refresh_family_aggregates(state)
+	residents_changed.emit(plot_id)
+	return true
+
+
+func get_social_cooldown_remaining(plot_id: int, member_id: String) -> int:
+	if not occupied_homes.has(plot_id):
+		return -1
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	for member_value in state.get("members", []):
+		if member_value is Dictionary and str(member_value.get("id", "")) == member_id:
+			return maxi(0, int(member_value.get("social_cooldown_until", -1)) - _get_total_game_minutes())
+	return -1
 
 
 func apply_household_action(plot_id: int, action_id: String) -> bool:
