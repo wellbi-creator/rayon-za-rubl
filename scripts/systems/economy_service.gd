@@ -6,6 +6,10 @@ signal transaction_completed(amount: int, reason: String)
 
 var balance: int = 1000000
 
+func set_balance(value: int) -> void:
+	balance = maxi(0, value)
+	balance_changed.emit(balance)
+
 func try_spend(amount: int, reason: String) -> bool:
 	if amount <= 0 or balance < amount:
 		return false
