@@ -23,6 +23,7 @@ var resident_button: Button
 var household_actions_heading: Label
 var household_actions_grid: GridContainer
 var household_action_buttons: Dictionary = {}
+var autonomy_toggle_button: Button
 var readiness_selector: OptionButton
 var readiness_button: Button
 var readiness_label: Label
@@ -258,6 +259,14 @@ func _create_interface() -> void:
 		household_actions_grid.add_child(action_button)
 		household_action_buttons[action_id] = action_button
 
+	autonomy_toggle_button = Button.new()
+	autonomy_toggle_button.custom_minimum_size = Vector2(0, 38)
+	autonomy_toggle_button.add_theme_font_size_override("font_size", 12)
+	autonomy_toggle_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+	autonomy_toggle_button.pressed.connect(_on_autonomy_toggle_pressed)
+	autonomy_toggle_button.visible = false
+	content.add_child(autonomy_toggle_button)
+
 	var footer := Label.new()
 	footer.text = "Глава 1  •  Возвращение жизни"
 	footer.add_theme_font_size_override("font_size", 12)
@@ -329,6 +338,7 @@ func _show_empty_selection() -> void:
 	resident_button.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
+	autonomy_toggle_button.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
@@ -347,6 +357,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	resident_button.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
+	autonomy_toggle_button.visible = false
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
@@ -383,6 +394,8 @@ func _on_plot_selected(plot_id: int) -> void:
 		if not current_family.is_empty():
 			household_actions_grid.visible = true
 			household_actions_heading.visible = true
+			autonomy_toggle_button.visible = true
+			autonomy_toggle_button.text = "Автономия: ВКЛ" if bool(current_family.get("autonomy_enabled", true)) else "Автономия: ВЫКЛ"
 			plot_description.text = "Дом заселён: здесь живёт %s. Выбери, чем помочь семье." % str(current_family["title"])
 			var needs: Dictionary = current_family.get("needs", {})
 			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%" % [
@@ -453,6 +466,14 @@ func _on_resident_button_pressed() -> void:
 		status_label.text = "Семья заселилась! В районе появились первые соседи."
 		_save_game()
 
+
+func _on_autonomy_toggle_pressed() -> void:
+	if selected_plot_id < 1:
+		return
+	var enabled := not resident_service.is_autonomy_enabled(selected_plot_id)
+	if resident_service.set_autonomy_enabled(selected_plot_id, enabled):
+		_save_game()
+		status_label.text = "Автономное поведение семьи %s." % ("включено" if enabled else "выключено")
 
 func _on_household_action_pressed(action_id: String) -> void:
 	if selected_plot_id < 1:
