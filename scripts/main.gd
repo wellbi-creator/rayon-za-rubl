@@ -6,6 +6,7 @@ const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
 const ConstructionServiceScript = preload("res://scripts/systems/construction_service.gd")
 const MoveInServiceScript = preload("res://scripts/systems/move_in_service.gd")
 const ResidentServiceScript = preload("res://scripts/systems/resident_service.gd")
+const GameTimeScript = preload("res://scripts/systems/game_time.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -15,6 +16,8 @@ var selected_plot_id: int = -1
 var construction_service: ConstructionService
 var move_in_service: MoveInService
 var resident_service: ResidentService
+var game_time: GameTime
+var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
 var readiness_selector: OptionButton
@@ -45,6 +48,9 @@ func _ready() -> void:
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
+	game_time = GameTimeScript.new()
+	add_child(game_time)
+	game_time.time_changed.connect(_on_game_time_changed)
 	resident_service = ResidentServiceScript.new()
 	add_child(resident_service)
 	resident_service.residents_changed.connect(_on_residents_changed)
@@ -64,6 +70,7 @@ func _ready() -> void:
 	_load_game()
 	world.set_resident_groups(resident_service.get_resident_display_data())
 	_update_balance()
+	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
 
 func _create_save_timer() -> void:
@@ -98,6 +105,10 @@ func _create_interface() -> void:
 	game_title.add_theme_font_size_override("font_size", 20)
 	game_title.add_theme_color_override("font_color", Color("#f4e8c8"))
 	top_row.add_child(game_title)
+	game_time_label = Label.new()
+	game_time_label.add_theme_font_size_override("font_size", 16)
+	game_time_label.add_theme_color_override("font_color", Color("#d9e6c8"))
+	top_row.add_child(game_time_label)
 	balance_label = Label.new()
 	balance_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -262,6 +273,10 @@ func _button_style(color: Color) -> StyleBoxFlat:
 
 func _update_balance() -> void:
 	balance_label.text = "₽ %s" % _format_money(economy.balance)
+
+func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
+	if game_time_label != null:
+		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
@@ -499,7 +514,8 @@ func _save_game() -> void:
 		"world": world.get_save_data(),
 		"construction": construction_service.get_save_data(),
 		"move_in": move_in_service.get_save_data(),
-		"residents": resident_service.get_save_data()
+		"residents": resident_service.get_save_data(),
+		"game_time": game_time.get_save_data()
 	}
 	save_service.save_game(data)
 
@@ -521,6 +537,10 @@ func _load_game() -> void:
 		resident_service.load_save_data(residents_data)
 	var saved_at := int(data.get("saved_at", 0))
 	var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
+	var game_time_data: Variant = data.get("game_time", {})
+	if game_time_data is Dictionary:
+		game_time.load_save_data(game_time_data, offline_seconds)
+	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
 	if construction_data is Dictionary and not construction_data.is_empty():
 		construction_service.load_save_data(construction_data, offline_seconds)
