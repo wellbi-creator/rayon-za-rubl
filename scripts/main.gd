@@ -441,6 +441,13 @@ func _on_plot_selected(plot_id: int) -> void:
 				member_toggle.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 				member_toggle.pressed.connect(_on_member_autonomy_toggle_pressed.bind(str(member.get("id", ""))))
 				member_autonomy_container.add_child(member_toggle)
+				var talk_button := Button.new()
+				talk_button.text = "Поговорить с семьёй: %s" % str(member.get("name", "Житель"))
+				talk_button.custom_minimum_size = Vector2(0, 34)
+				talk_button.add_theme_font_size_override("font_size", 11)
+				talk_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
+				talk_button.pressed.connect(_on_resident_talk_pressed.bind(str(member.get("id", ""))))
+				member_autonomy_container.add_child(talk_button)
 			var member_summary := "\n".join(member_lines)
 			status_label.text = "Жителей: %d • %s\nСреднее по семье — Энергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s\n\nПо каждому жителю:\n%s" % [
 				int(current_family["members_count"]),
@@ -537,6 +544,20 @@ func _on_member_autonomy_toggle_pressed(member_id: String) -> void:
 				_save_game()
 				_on_plot_selected(selected_plot_id)
 			return
+
+func _on_resident_talk_pressed(member_id: String) -> void:
+	if selected_plot_id < 1 or member_id.is_empty():
+		return
+	if resident_service.talk_to_family(selected_plot_id, member_id):
+		_save_game()
+		status_label.text = "Разговор состоялся! Отношения и настроение семьи немного улучшились."
+	else:
+		var remaining := resident_service.get_social_cooldown_remaining(selected_plot_id, member_id)
+		if remaining > 0:
+			status_label.text = "Следующий разговор будет доступен через %d игровых минут." % remaining
+		else:
+			status_label.text = "Для разговора житель должен быть дома или на прогулке вместе с кем-то из семьи."
+
 
 func _on_household_action_pressed(action_id: String) -> void:
 	if selected_plot_id < 1:
