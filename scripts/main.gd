@@ -420,8 +420,9 @@ func _on_plot_selected(plot_id: int) -> void:
 				var member_needs: Dictionary = member.get("needs", {})
 				var member_autonomy := bool(member.get("autonomy_enabled", true))
 				var member_last_action := str(member.get("last_action_label", "Пока действий не было"))
-				member_lines.append("%s — Энергия %d%% • Еда %d%% • Гигиена %d%% • Досуг %d%% • Настроение %d%%\nАвтономия: %s • Последнее действие: %s" % [
+				member_lines.append("%s — %s\nЭнергия %d%% • Еда %d%% • Гигиена %d%% • Досуг %d%% • Настроение %d%%\nАвтономия: %s • Последнее действие: %s" % [
 					str(member.get("name", "Житель")),
+					str(member.get("activity_label", "Дома")),
 					int(member_needs.get("energy", 75.0)),
 					int(member_needs.get("hunger", 80.0)),
 					int(member_needs.get("hygiene", 80.0)),
