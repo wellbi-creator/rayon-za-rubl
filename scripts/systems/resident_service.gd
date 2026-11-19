@@ -159,14 +159,17 @@ func _get_member_display_data(state: Dictionary) -> Array:
 		if not member_value is Dictionary:
 			continue
 		var member: Dictionary = member_value
+		var preferences: Dictionary = member.get("preferences", {})
+		var favorite_activity := str(preferences.get("favorite_activity", "walking"))
+		var favorite_action := str(preferences.get("favorite_action", "leisure"))
 		result.append({
 			"id": str(member.get("id", "")),
 			"name": str(member.get("name", "Житель")),
 			"role": str(member.get("role", "Житель")),
-			"preferences": member.get("preferences", {}).duplicate(true),
+			"preferences": preferences.duplicate(true),
 			"preferences_label": "%s • %s" % [
-				str(PREFERENCE_LABELS.get(str(member.get("preferences", {}).get("favorite_activity", "walking")), "Любит прогулки")),
-				str(ACTION_PREFERENCE_LABELS.get(str(member.get("preferences", {}).get("favorite_action", "leisure")), "Любит развлечения"))
+				str(PREFERENCE_LABELS.get(favorite_activity, "Любит прогулки")),
+				str(ACTION_PREFERENCE_LABELS.get(favorite_action, "Любит развлечения"))
 			],
 			"needs": member.get("needs", NEED_DEFAULTS).duplicate(true),
 			"mood": int(member.get("mood", 75)),
