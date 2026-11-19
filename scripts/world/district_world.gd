@@ -375,7 +375,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			touch_moved = false
 		else:
 			if touch_active and not touch_moved:
-				var world_position := get_viewport().get_canvas_transform().affine_inverse() * event.position
+				var world_position: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
 				_select_at(world_position)
 			touch_active = false
 	elif event is InputEventScreenDrag:
