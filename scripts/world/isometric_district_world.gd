@@ -161,14 +161,27 @@ func _draw_house(ground: Vector2, repaired: bool) -> void:
 		ground + Vector2(39, -39), ground + Vector2(0, -62)
 	]), Color("#75463e"))
 	draw_line(ground + Vector2(0, -62), ground + Vector2(0, -44), Color("#c58c6c"), 2.0)
+	# Roof seams, chimney and eaves add readable architectural detail.
+	draw_line(ground + Vector2(-28, -27), ground + Vector2(-5, -41), Color("#b8755e"), 1.2)
+	draw_line(ground + Vector2(5, -41), ground + Vector2(28, -27), Color("#a96c58"), 1.2)
+	draw_line(ground + Vector2(-35, -21), ground + Vector2(0, -42), Color("#5f403b"), 1.4)
+	draw_line(ground + Vector2(0, -42), ground + Vector2(35, -21), Color("#5f403b"), 1.4)
+	draw_rect(Rect2(ground + Vector2(20, -68), Vector2(8, 19)), Color("#8a5b4c"), true)
+	draw_rect(Rect2(ground + Vector2(18, -70), Vector2(12, 4)), Color("#62463f"), true)
 	var window_color := Color("#f4d77f") if repaired else Color("#8fb8bc")
+	window_color = window_color.lerp(Color("#f2cf78"), night_factor * 0.85)
 	_draw_iso_window(ground + Vector2(-21, -37), window_color)
 	_draw_iso_window(ground + Vector2(8, -25), window_color)
+	if night_factor > 0.05:
+		draw_circle(ground + Vector2(-16, -28), 10.0, Color("#f7d98b", night_factor * 0.10))
+		draw_circle(ground + Vector2(13, -16), 10.0, Color("#f7d98b", night_factor * 0.10))
 	# Door is drawn on the front-facing right wall.
 	draw_colored_polygon(PackedVector2Array([
 		ground + Vector2(4, -25), ground + Vector2(13, -20),
 		ground + Vector2(13, 2), ground + Vector2(4, -3)
 	]), Color("#76513d"))
+	draw_circle(ground + Vector2(10, -12), 1.5, Color("#e2bd78"))
+	draw_line(ground + Vector2(-31, -18), ground + Vector2(-31, 25), Color("#f0d7ad", 0.5), 1.0)
 	_draw_bush(ground + Vector2(-43, 12))
 	_draw_bush(ground + Vector2(43, 12))
 	if repaired:
