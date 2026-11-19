@@ -20,6 +20,8 @@ var game_time: GameTime
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
+var household_actions_grid: GridContainer
+var household_action_buttons: Dictionary = {}
 var readiness_selector: OptionButton
 var readiness_button: Button
 var readiness_label: Label
@@ -232,6 +234,29 @@ func _create_interface() -> void:
 	resident_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 	content.add_child(resident_button)
 
+	var actions_heading := Label.new()
+	actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
+	actions_heading.add_theme_font_size_override("font_size", 13)
+	actions_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+	actions_heading.visible = false
+	content.add_child(actions_heading)
+
+	household_actions_grid = GridContainer.new()
+	household_actions_grid.columns = 2
+	household_actions_grid.add_theme_constant_override("h_separation", 8)
+	household_actions_grid.add_theme_constant_override("v_separation", 6)
+	household_actions_grid.visible = false
+	content.add_child(household_actions_grid)
+	for action_id in ["meal", "shower", "rest", "leisure"]:
+		var action_button := Button.new()
+		action_button.text = resident_service.get_household_action_label(action_id)
+		action_button.custom_minimum_size = Vector2(0, 38)
+		action_button.add_theme_font_size_override("font_size", 12)
+		action_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+		action_button.pressed.connect(_on_household_action_pressed.bind(action_id))
+		household_actions_grid.add_child(action_button)
+		household_action_buttons[action_id] = action_button
+
 	var footer := Label.new()
 	footer.text = "Глава 1  •  Возвращение жизни"
 	footer.add_theme_font_size_override("font_size", 12)
@@ -301,6 +326,7 @@ func _show_empty_selection() -> void:
 	readiness_button.visible = false
 	resident_label.visible = false
 	resident_button.visible = false
+	household_actions_grid.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
@@ -317,6 +343,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	readiness_button.visible = false
 	resident_label.visible = false
 	resident_button.visible = false
+	household_actions_grid.visible = false
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
@@ -351,7 +378,8 @@ func _on_plot_selected(plot_id: int) -> void:
 		var ready := move_in_service.is_ready(plot_id)
 		var current_family := resident_service.get_family_at_plot(plot_id)
 		if not current_family.is_empty():
-			plot_description.text = "Дом заселён: здесь живёт %s." % str(current_family["title"])
+			household_actions_grid.visible = true
+			plot_description.text = "Дом заселён: здесь живёт %s. Выбери, чем помочь семье." % str(current_family["title"])
 			var needs: Dictionary = current_family.get("needs", {})
 			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%" % [
 				int(current_family["members_count"]),
@@ -420,6 +448,21 @@ func _on_resident_button_pressed() -> void:
 		_on_plot_selected(selected_plot_id)
 		status_label.text = "Семья заселилась! В районе появились первые соседи."
 		_save_game()
+
+
+func _on_household_action_pressed(action_id: String) -> void:
+	if selected_plot_id < 1:
+		return
+	if resident_service.apply_household_action(selected_plot_id, action_id):
+		_save_game()
+		var action_label := resident_service.get_household_action_label(action_id)
+		status_label.text = "%s: потребность семьи восстановлена." % action_label
+	else:
+		var remaining := resident_service.get_household_action_cooldown(selected_plot_id, action_id)
+		if remaining > 0:
+			status_label.text = "Это действие будет доступно через %d игровых минут." % remaining
+		else:
+			status_label.text = "Сейчас это действие недоступно по распорядку семьи."
 
 func _on_residents_changed(plot_id: int) -> void:
 	world.set_resident_groups(resident_service.get_resident_display_data())
