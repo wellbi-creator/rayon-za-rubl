@@ -52,6 +52,8 @@ const MEMBER_TEMPLATES := {
 	]
 }
 const MAX_SIMULATION_MINUTES := 10080
+const RELATIONSHIP_DEFAULT := 60
+const RELATIONSHIP_LABELS := {"very_good": "Очень хорошие", "good": "Хорошие", "neutral": "Нейтральные", "strained": "Напряжённые"}
 
 const HOUSEHOLD_ACTIONS := {
 	"meal": {"label": "Приготовить еду", "need": "hunger", "gain": 35.0, "cooldown": 180, "allowed": ["at_home"]},
@@ -65,6 +67,112 @@ var moved_families: Dictionary = {}
 var current_minute_of_day: int = 480
 var current_day: int = 1
 var last_simulated_total_minute: int = -1
+
+
+func _relationship_key(first_id: String, second_id: String) -> String:
+	var ids := [first_id, second_id]
+	ids.sort()
+	return "%s|%s" % [ids[0], ids[1]]
+
+
+func _create_relationships(members: Array) -> Dictionary:
+	var relationships: Dictionary = {}
+	for i in range(members.size()):
+		if not members[i] is Dictionary:
+			continue
+		for j in range(i + 1, members.size()):
+			if not members[j] is Dictionary:
+				continue
+			var first: Dictionary = members[i]
+			var second: Dictionary = members[j]
+			relationships[_relationship_key(str(first.get("id", "")), str(second.get("id", "")))] = RELATIONSHIP_DEFAULT
+	return relationships
+
+
+func _normalize_relationships(state: Dictionary) -> void:
+	var members: Array = state.get("members", [])
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	for i in range(members.size()):
+		if not members[i] is Dictionary:
+			continue
+		for j in range(i + 1, members.size()):
+			if not members[j] is Dictionary:
+				continue
+			var first: Dictionary = members[i]
+			var second: Dictionary = members[j]
+			var key := _relationship_key(str(first.get("id", "")), str(second.get("id", "")))
+			relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)), 0, 100)
+	state["relationships"] = relationships
+
+
+func _get_member_relationship_average(state: Dictionary, member_id: String) -> float:
+	var members: Array = state.get("members", [])
+	var relationships: Dictionary = state.get("relationships", {})
+	var total := 0.0
+	var count := 0
+	for other_value in members:
+		if not other_value is Dictionary:
+			continue
+		var other: Dictionary = other_value
+		var other_id := str(other.get("id", ""))
+		if other_id == member_id:
+			continue
+		var key := _relationship_key(member_id, other_id)
+		total += float(relationships.get(key, RELATIONSHIP_DEFAULT))
+		count += 1
+	return total / count if count > 0 else float(RELATIONSHIP_DEFAULT)
+
+
+func _get_relationship_label(value: float) -> String:
+	if value >= 85.0:
+		return str(RELATIONSHIP_LABELS["very_good"])
+	if value >= 70.0:
+		return str(RELATIONSHIP_LABELS["good"])
+	if value >= 45.0:
+		return str(RELATIONSHIP_LABELS["neutral"])
+	return str(RELATIONSHIP_LABELS["strained"])
+
+
+func _update_relationships(state: Dictionary) -> void:
+	var members: Array = state.get("members", [])
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	for i in range(members.size()):
+		if not members[i] is Dictionary:
+			continue
+		var first: Dictionary = members[i]
+		for j in range(i + 1, members.size()):
+			if not members[j] is Dictionary:
+				continue
+			var second: Dictionary = members[j]
+			var first_id := str(first.get("id", ""))
+			var second_id := str(second.get("id", ""))
+			var key := _relationship_key(first_id, second_id)
+			var score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+			var first_needs: Dictionary = first.get("needs", NEED_DEFAULTS)
+			var second_needs: Dictionary = second.get("needs", NEED_DEFAULTS)
+			var first_activity := str(first.get("activity", "at_home"))
+			var second_activity := str(second.get("activity", "at_home"))
+			var shared_activity := first_activity == second_activity and first_activity in ["at_home", "walking"]
+			var first_ok := int(first.get("mood", 75)) >= 60 and float(first_needs.get("home_comfort", 75.0)) >= 40.0
+			var second_ok := int(second.get("mood", 75)) >= 60 and float(second_needs.get("home_comfort", 75.0)) >= 40.0
+			var first_strained := int(first.get("mood", 75)) < 35
+			var second_strained := int(second.get("mood", 75)) < 35
+			if shared_activity and first_ok and second_ok:
+				score += 1
+			elif first_strained or second_strained:
+				score -= 1
+			relationships[key] = clampi(score, 0, 100)
+	state["relationships"] = relationships
+
+
+func _apply_relationship_satisfaction(state: Dictionary, member: Dictionary) -> void:
+	var average := _get_member_relationship_average(state, str(member.get("id", "")))
+	var satisfaction := int(member.get("satisfaction", 75))
+	if average >= 75.0:
+		satisfaction += 1
+	elif average < 35.0:
+		satisfaction -= 1
+	member["satisfaction"] = clampi(satisfaction, 0, 100)
 
 
 func _create_member_states(family_id: String, starting_needs: Dictionary) -> Array:
@@ -171,6 +279,8 @@ func _get_member_display_data(state: Dictionary) -> Array:
 				str(PREFERENCE_LABELS.get(favorite_activity, "Любит прогулки")),
 				str(ACTION_PREFERENCE_LABELS.get(favorite_action, "Любит развлечения"))
 			],
+			"relationship_average": _get_member_relationship_average(state, str(member.get("id", ""))),
+			"relationship_label": _get_relationship_label(_get_member_relationship_average(state, str(member.get("id", "")))),
 			"needs": member.get("needs", NEED_DEFAULTS).duplicate(true),
 			"mood": int(member.get("mood", 75)),
 			"satisfaction": int(member.get("satisfaction", 75)),
@@ -240,6 +350,7 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"needs": NEED_DEFAULTS.duplicate(true),
 		"members": _create_member_states(family_id, NEED_DEFAULTS)
 	}
+	moved_families[family_id]["relationships"] = _create_relationships(moved_families[family_id]["members"])
 	last_simulated_total_minute = _get_total_game_minutes()
 	residents_changed.emit(plot_id)
 	family_moved_in.emit(plot_id, family_id)
@@ -297,12 +408,14 @@ func _simulate_needs_minute(total_minute: int) -> void:
 		state["members"] = members
 		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
 		if minute_of_day % 60 == 0:
+			_update_relationships(state)
 			members = state.get("members", [])
 			for member_value in members:
 				if not member_value is Dictionary:
 					continue
 				var member: Dictionary = member_value
 				_update_mood_and_satisfaction(member, member.get("needs", NEED_DEFAULTS))
+				_apply_relationship_satisfaction(state, member)
 			state["members"] = members
 			_refresh_family_aggregates(state)
 
@@ -541,7 +654,8 @@ func get_resident_display_data() -> Array:
 			"plot_id": int(plot_id),
 			"members_count": int(profile.get("members_count", 0)),
 			"activity": str(state.get("activity", "at_home")),
-			"activity_label": str(state.get("activity_label", "Дома"))
+			"activity_label": str(state.get("activity_label", "Дома")),
+			"members": _get_member_display_data(state)
 		})
 	return result
 
@@ -585,6 +699,7 @@ func load_save_data(data: Dictionary) -> void:
 					restored["members"] = _create_member_states(str(family_id), restored["needs"])
 				else:
 					_normalize_member_states(restored)
+				_normalize_relationships(restored)
 				_refresh_family_aggregates(restored)
 				moved_families[str(family_id)] = restored
 	last_simulated_total_minute = int(data.get("last_simulated_total_minute", -1))
