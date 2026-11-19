@@ -1,6 +1,6 @@
 extends Node2D
 
-const DistrictWorldScript = preload("res://scripts/world/district_world.gd")
+const DistrictWorldScript = preload("res://scripts/world/isometric_district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
 const ConstructionServiceScript = preload("res://scripts/systems/construction_service.gd")
