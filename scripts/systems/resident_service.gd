@@ -69,7 +69,8 @@ func get_occupied_home_count() -> int:
 func get_total_resident_count() -> int:
 	var total := 0
 	for family_id in moved_families:
-		total += int(FAMILY_CATALOG.get(family_id, {}).get("members_count", 0))
+		var profile: Dictionary = FAMILY_CATALOG.get(family_id, {})
+		total += int(profile.get("members_count", 0))
 	return total
 
 func get_save_data() -> Dictionary:
