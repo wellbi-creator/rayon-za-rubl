@@ -215,14 +215,16 @@ func get_render_diagnostic_text() -> String:
 	var camera_position := camera.global_position if camera != null else Vector2.ZERO
 	var camera_zoom := camera.zoom.x if camera != null else 0.0
 	var camera_current := camera.is_current() if camera != null else false
-	return "WORLD DEBUG  draw=%d  visible=%s  viewport=%.0fx%.0f  camera=%s  zoom=%.2f  current=%s" % [
+	var canvas_transform := get_viewport().get_canvas_transform()
+	return "WORLD draw=%d  visible=%s  viewport=%.0fx%.0f  camera=%s  zoom=%.2f  current=%s  canvas_origin=%s" % [
 		_draw_callback_count,
 		str(is_visible_in_tree()),
 		viewport_size.x,
 		viewport_size.y,
 		str(Vector2i(roundi(camera_position.x), roundi(camera_position.y))),
 		camera_zoom,
-		str(camera_current)
+		str(camera_current),
+		str(Vector2i(roundi(canvas_transform.origin.x), roundi(canvas_transform.origin.y)))
 	]
 
 func _draw() -> void:
@@ -233,6 +235,12 @@ func _draw() -> void:
 	_draw_traffic_signals()
 	_draw_depth_sorted_world_objects()
 	_draw_ambient_birds()
+	# Temporary render-pipeline marker: should appear at the camera's screen center.
+	if camera != null:
+		var marker_center := camera.position
+		draw_rect(Rect2(marker_center - Vector2(16, 16), Vector2(32, 32)), Color("#ff35d3"), true)
+		draw_line(marker_center + Vector2(-24, 0), marker_center + Vector2(24, 0), Color("#ffffff"), 3.0)
+		draw_line(marker_center + Vector2(0, -24), marker_center + Vector2(0, 24), Color("#ffffff"), 3.0)
 
 func _draw_depth_sorted_world_objects() -> void:
 	# Trees, plots and residents share one painter's queue. Ground-contact Y controls
