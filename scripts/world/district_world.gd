@@ -20,6 +20,8 @@ var plot_states: Array[Dictionary] = []
 var selected_plot: int = -1
 var camera: Camera2D
 var dragging: bool = false
+var traffic_time: float = 0.0
+var car_positions: Array[float] = [80.0, 880.0]
 
 func _ready() -> void:
 	for i in PLOT_RECTS.size():
@@ -29,6 +31,12 @@ func _ready() -> void:
 	camera.zoom = Vector2.ONE
 	add_child(camera)
 	camera.make_current()
+	queue_redraw()
+
+func _process(delta: float) -> void:
+	traffic_time += delta
+	car_positions[0] = wrapf(car_positions[0] + delta * 72.0, -150.0, 1450.0)
+	car_positions[1] = wrapf(car_positions[1] - delta * 54.0, -150.0, 1450.0)
 	queue_redraw()
 
 func _draw() -> void:
@@ -68,6 +76,10 @@ func _draw() -> void:
 	draw_circle(Vector2(525, 490), 8, Color("#b5c98b"))
 	draw_circle(Vector2(615, 550), 8, Color("#b5c98b"))
 
+	_draw_neighborhood_details()
+	_draw_car(Vector2(car_positions[0], 354), Color("#c96e4e"), false)
+	_draw_car(Vector2(car_positions[1], 397), Color("#d7d6c9"), true)
+
 func _draw_plot(plot_id: int) -> void:
 	var rect := PLOT_RECTS[plot_id]
 	var state: Dictionary = plot_states[plot_id]
@@ -102,6 +114,16 @@ func _draw_house(pos: Vector2, finished: bool, progress: float) -> void:
 	draw_rect(Rect2(pos + Vector2(101, 55), Vector2(24, 23)), Color("#8bb7bd"))
 	draw_rect(Rect2(pos + Vector2(73, 75), Vector2(18, 30)), Color("#78533e"))
 	draw_circle(pos + Vector2(81, 90), 2, Color("#e8c66f"))
+	# Window frames, chimney, flower boxes and garden shrubs.
+	draw_rect(Rect2(pos + Vector2(33, 52), Vector2(30, 29)), Color("#f0e2c4"), false, 3.0)
+	draw_rect(Rect2(pos + Vector2(98, 52), Vector2(30, 29)), Color("#f0e2c4"), false, 3.0)
+	draw_line(pos + Vector2(48, 53), pos + Vector2(48, 80), Color("#f0e2c4"), 2.0)
+	draw_line(pos + Vector2(113, 53), pos + Vector2(113, 80), Color("#f0e2c4"), 2.0)
+	draw_rect(Rect2(pos + Vector2(112, 8), Vector2(12, 25)), Color("#a77a60"))
+	draw_rect(Rect2(pos + Vector2(31, 108), Vector2(24, 8)), Color("#d58c75"))
+	draw_rect(Rect2(pos + Vector2(112, 108), Vector2(24, 8)), Color("#d58c75"))
+	_draw_bush(pos + Vector2(17, 111))
+	_draw_bush(pos + Vector2(145, 111))
 	if finished:
 		draw_rect(Rect2(pos + Vector2(36, 55), Vector2(24, 23)), Color("#f4d77b"))
 		draw_rect(Rect2(pos + Vector2(101, 55), Vector2(24, 23)), Color("#f4d77b"))
@@ -121,6 +143,61 @@ func _draw_tree(pos: Vector2) -> void:
 	draw_circle(pos, 18, Color("#4e7951"))
 	draw_circle(pos + Vector2(-9, -5), 11, Color("#638e5c"))
 	draw_circle(pos + Vector2(9, -7), 10, Color("#78a36a"))
+
+func _draw_neighborhood_details() -> void:
+	# Sidewalk joints, pedestrian crossing and small street furniture.
+	for x in range(-60, 1400, 38):
+		draw_line(Vector2(x, 333), Vector2(x + 18, 333), Color("#e5ddc9", 0.55), 2.0)
+		draw_line(Vector2(x, 421), Vector2(x + 18, 421), Color("#e5ddc9", 0.55), 2.0)
+	for i in 5:
+		draw_rect(Rect2(550 + i * 15, 343, 8, 22), Color("#eee7d5", 0.9))
+		draw_rect(Rect2(550 + i * 15, 389, 8, 22), Color("#eee7d5", 0.9))
+	# Warm wooden benches in the park.
+	draw_rect(Rect2(510, 535, 34, 5), Color("#8a5e40"))
+	draw_rect(Rect2(510, 542, 34, 3), Color("#604936"))
+	draw_rect(Rect2(590, 485, 34, 5), Color("#8a5e40"))
+	draw_rect(Rect2(590, 492, 34, 3), Color("#604936"))
+	# Flower beds and shrubs make empty plots feel maintained.
+	for p in [Vector2(330, 185), Vector2(825, 185), Vector2(825, 475), Vector2(180, 575)]:
+		_draw_flower_bed(p)
+	# Street lamps along both sides of the main road.
+	for x in [160.0, 455.0, 780.0, 1040.0, 1260.0]:
+		_draw_lamp(Vector2(x, 322))
+		_draw_lamp(Vector2(x + 105.0, 432))
+
+func _draw_lamp(pos: Vector2) -> void:
+	draw_circle(pos + Vector2(0, 3), 9, Color("#52634c", 0.25))
+	draw_rect(Rect2(pos + Vector2(-2, -25), Vector2(4, 27)), Color("#454e49"))
+	draw_line(pos + Vector2(0, -24), pos + Vector2(10, -31), Color("#454e49"), 3.0)
+	draw_circle(pos + Vector2(11, -31), 5, Color("#f3d98e"))
+	draw_circle(pos + Vector2(11, -31), 9, Color("#f3d98e", 0.13))
+
+func _draw_flower_bed(pos: Vector2) -> void:
+	draw_rect(Rect2(pos, Vector2(34, 15)), Color("#6e8d59"))
+	for i in 5:
+		var flower_pos := pos + Vector2(5 + i * 6, 7)
+		draw_circle(flower_pos, 2.5, Color("#e7c6a0") if i % 2 == 0 else Color("#e8d98f"))
+		draw_circle(flower_pos + Vector2(0, 3), 2, Color("#527a4b"))
+
+func _draw_bush(pos: Vector2) -> void:
+	draw_circle(pos, 8, Color("#4e784e"))
+	draw_circle(pos + Vector2(-4, -2), 5, Color("#6f985e"))
+	draw_circle(pos + Vector2(4, -3), 5, Color("#82a96a"))
+
+func _draw_car(pos: Vector2, body_color: Color, facing_left: bool) -> void:
+	# Compact top-down car with shadow, roof glass and visible wheels.
+	var direction := -1.0 if facing_left else 1.0
+	draw_rect(Rect2(pos + Vector2(-18, -7), Vector2(42, 20)), Color("#33413d", 0.35))
+	draw_rect(Rect2(pos + Vector2(-21, -9), Vector2(42, 18)), body_color)
+	draw_rect(Rect2(pos + Vector2(-10, -7), Vector2(20, 14)), Color("#a9c5c5"))
+	draw_rect(Rect2(pos + Vector2(-7, -6), Vector2(14, 12)), Color("#d2e0d9"))
+	draw_rect(Rect2(pos + Vector2(-18, -11), Vector2(7, 4)), Color("#303a38"))
+	draw_rect(Rect2(pos + Vector2(12, -11), Vector2(7, 4)), Color("#303a38"))
+	draw_rect(Rect2(pos + Vector2(-18, 7), Vector2(7, 4)), Color("#303a38"))
+	draw_rect(Rect2(pos + Vector2(12, 7), Vector2(7, 4)), Color("#303a38"))
+	var front_x := 19.0 * direction
+	draw_rect(Rect2(pos + Vector2(front_x - 2.0, -6), Vector2(3, 4)), Color("#f6e5a7"))
+	draw_rect(Rect2(pos + Vector2(front_x - 2.0, 3), Vector2(3, 4)), Color("#f6e5a7"))
 
 func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
 	var points := PackedVector2Array()
