@@ -241,6 +241,7 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"satisfaction": 75,
 			"autonomy_enabled": true,
 			"action_cooldowns": {},
+			"shared_time_cooldowns": {},
 			"social_cooldown_until": -1,
 			"last_action_label": "Пока действий не было",
 			"last_action_minute": -1,
@@ -276,6 +277,7 @@ func _normalize_member_states(state: Dictionary) -> void:
 		member["preferences"] = preferences
 		member["autonomy_enabled"] = bool(member.get("autonomy_enabled", true))
 		member["action_cooldowns"] = member.get("action_cooldowns", {}).duplicate(true)
+		member["shared_time_cooldowns"] = member.get("shared_time_cooldowns", {}).duplicate(true)
 		member["last_action_label"] = str(member.get("last_action_label", "Пока действий не было"))
 		member["last_action_minute"] = int(member.get("last_action_minute", -1))
 		var member_schedule := _get_member_schedule_entry(str(member.get("id", "")), current_minute_of_day)
