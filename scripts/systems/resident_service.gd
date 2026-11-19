@@ -52,6 +52,7 @@ const MEMBER_TEMPLATES := {
 	]
 }
 const MAX_SIMULATION_MINUTES := 10080
+const FAMILY_EVENT_COOLDOWN_MINUTES := 360
 const RELATIONSHIP_DEFAULT := 60
 const RELATIONSHIP_LABELS := {"very_good": "Очень хорошие", "good": "Хорошие", "neutral": "Нейтральные", "strained": "Напряжённые"}
 
@@ -375,6 +376,7 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	profile["members"] = _get_member_display_data(state)
 	profile["activity_history"] = state.get("activity_history", []).duplicate(true)
+	profile["active_event"] = state.get("active_event", {}).duplicate(true)
 	return profile
 
 func is_plot_occupied(plot_id: int) -> bool:
@@ -403,7 +405,9 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"needs": NEED_DEFAULTS.duplicate(true),
 		"members": _create_member_states(family_id, NEED_DEFAULTS),
 		"activity_history": [],
-		"relationship_milestones": {}
+		"relationship_milestones": {},
+		"active_event": {},
+		"family_event_cooldown_until": 0
 	}
 	moved_families[family_id]["relationships"] = _create_relationships(moved_families[family_id]["members"])
 	last_simulated_total_minute = _get_total_game_minutes()
@@ -476,6 +480,150 @@ func _simulate_needs_minute(total_minute: int) -> void:
 				_apply_relationship_satisfaction(state, member)
 			state["members"] = members
 			_refresh_family_aggregates(state)
+			_try_create_family_event(state, total_minute)
+
+func _try_create_family_event(state: Dictionary, total_minute: int) -> void:
+	var active_event: Variant = state.get("active_event", {})
+	if active_event is Dictionary and not active_event.is_empty():
+		return
+	if total_minute < int(state.get("family_event_cooldown_until", 0)):
+		return
+	var members: Array = state.get("members", [])
+	if members.size() < 2:
+		return
+	var relationships: Dictionary = state.get("relationships", {})
+	var lowest_score := 101
+	var lowest_pair: Array = []
+	var highest_score := -1
+	var highest_pair: Array = []
+	for i in range(members.size()):
+		if not members[i] is Dictionary:
+			continue
+		var first: Dictionary = members[i]
+		for j in range(i + 1, members.size()):
+			if not members[j] is Dictionary:
+				continue
+			var second: Dictionary = members[j]
+			var key := _relationship_key(str(first.get("id", "")), str(second.get("id", "")))
+			var score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+			if score < lowest_score:
+				lowest_score = score
+				lowest_pair = [first, second]
+			if score > highest_score:
+				highest_score = score
+				highest_pair = [first, second]
+	if lowest_score <= 40 and lowest_pair.size() == 2:
+		var first: Dictionary = lowest_pair[0]
+		var second: Dictionary = lowest_pair[1]
+		state["active_event"] = {
+			"id": "disagreement_%s_%s_%d" % [str(first.get("id", "")), str(second.get("id", "")), total_minute],
+			"type": "disagreement",
+			"title": "Небольшое семейное разногласие",
+			"description": "%s и %s не могут прийти к согласию. Можно помочь им спокойно обсудить проблему или дать время остыть." % [str(first.get("name", "Житель")), str(second.get("name", "Житель"))],
+			"member_ids": [str(first.get("id", "")), str(second.get("id", ""))],
+			"choices": [
+				{"id": "talk", "label": "Помочь им помириться"},
+				{"id": "space", "label": "Дать время остыть"}
+			],
+			"created_minute": total_minute
+		}
+	elif highest_score >= 85 and highest_pair.size() == 2:
+		var first: Dictionary = highest_pair[0]
+		var second: Dictionary = highest_pair[1]
+		if int(first.get("mood", 75)) < 60 or int(second.get("mood", 75)) < 60:
+			return
+		state["active_event"] = {
+			"id": "family_support_%s_%s_%d" % [str(first.get("id", "")), str(second.get("id", "")), total_minute],
+			"type": "family_support",
+			"title": "Тёплый семейный момент",
+			"description": "%s и %s особенно хорошо понимают друг друга. Можно поддержать их близость или оставить им спокойный вечер." % [str(first.get("name", "Житель")), str(second.get("name", "Житель"))],
+			"member_ids": [str(first.get("id", "")), str(second.get("id", ""))],
+			"choices": [
+				{"id": "celebrate", "label": "Поддержать семейный вечер"},
+				{"id": "quiet", "label": "Пусть спокойно отдохнут"}
+			],
+			"created_minute": total_minute
+		}
+
+
+func resolve_family_event(plot_id: int, event_id: String, choice_id: String) -> bool:
+	if not occupied_homes.has(plot_id) or event_id.is_empty() or choice_id.is_empty():
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	if state.is_empty():
+		return false
+	var event: Dictionary = state.get("active_event", {}).duplicate(true)
+	if event.is_empty() or str(event.get("id", "")) != event_id:
+		return false
+	var valid_choice := false
+	for choice_value in event.get("choices", []):
+		if choice_value is Dictionary and str(choice_value.get("id", "")) == choice_id:
+			valid_choice = true
+			break
+	if not valid_choice:
+		return false
+	var member_ids: Array = event.get("member_ids", [])
+	if member_ids.size() != 2:
+		return false
+	var members: Array = state.get("members", [])
+	var first: Dictionary = {}
+	var second: Dictionary = {}
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if str(member.get("id", "")) == str(member_ids[0]):
+			first = member
+		elif str(member.get("id", "")) == str(member_ids[1]):
+			second = member
+	if first.is_empty() or second.is_empty():
+		return false
+	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
+	var key := _relationship_key(str(member_ids[0]), str(member_ids[1]))
+	var previous_score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+	var relationship_gain := 1
+	var mood_gain := 1
+	var satisfaction_gain := 1
+	var result_label := "дали друг другу время остыть"
+	if str(event.get("type", "")) == "disagreement":
+		if choice_id == "talk":
+			relationship_gain = 6
+			mood_gain = 3
+			satisfaction_gain = 2
+			result_label = "спокойно поговорили и помирились"
+		else:
+			relationship_gain = 1
+			mood_gain = 1
+			satisfaction_gain = 1
+			result_label = "получили время остыть"
+	else:
+		if choice_id == "celebrate":
+			relationship_gain = 3
+			mood_gain = 3
+			satisfaction_gain = 3
+			result_label = "провели тёплый семейный вечер"
+		else:
+			relationship_gain = 1
+			mood_gain = 1
+			satisfaction_gain = 1
+			result_label = "спокойно отдохнули вместе"
+	var new_score := clampi(previous_score + relationship_gain, 0, 100)
+	relationships[key] = new_score
+	_record_relationship_milestones(state, str(member_ids[0]), str(member_ids[1]), previous_score, new_score, "player", _get_total_game_minutes())
+	for participant in [first, second]:
+		participant["mood"] = clampi(int(participant.get("mood", 75)) + mood_gain, 0, 100)
+		participant["satisfaction"] = clampi(int(participant.get("satisfaction", 75)) + satisfaction_gain, 0, 100)
+	state["relationships"] = relationships
+	state["members"] = members
+	var description := "%s и %s %s" % [str(first.get("name", "Житель")), str(second.get("name", "Житель")), result_label]
+	_record_family_event(state, description, "player", _get_total_game_minutes())
+	state["active_event"] = {}
+	state["family_event_cooldown_until"] = _get_total_game_minutes() + FAMILY_EVENT_COOLDOWN_MINUTES
+	_refresh_family_aggregates(state)
+	residents_changed.emit(plot_id)
+	return true
+
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
 	var critical_count := 0
@@ -1085,6 +1233,11 @@ func load_save_data(data: Dictionary) -> void:
 					restored["relationship_milestones"] = {}
 				else:
 					restored["relationship_milestones"] = restored["relationship_milestones"].duplicate(true)
+				if not restored.get("active_event", {}) is Dictionary:
+					restored["active_event"] = {}
+				else:
+					restored["active_event"] = restored["active_event"].duplicate(true)
+				restored["family_event_cooldown_until"] = int(restored.get("family_event_cooldown_until", 0))
 				restored["autonomy_enabled"] = bool(restored.get("autonomy_enabled", true))
 				if not restored.has("needs") or not restored["needs"] is Dictionary:
 					restored["needs"] = NEED_DEFAULTS.duplicate(true)
