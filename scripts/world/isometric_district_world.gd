@@ -33,6 +33,8 @@ var camera_smoothing := 10.0
 var keyboard_pan_speed := 520.0
 var camera_min_zoom := 0.55
 var camera_max_zoom := 1.6
+var world_hour := 12.0
+var night_factor := 0.0
 
 func _ready() -> void:
 	for i in PLOT_CELLS.size():
@@ -70,7 +72,11 @@ func _draw_ground() -> void:
 			var cell := Vector2i(x, y)
 			var center: Vector2 = Grid.grid_to_world(cell, TILE)
 			var fill := Color("#78966d") if (x + y) % 2 == 0 else Color("#819d72")
-			_draw_diamond(center, TILE, fill, Color("#a4b78d", 0.48), 1.0)
+			fill = fill.lerp(Color("#344b4b"), night_factor * 0.62)
+			var edge := Color("#a4b78d", 0.48).lerp(Color("#607c7a", 0.6), night_factor)
+			_draw_diamond(center, TILE, fill, edge, 1.0)
+			if (x * 3 + y * 5) % 7 == 0:
+				_draw_grass_detail(center + Vector2(float((x * 17) % 35) - 17.0, float((y * 11) % 15) - 7.0))
 
 func _draw_roads() -> void:
 	# The two streets follow the same logical cells as the approved preview.
@@ -86,10 +92,18 @@ func _draw_roads() -> void:
 		var p: Vector2 = Grid.grid_to_world(Vector2i(4, y), TILE)
 		draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
 
+func _draw_grass_detail(pos: Vector2) -> void:
+	var blade_color := Color("#b3c58a", 0.42).lerp(Color("#70877b", 0.35), night_factor)
+	draw_line(pos, pos + Vector2(-2, -5), blade_color, 1.0)
+	draw_line(pos + Vector2(1, 0), pos + Vector2(3, -4), blade_color, 1.0)
+
 func _draw_road_cell(cell: Vector2i) -> void:
 	var center: Vector2 = Grid.grid_to_world(cell, TILE)
-	_draw_diamond(center, TILE, Color("#c5bda7"), Color("#ded4bd"), 1.0)
-	_draw_diamond(center, TILE * Vector2(0.86, 0.82), Color("#59615f"), Color("#737c75"), 1.0)
+	_draw_diamond(center, TILE, Color("#c5bda7").lerp(Color("#626b68"), night_factor * 0.5), Color("#ded4bd"), 1.0)
+	_draw_diamond(center, TILE * Vector2(0.86, 0.82), Color("#59615f").lerp(Color("#303c43"), night_factor * 0.45), Color("#737c75"), 1.0)
+	var curb_color := Color("#d8cdb4").lerp(Color("#82908c"), night_factor * 0.6)
+	draw_line(center + Vector2(-52, -2), center + Vector2(0, 25), curb_color, 1.4)
+	draw_line(center + Vector2(0, 25), center + Vector2(52, -2), curb_color, 1.4)
 
 func _draw_environment() -> void:
 	for cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5)]:
@@ -245,6 +259,8 @@ func _draw_tree(pos: Vector2) -> void:
 	draw_circle(pos + Vector2(-9, -17), 10, Color("#638f5b"))
 	draw_circle(pos + Vector2(8, -20), 10, Color("#79a66a"))
 	draw_circle(pos + Vector2(-3, -25), 7, Color("#8bb477"))
+	draw_circle(pos + Vector2(-5, -15), 3, Color("#a4c47a", 0.55))
+	draw_circle(pos + Vector2(8, -19), 2.5, Color("#a4c47a", 0.45))
 
 func _draw_bush(pos: Vector2) -> void:
 	draw_circle(pos, 7, Color("#4d784d"))
@@ -255,8 +271,11 @@ func _draw_lamp(pos: Vector2) -> void:
 	draw_ellipse(pos + Vector2(0, 4), Vector2(7, 3), Color("#435443", 0.3))
 	draw_line(pos, pos + Vector2(0, -24), Color("#3d4944"), 3.0)
 	draw_line(pos + Vector2(0, -23), pos + Vector2(8, -28), Color("#3d4944"), 2.0)
-	draw_circle(pos + Vector2(9, -29), 4.0, Color("#f3d98e"))
-	draw_circle(pos + Vector2(9, -29), 9.0 + sin(construction_animation_time * 2.0) * 1.0, Color("#f3d98e", 0.12))
+	var lamp_glow := night_factor
+	draw_circle(pos + Vector2(9, -29), 4.0, Color("#f3d98e").lerp(Color("#b5a77e"), 1.0 - lamp_glow))
+	if lamp_glow > 0.04:
+		draw_circle(pos + Vector2(9, -29), 9.0 + sin(construction_animation_time * 2.0) * 1.0, Color("#f3d98e", lamp_glow * 0.22))
+		draw_circle(pos + Vector2(9, -29), 17.0, Color("#f3d98e", lamp_glow * 0.06))
 
 func _draw_residents() -> void:
 	for group in resident_groups:
@@ -393,6 +412,12 @@ func _select_world_position(world_position: Vector2) -> void:
 func _zoom(factor: float) -> void:
 	camera_target_zoom = clampf(camera_target_zoom * factor, camera_min_zoom, camera_max_zoom)
 	_clamp_camera_target()
+
+func set_time_of_day(hour: int, minute: int) -> void:
+	world_hour = fposmod(float(hour) + float(minute) / 60.0, 24.0)
+	var daylight := clampf((sin((world_hour - 6.0) / 12.0 * PI) + 0.12) / 1.12, 0.0, 1.0)
+	night_factor = 1.0 - daylight
+	queue_redraw()
 
 func set_resident_groups(groups: Array) -> void:
 	resident_groups = groups.duplicate(true)
