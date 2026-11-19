@@ -298,23 +298,61 @@ func _draw_residents() -> void:
 		if plot_id < 1 or plot_id >= PLOT_CELLS.size():
 			continue
 		var activity := str(group.get("activity", "at_home"))
-		if activity == "sleeping" or activity == "at_work":
+		if activity in ["sleeping", "at_work", "at_school"]:
 			continue
 		var home: Vector2 = Grid.grid_to_world(PLOT_CELLS[plot_id], TILE)
 		var count := clampi(int(group.get("members_count", 0)), 0, 8)
+		var walking := activity == "walking"
+		var route := _get_walk_route(plot_id) if walking else []
 		for member_index in count:
-			var phase := pedestrian_time * 1.4 + float(member_index) * 1.8
-			var pos := home + Vector2(sin(phase) * 13.0, 15.0 + cos(phase * 0.7) * 3.0)
-			_draw_person(pos, member_index)
+			var phase := pedestrian_time * 1.4 + float(member_index) * 1.8 + float(plot_id) * 0.7
+			var pos: Vector2
+			if walking and route.size() > 1:
+				pos = _position_on_walk_route(route, pedestrian_time * 24.0 + float(member_index) * 31.0 + float(plot_id) * 13.0)
+			else:
+				pos = home + Vector2(sin(phase) * 13.0, 15.0 + cos(phase * 0.7) * 2.0)
+			_draw_person(pos, member_index, walking, phase)
 
-func _draw_person(pos: Vector2, variant: int) -> void:
+func _get_walk_route(plot_id: int) -> Array[Vector2]:
+	var home_cell: Vector2i = PLOT_CELLS[plot_id]
+	var vertical_road_y := 1 if home_cell.y <= 3 else 5
+	var approach := Grid.grid_to_world(Vector2i(4, vertical_road_y), TILE)
+	var junction := Grid.grid_to_world(Vector2i(4, 3), TILE)
+	var home := Grid.grid_to_world(home_cell, TILE)
+	var route: Array[Vector2] = [home + Vector2(0, 17), approach, junction]
+	var side_road_x := 1 if home_cell.x < 4 else 7
+	route.append(Grid.grid_to_world(Vector2i(side_road_x, 3), TILE))
+	return route
+
+func _position_on_walk_route(route: Array[Vector2], distance: float) -> Vector2:
+	var total_length := 0.0
+	for i in range(route.size() - 1):
+		total_length += route[i].distance_to(route[i + 1])
+	if total_length <= 0.001:
+		return route[0]
+	var remaining := fposmod(distance, total_length)
+	for i in range(route.size() - 1):
+		var segment_length := route[i].distance_to(route[i + 1])
+		if remaining <= segment_length:
+			return route[i].lerp(route[i + 1], remaining / maxf(segment_length, 0.001))
+		remaining -= segment_length
+	return route[route.size() - 1]
+
+func _draw_person(pos: Vector2, variant: int, walking: bool = false, walk_phase: float = 0.0) -> void:
 	var shirts := [Color("#d58c68"), Color("#6e91a3"), Color("#d5bd78")]
 	var shirt: Color = shirts[variant % shirts.size()]
+	var stride := sin(walk_phase * 5.5) if walking else sin(walk_phase) * 0.12
+	var body_bob := absf(stride) * 1.2 if walking else sin(walk_phase * 2.0) * 0.45
+	var body_pos := pos + Vector2(0, -body_bob)
 	draw_ellipse(pos + Vector2(1, 5), Vector2(4, 2), Color("#34443a", 0.28))
-	draw_circle(pos + Vector2(0, -5), 3.0, Color("#e7c6a3"))
-	draw_rect(Rect2(pos + Vector2(-2.5, -2), Vector2(5, 7)), shirt, true)
-	draw_line(pos + Vector2(-1, 5), pos + Vector2(-2, 8), Color("#39433f"), 1.5)
-	draw_line(pos + Vector2(1, 5), pos + Vector2(2, 8), Color("#39433f"), 1.5)
+	draw_circle(body_pos + Vector2(0, -5), 3.0, Color("#e7c6a3"))
+	draw_rect(Rect2(body_pos + Vector2(-2.5, -2), Vector2(5, 7)), shirt, true)
+	var leg_swing := stride * 2.2
+	draw_line(body_pos + Vector2(-1, 5), body_pos + Vector2(-2 - leg_swing, 8), Color("#39433f"), 1.5)
+	draw_line(body_pos + Vector2(1, 5), body_pos + Vector2(2 + leg_swing, 8), Color("#39433f"), 1.5)
+	if walking:
+		draw_line(body_pos + Vector2(-2, 0), body_pos + Vector2(-4 - stride, 3), shirt.darkened(0.12), 1.2)
+		draw_line(body_pos + Vector2(2, 0), body_pos + Vector2(4 + stride, 3), shirt.darkened(0.12), 1.2)
 
 func _draw_diamond(center: Vector2, size: Vector2, fill: Color, outline: Color, width: float) -> void:
 	var points := PackedVector2Array([
