@@ -248,14 +248,18 @@ func _simulate_needs_minute(total_minute: int) -> void:
 			else:
 				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			member["needs"] = needs
-			_update_mood_and_satisfaction(member, needs)
 		state["members"] = members
-		_refresh_family_aggregates(state)
 		var activity := str(schedule["activity"])
 		_run_autonomous_action(state, total_minute, activity)
 		if minute_of_day % 60 == 0:
-			var updated_needs: Dictionary = state.get("needs", NEED_DEFAULTS)
-			_update_mood_and_satisfaction(state, updated_needs)
+			members = state.get("members", [])
+			for member_value in members:
+				if not member_value is Dictionary:
+					continue
+				var member: Dictionary = member_value
+				_update_mood_and_satisfaction(member, member.get("needs", NEED_DEFAULTS))
+			state["members"] = members
+			_refresh_family_aggregates(state)
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
 	var critical_count := 0
