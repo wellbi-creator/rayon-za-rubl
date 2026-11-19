@@ -277,6 +277,8 @@ func _update_balance() -> void:
 func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if game_time_label != null:
 		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
+	if resident_service != null:
+		resident_service.update_time(hour, minute, day)
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
@@ -379,7 +381,7 @@ func _on_plot_selected(plot_id: int) -> void:
 		if ready:
 			var resident_family := current_family
 			if not resident_family.is_empty():
-				resident_label.text = "%s уже живёт здесь. Жителей: %d. Настроение: %d%% • Удовлетворённость: %d%%" % [resident_family["title"], int(resident_family["members_count"]), int(resident_family["mood"]), int(resident_family["satisfaction"])]
+				resident_label.text = "%s уже живёт здесь. Жителей: %d. Сейчас: %s. Настроение: %d%% • Удовлетворённость: %d%%" % [resident_family["title"], int(resident_family["members_count"]), str(resident_family.get("activity_label", "Дома")), int(resident_family["mood"]), int(resident_family["satisfaction"])]
 				resident_button.visible = false
 			else:
 				var available_families := resident_service.get_available_families()

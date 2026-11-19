@@ -4,7 +4,16 @@ class_name ResidentService
 signal residents_changed(plot_id: int)
 signal family_moved_in(plot_id: int, family_id: String)
 
-# Starter content is data-driven. Story names and individual biographies can be authored later.
+# Daily routine is deliberately data-driven so later families can have individual schedules.
+const DAILY_SCHEDULE := [
+	{"start_minute": 0, "end_minute": 360, "activity": "sleeping", "label": "Спят"},
+	{"start_minute": 360, "end_minute": 480, "activity": "at_home", "label": "Дома, собираются"},
+	{"start_minute": 480, "end_minute": 1020, "activity": "at_work", "label": "На работе"},
+	{"start_minute": 1020, "end_minute": 1200, "activity": "walking", "label": "Гуляют в районе"},
+	{"start_minute": 1200, "end_minute": 1320, "activity": "at_home", "label": "Дома, отдыхают"},
+	{"start_minute": 1320, "end_minute": 1440, "activity": "sleeping", "label": "Спят"}
+]
+
 const FAMILY_CATALOG := {
 	"first_neighbors": {
 		"id": "first_neighbors",
@@ -18,6 +27,8 @@ const FAMILY_CATALOG := {
 
 var occupied_homes: Dictionary = {}
 var moved_families: Dictionary = {}
+var current_minute_of_day: int = 480
+var current_day: int = 1
 
 func get_family_catalog() -> Array:
 	var result: Array = []
@@ -37,9 +48,12 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	if family_id.is_empty() or not FAMILY_CATALOG.has(family_id):
 		return {}
 	var profile: Dictionary = FAMILY_CATALOG[family_id].duplicate(true)
-	profile["mood"] = int(moved_families[family_id].get("mood", profile["initial_mood"]))
-	profile["satisfaction"] = int(moved_families[family_id].get("satisfaction", profile["initial_satisfaction"]))
-	profile["relationship"] = int(moved_families[family_id].get("relationship", 0))
+	var state: Dictionary = moved_families[family_id]
+	profile["mood"] = int(state.get("mood", profile["initial_mood"]))
+	profile["satisfaction"] = int(state.get("satisfaction", profile["initial_satisfaction"]))
+	profile["relationship"] = int(state.get("relationship", 0))
+	profile["activity"] = str(state.get("activity", "at_home"))
+	profile["activity_label"] = str(state.get("activity_label", "Дома"))
 	return profile
 
 func is_plot_occupied(plot_id: int) -> bool:
@@ -51,17 +65,43 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 	if not FAMILY_CATALOG.has(family_id) or moved_families.has(family_id):
 		return false
 	var profile: Dictionary = FAMILY_CATALOG[family_id]
+	var schedule: Dictionary = _get_schedule_entry(current_minute_of_day)
 	occupied_homes[plot_id] = family_id
 	moved_families[family_id] = {
 		"plot_id": plot_id,
 		"mood": int(profile["initial_mood"]),
 		"satisfaction": int(profile["initial_satisfaction"]),
 		"relationship": 0,
-		"moved_in_at": int(Time.get_unix_time_from_system())
+		"moved_in_at": int(Time.get_unix_time_from_system()),
+		"activity": str(schedule["activity"]),
+		"activity_label": str(schedule["label"])
 	}
 	residents_changed.emit(plot_id)
 	family_moved_in.emit(plot_id, family_id)
 	return true
+
+func update_time(hour: int, minute: int, day: int) -> void:
+	current_minute_of_day = posmod(hour * 60 + minute, 1440)
+	current_day = maxi(1, day)
+	var schedule := _get_schedule_entry(current_minute_of_day)
+	for family_id in moved_families:
+		var state: Dictionary = moved_families[family_id]
+		var next_activity := str(schedule["activity"])
+		if str(state.get("activity", "")) == next_activity:
+			continue
+		state["activity"] = next_activity
+		state["activity_label"] = str(schedule["label"])
+		state["last_schedule_day"] = current_day
+		residents_changed.emit(int(state.get("plot_id", -1)))
+
+func _get_schedule_entry(minute_of_day: int) -> Dictionary:
+	for entry in DAILY_SCHEDULE:
+		if minute_of_day >= int(entry["start_minute"]) and minute_of_day < int(entry["end_minute"]):
+			return entry
+	return DAILY_SCHEDULE[0]
+
+func get_daily_schedule() -> Array:
+	return DAILY_SCHEDULE.duplicate(true)
 
 func get_occupied_home_count() -> int:
 	return occupied_homes.size()
@@ -71,9 +111,12 @@ func get_resident_display_data() -> Array:
 	for plot_id in occupied_homes:
 		var family_id := str(occupied_homes[plot_id])
 		var profile: Dictionary = FAMILY_CATALOG.get(family_id, {})
+		var state: Dictionary = moved_families.get(family_id, {})
 		result.append({
 			"plot_id": int(plot_id),
-			"members_count": int(profile.get("members_count", 0))
+			"members_count": int(profile.get("members_count", 0)),
+			"activity": str(state.get("activity", "at_home")),
+			"activity_label": str(state.get("activity_label", "Дома"))
 		})
 	return result
 
