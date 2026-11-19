@@ -353,14 +353,16 @@ func _on_plot_selected(plot_id: int) -> void:
 		if not current_family.is_empty():
 			plot_description.text = "Дом заселён: здесь живёт %s." % str(current_family["title"])
 			var needs: Dictionary = current_family.get("needs", {})
-			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%" % [
+			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%" % [
 				int(current_family["members_count"]),
 				str(current_family.get("activity_label", "Дома")),
 				int(needs.get("energy", 75.0)),
 				int(needs.get("hunger", 80.0)),
 				int(needs.get("hygiene", 80.0)),
 				int(needs.get("leisure", 75.0)),
-				int(needs.get("home_comfort", 75.0))
+				int(needs.get("home_comfort", 75.0)),
+				int(current_family.get("mood", 75)),
+				int(current_family.get("satisfaction", 75))
 			]
 			build_button.text = "Дом заселён"
 		else:
