@@ -4,6 +4,7 @@ class_name DistrictWorld
 signal plot_selected(plot_id: int)
 
 const Grid = preload("res://scripts/world/isometric_grid.gd")
+const RoadPathNetwork = preload("res://scripts/world/road_path_network.gd")
 const TILE := Vector2(128.0, 64.0)
 const MAP_WIDTH := 9
 const MAP_HEIGHT := 7
@@ -20,6 +21,8 @@ var plot_states: Array[Dictionary] = []
 var selected_plot: int = -1
 var camera: Camera2D
 var resident_groups: Array = []
+var transport_entries: Array[Dictionary] = []
+var road_path_network: RoadPathNetwork
 var baba_home_repaired := false
 var construction_animation_time := 0.0
 var pedestrian_time := 0.0
@@ -37,6 +40,8 @@ var world_hour := 12.0
 var night_factor := 0.0
 
 func _ready() -> void:
+	road_path_network = RoadPathNetwork.new()
+	road_path_network.configure(MAP_WIDTH, MAP_HEIGHT, 3, 4)
 	for i in PLOT_CELLS.size():
 		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0})
 	camera = Camera2D.new()
@@ -75,6 +80,16 @@ func _draw_depth_sorted_world_objects() -> void:
 	for plot_id in PLOT_CELLS.size():
 		var plot_pos: Vector2 = Grid.grid_to_world(PLOT_CELLS[plot_id], TILE)
 		entries.append({"kind": "plot", "plot_id": plot_id, "position": plot_pos, "depth": plot_pos.y})
+	for transport in transport_entries:
+		if not transport is Dictionary:
+			continue
+		var transport_position: Vector2 = transport.get("position", Vector2.ZERO)
+		entries.append({
+			"kind": "transport",
+			"position": transport_position,
+			"depth": float(transport.get("depth", transport_position.y + 5.0)),
+			"transport": transport
+		})
 	for resident in _collect_resident_draw_entries():
 		entries.append({
 			"kind": "resident",
@@ -89,6 +104,8 @@ func _draw_depth_sorted_world_objects() -> void:
 				_draw_tree(entry["position"])
 			"plot":
 				_draw_plot(int(entry["plot_id"]))
+			"transport":
+				_draw_transport_entry(entry["transport"])
 			"resident":
 				var resident: Dictionary = entry["resident"]
 				_draw_person(
@@ -107,8 +124,32 @@ func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	var pos_b: Vector2 = b.get("position", Vector2.ZERO)
 	if not is_equal_approx(pos_a.x, pos_b.x):
 		return pos_a.x < pos_b.x
-	var kind_order := {"tree": 0, "plot": 1, "resident": 2}
+	var kind_order := {"tree": 0, "plot": 1, "resident": 2, "transport": 3}
 	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
+
+func _draw_transport_entry(entry: Dictionary) -> void:
+	# A compact data-driven vehicle sprite; actual traffic movement is a later stage.
+	var ground: Vector2 = entry.get("position", Vector2.ZERO)
+	var body_color: Color = entry.get("color", Color("#587b8a"))
+	var facing: float = float(entry.get("rotation", 0.0))
+	var local_points := PackedVector2Array([
+		Vector2(-13, 0), Vector2(-7, -5), Vector2(7, -5),
+		Vector2(13, 0), Vector2(7, 5), Vector2(-7, 5)
+	])
+	var points := PackedVector2Array()
+	for point in local_points:
+		points.append(ground + point.rotated(facing))
+	draw_ellipse(ground + Vector2(1, 4), Vector2(13, 5), Color("#26352f", 0.28))
+	draw_colored_polygon(points, body_color)
+	draw_line(points[0], points[1], body_color.lightened(0.22), 1.2)
+	draw_line(points[1], points[2], body_color.lightened(0.3), 1.2)
+	draw_line(points[2], points[3], body_color.darkened(0.18), 1.2)
+	draw_colored_polygon(PackedVector2Array([
+		ground + Vector2(-5, -2).rotated(facing),
+		ground + Vector2(0, -4).rotated(facing),
+		ground + Vector2(5, -2).rotated(facing),
+		ground + Vector2(0, 1).rotated(facing)
+	]), Color("#b9d5d4"))
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
@@ -562,6 +603,18 @@ func set_time_of_day(hour: int, minute: int) -> void:
 func set_resident_groups(groups: Array) -> void:
 	resident_groups = groups.duplicate(true)
 	queue_redraw()
+
+func set_transport_entries(entries: Array) -> void:
+	transport_entries.clear()
+	for entry in entries:
+		if entry is Dictionary and entry.has("position"):
+			transport_entries.append(entry.duplicate(true))
+	queue_redraw()
+
+func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> Array[Vector2]:
+	if road_path_network == null:
+		return []
+	return road_path_network.get_route(start_road_cell, end_road_cell, TILE)
 
 func get_save_data() -> Dictionary:
 	return {"plot_states": plot_states.duplicate(true), "baba_home_repaired": baba_home_repaired}
