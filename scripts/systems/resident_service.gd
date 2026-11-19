@@ -383,7 +383,8 @@ func _apply_action_to_member(member: Dictionary, action_id: String, total_minute
 	if not HOUSEHOLD_ACTIONS.has(action_id):
 		return false
 	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
-	if not (action.get("allowed", []) as Array).has(activity):
+	var allowed_activities: Array = action.get("allowed", [])
+	if not allowed_activities.has(activity):
 		return false
 	var cooldowns: Dictionary = member.get("action_cooldowns", {}).duplicate(true)
 	var last_used := int(cooldowns.get(action_id, -1000000))
