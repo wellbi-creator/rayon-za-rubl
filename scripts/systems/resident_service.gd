@@ -46,9 +46,9 @@ const ACTION_PREFERENCE_LABELS := {
 }
 const MEMBER_TEMPLATES := {
 	"first_neighbors": [
-		{"id": "adult_one", "name": "Взрослый 1", "role": "Взрослый", "need_rates": {"energy": 1.0, "hunger": 1.0, "hygiene": 1.0, "leisure": 1.0}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}},
-		{"id": "adult_two", "name": "Взрослый 2", "role": "Взрослый", "need_rates": {"energy": 0.9, "hunger": 1.05, "hygiene": 0.95, "leisure": 1.1}, "preferences": {"favorite_activity": "at_home", "favorite_action": "meal"}},
-		{"id": "child_one", "name": "Ребёнок", "role": "Ребёнок", "need_rates": {"energy": 1.15, "hunger": 1.2, "hygiene": 1.0, "leisure": 1.25}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}}
+		{"id": "adult_one", "name": "Взрослый 1", "role": "Взрослый", "need_rates": {"energy": 1.0, "hunger": 1.0, "hygiene": 1.0, "leisure": 1.0}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}, "goal": {"id": "personal_wellbeing", "title": "Найти время для себя", "description": "Регулярно уделять внимание отдыху и личному самочувствию.", "action_id": "rest", "target": 3}},
+		{"id": "adult_two", "name": "Взрослый 2", "role": "Взрослый", "need_rates": {"energy": 0.9, "hunger": 1.05, "hygiene": 0.95, "leisure": 1.1}, "preferences": {"favorite_activity": "at_home", "favorite_action": "meal"}, "goal": {"id": "family_cooking", "title": "Создать уют дома", "description": "Не забывать о домашних делах и заботе о близких.", "action_id": "meal", "target": 3}},
+		{"id": "child_one", "name": "Ребёнок", "role": "Ребёнок", "need_rates": {"energy": 1.15, "hunger": 1.2, "hygiene": 1.0, "leisure": 1.25}, "preferences": {"favorite_activity": "walking", "favorite_action": "leisure"}, "goal": {"id": "creative_play", "title": "Найти время для любимых занятий", "description": "Чаще заниматься тем, что приносит радость.", "action_id": "leisure", "target": 3}}
 	]
 }
 const MAX_SIMULATION_MINUTES := 10080
@@ -236,6 +236,7 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"name": str(template.get("name", "Житель")),
 			"role": str(template.get("role", "Житель")),
 			"preferences": template.get("preferences", {"favorite_activity": "walking", "favorite_action": "leisure"}).duplicate(true),
+			"personal_goal": _create_personal_goal(template.get("goal", {})),
 			"need_rates": template.get("need_rates", {}).duplicate(true),
 			"needs": starting_needs.duplicate(true),
 			"mood": 75,
@@ -250,6 +251,19 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"activity_label": str(_get_member_schedule_entry(str(template.get("id", "")), current_minute_of_day)["label"])
 		})
 	return result
+
+
+func _create_personal_goal(template_value: Variant) -> Dictionary:
+	var template: Dictionary = template_value.duplicate(true) if template_value is Dictionary else {}
+	return {
+		"id": str(template.get("id", "personal_wellbeing")),
+		"title": str(template.get("title", "Найти своё занятие")),
+		"description": str(template.get("description", "Постепенно двигаться к личной цели.")),
+		"action_id": str(template.get("action_id", "leisure")),
+		"target": maxi(1, int(template.get("target", 3))),
+		"progress": clampi(int(template.get("progress", 0)), 0, maxi(1, int(template.get("target", 3)))),
+		"completed": bool(template.get("completed", false))
+	}
 
 
 func _normalize_member_states(state: Dictionary) -> void:
@@ -276,6 +290,12 @@ func _normalize_member_states(state: Dictionary) -> void:
 		if not ACTION_PREFERENCE_LABELS.has(str(preferences.get("favorite_action", ""))):
 			preferences["favorite_action"] = "leisure"
 		member["preferences"] = preferences
+		var template_goal: Dictionary = {}
+		for template_value in MEMBER_TEMPLATES.get("first_neighbors", []):
+			if template_value is Dictionary and str(template_value.get("id", "")) == str(member.get("id", "")):
+				template_goal = template_value.get("goal", {})
+				break
+		member["personal_goal"] = _create_personal_goal(member.get("personal_goal", template_goal))
 		member["autonomy_enabled"] = bool(member.get("autonomy_enabled", true))
 		member["action_cooldowns"] = member.get("action_cooldowns", {}).duplicate(true)
 		member["shared_time_cooldowns"] = member.get("shared_time_cooldowns", {}).duplicate(true)
@@ -328,6 +348,7 @@ func _get_member_display_data(state: Dictionary) -> Array:
 			"name": str(member.get("name", "Житель")),
 			"role": str(member.get("role", "Житель")),
 			"preferences": preferences.duplicate(true),
+			"personal_goal": member.get("personal_goal", {}).duplicate(true),
 			"preferences_label": "%s • %s" % [
 				str(PREFERENCE_LABELS.get(favorite_activity, "Любит прогулки")),
 				str(ACTION_PREFERENCE_LABELS.get(favorite_action, "Любит развлечения"))
@@ -962,11 +983,15 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 			candidates.erase(favorite_action)
 			candidates.push_front(favorite_action)
 		for action_id in candidates:
+			var goal_was_completed := bool(member.get("personal_goal", {}).get("completed", false))
 			if _apply_action_to_member(member, str(action_id), total_minute, member_activity):
 				state["last_action_label"] = "%s: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])]
 				state["last_action_source"] = "autonomous"
 				state["last_action_minute"] = total_minute
 				_record_family_event(state, "%s самостоятельно: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])], "autonomous", total_minute)
+				var goal_after: Dictionary = member.get("personal_goal", {})
+				if not goal_was_completed and bool(goal_after.get("completed", false)):
+					_record_family_event(state, "%s достиг(ла) личной цели: %s" % [str(member.get("name", "Житель")), str(goal_after.get("title", "Личная цель"))], "autonomous", total_minute)
 				break
 	state["members"] = members
 	_refresh_family_aggregates(state)
@@ -1099,6 +1124,13 @@ func _apply_action_to_member(member: Dictionary, action_id: String, total_minute
 	var need_key := str(action["need"])
 	needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
 	member["needs"] = needs
+	var personal_goal: Dictionary = member.get("personal_goal", {}).duplicate(true)
+	if not bool(personal_goal.get("completed", false)) and str(personal_goal.get("action_id", "")) == action_id:
+		var target := maxi(1, int(personal_goal.get("target", 3)))
+		var progress := mini(target, int(personal_goal.get("progress", 0)) + 1)
+		personal_goal["progress"] = progress
+		personal_goal["completed"] = progress >= target
+		member["personal_goal"] = personal_goal
 	cooldowns[action_id] = total_minute
 	member["action_cooldowns"] = cooldowns
 	member["last_action_label"] = str(action["label"])
