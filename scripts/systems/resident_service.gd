@@ -69,6 +69,22 @@ var current_day: int = 1
 var last_simulated_total_minute: int = -1
 
 
+func _record_family_event(state: Dictionary, description: String, source: String, total_minute: int) -> void:
+	var history: Array = state.get("activity_history", []).duplicate(true)
+	var day := int(total_minute / 1440)
+	var minute_of_day := posmod(total_minute, 1440)
+	history.append({
+		"day": day,
+		"hour": int(minute_of_day / 60),
+		"minute": posmod(minute_of_day, 60),
+		"description": description,
+		"source": source
+	})
+	while history.size() > 8:
+		history.pop_front()
+	state["activity_history"] = history
+
+
 func _relationship_key(first_id: String, second_id: String) -> String:
 	var ids := [first_id, second_id]
 	ids.sort()
@@ -324,6 +340,7 @@ func get_family_at_plot(plot_id: int) -> Dictionary:
 	profile["last_action_minute"] = int(state.get("last_action_minute", -1))
 	profile["needs"] = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	profile["members"] = _get_member_display_data(state)
+	profile["activity_history"] = state.get("activity_history", []).duplicate(true)
 	return profile
 
 func is_plot_occupied(plot_id: int) -> bool:
@@ -350,7 +367,8 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"last_action_source": "",
 		"last_action_minute": -1,
 		"needs": NEED_DEFAULTS.duplicate(true),
-		"members": _create_member_states(family_id, NEED_DEFAULTS)
+		"members": _create_member_states(family_id, NEED_DEFAULTS),
+		"activity_history": []
 	}
 	moved_families[family_id]["relationships"] = _create_relationships(moved_families[family_id]["members"])
 	last_simulated_total_minute = _get_total_game_minutes()
@@ -490,6 +508,7 @@ func talk_to_family(plot_id: int, member_id: String) -> bool:
 	speaker["social_cooldown_until"] = total_minute + 120
 	speaker["last_action_label"] = "Поговорил(а) с семьёй"
 	speaker["last_action_minute"] = total_minute
+	_record_family_event(state, "%s поговорил(а) с семьёй" % str(speaker.get("name", "Житель")), "player", total_minute)
 	state["relationships"] = relationships
 	state["members"] = members
 	_refresh_family_aggregates(state)
@@ -551,6 +570,7 @@ func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: 
 	state["last_action_label"] = str(action["label"])
 	state["last_action_source"] = source
 	state["last_action_minute"] = total_minute
+	_record_family_event(state, "%s: %s" % [str(action["label"]), "действие игрока"], source, total_minute)
 	return true
 
 func set_autonomy_enabled(plot_id: int, enabled: bool) -> bool:
@@ -605,6 +625,7 @@ func _run_autonomous_action(state: Dictionary, total_minute: int, activity: Stri
 				state["last_action_label"] = "%s: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])]
 				state["last_action_source"] = "autonomous"
 				state["last_action_minute"] = total_minute
+				_record_family_event(state, "%s самостоятельно: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])], "autonomous", total_minute)
 				break
 	state["members"] = members
 	_refresh_family_aggregates(state)
@@ -655,6 +676,7 @@ func _run_autonomous_social_interaction(state: Dictionary, total_minute: int) ->
 		state["last_action_label"] = "%s: разговор с семьёй" % str(speaker.get("name", "Житель"))
 		state["last_action_source"] = "autonomous"
 		state["last_action_minute"] = total_minute
+		_record_family_event(state, "%s самостоятельно поговорил(а) с семьёй" % str(speaker.get("name", "Житель")), "autonomous", total_minute)
 		_refresh_family_aggregates(state)
 		return
 
@@ -800,6 +822,10 @@ func load_save_data(data: Dictionary) -> void:
 			var saved_profile: Variant = saved_families[family_id]
 			if FAMILY_CATALOG.has(str(family_id)) and saved_profile is Dictionary:
 				var restored: Dictionary = saved_profile.duplicate(true)
+				if not restored.get("activity_history", []) is Array:
+					restored["activity_history"] = []
+				else:
+					restored["activity_history"] = restored["activity_history"].duplicate(true)
 				restored["autonomy_enabled"] = bool(restored.get("autonomy_enabled", true))
 				if not restored.has("needs") or not restored["needs"] is Dictionary:
 					restored["needs"] = NEED_DEFAULTS.duplicate(true)
