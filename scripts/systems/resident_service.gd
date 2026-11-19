@@ -60,7 +60,11 @@ func _create_member_states(family_id: String, starting_needs: Dictionary) -> Arr
 			"need_rates": template.get("need_rates", {}).duplicate(true),
 			"needs": starting_needs.duplicate(true),
 			"mood": 75,
-			"satisfaction": 75
+			"satisfaction": 75,
+			"autonomy_enabled": true,
+			"action_cooldowns": {},
+			"last_action_label": "Пока действий не было",
+			"last_action_minute": -1
 		})
 	return result
 
@@ -82,6 +86,10 @@ func _normalize_member_states(state: Dictionary) -> void:
 		member["mood"] = clampi(int(member.get("mood", state.get("mood", 75))), 0, 100)
 		member["satisfaction"] = clampi(int(member.get("satisfaction", state.get("satisfaction", 75))), 0, 100)
 		member["need_rates"] = member.get("need_rates", {}).duplicate(true)
+		member["autonomy_enabled"] = bool(member.get("autonomy_enabled", true))
+		member["action_cooldowns"] = member.get("action_cooldowns", {}).duplicate(true)
+		member["last_action_label"] = str(member.get("last_action_label", "Пока действий не было"))
+		member["last_action_minute"] = int(member.get("last_action_minute", -1))
 	state["members"] = members
 
 
@@ -124,7 +132,10 @@ func _get_member_display_data(state: Dictionary) -> Array:
 			"role": str(member.get("role", "Житель")),
 			"needs": member.get("needs", NEED_DEFAULTS).duplicate(true),
 			"mood": int(member.get("mood", 75)),
-			"satisfaction": int(member.get("satisfaction", 75))
+			"satisfaction": int(member.get("satisfaction", 75)),
+			"autonomy_enabled": bool(member.get("autonomy_enabled", true)),
+			"last_action_label": str(member.get("last_action_label", "Пока действий не было")),
+			"last_action_minute": int(member.get("last_action_minute", -1))
 		})
 	return result
 
@@ -237,14 +248,18 @@ func _simulate_needs_minute(total_minute: int) -> void:
 			else:
 				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			member["needs"] = needs
-			_update_mood_and_satisfaction(member, needs)
 		state["members"] = members
-		_refresh_family_aggregates(state)
 		var activity := str(schedule["activity"])
 		_run_autonomous_action(state, total_minute, activity)
 		if minute_of_day % 60 == 0:
-			var updated_needs: Dictionary = state.get("needs", NEED_DEFAULTS)
-			_update_mood_and_satisfaction(state, updated_needs)
+			members = state.get("members", [])
+			for member_value in members:
+				if not member_value is Dictionary:
+					continue
+				var member: Dictionary = member_value
+				_update_mood_and_satisfaction(member, member.get("needs", NEED_DEFAULTS))
+			state["members"] = members
+			_refresh_family_aggregates(state)
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
 	var critical_count := 0
@@ -334,22 +349,74 @@ func is_autonomy_enabled(plot_id: int) -> bool:
 func _run_autonomous_action(state: Dictionary, total_minute: int, activity: String) -> void:
 	if not bool(state.get("autonomy_enabled", true)):
 		return
-	var needs: Dictionary = state.get("needs", NEED_DEFAULTS)
-	var candidates: Array = []
-	if activity == "at_home":
-		if float(needs.get("hunger", 100.0)) < 55.0:
-			candidates.append("meal")
-		if float(needs.get("hygiene", 100.0)) < 45.0:
-			candidates.append("shower")
-		if float(needs.get("energy", 100.0)) < 35.0:
-			candidates.append("rest")
-		if float(needs.get("leisure", 100.0)) < 45.0:
+	var members: Array = state.get("members", [])
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if not bool(member.get("autonomy_enabled", true)):
+			continue
+		var needs: Dictionary = member.get("needs", NEED_DEFAULTS)
+		var candidates: Array = []
+		if activity == "at_home":
+			if float(needs.get("hunger", 100.0)) < 55.0:
+				candidates.append("meal")
+			if float(needs.get("hygiene", 100.0)) < 45.0:
+				candidates.append("shower")
+			if float(needs.get("energy", 100.0)) < 35.0:
+				candidates.append("rest")
+			if float(needs.get("leisure", 100.0)) < 45.0:
+				candidates.append("leisure")
+		elif activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
 			candidates.append("leisure")
-	elif activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
-		candidates.append("leisure")
-	for action_id in candidates:
-		if _apply_action_to_state(state, str(action_id), total_minute, activity, "autonomous"):
-			return
+		for action_id in candidates:
+			if _apply_action_to_member(member, str(action_id), total_minute, activity):
+				state["last_action_label"] = "%s: %s" % [str(member.get("name", "Житель")), str(HOUSEHOLD_ACTIONS[action_id]["label"])]
+				state["last_action_source"] = "autonomous"
+				state["last_action_minute"] = total_minute
+				break
+	state["members"] = members
+	_refresh_family_aggregates(state)
+
+
+func _apply_action_to_member(member: Dictionary, action_id: String, total_minute: int, activity: String) -> bool:
+	if not HOUSEHOLD_ACTIONS.has(action_id):
+		return false
+	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
+	var allowed_activities: Array = action.get("allowed", [])
+	if not allowed_activities.has(activity):
+		return false
+	var cooldowns: Dictionary = member.get("action_cooldowns", {}).duplicate(true)
+	var last_used := int(cooldowns.get(action_id, -1000000))
+	if total_minute - last_used < int(action["cooldown"]):
+		return false
+	var needs: Dictionary = member.get("needs", NEED_DEFAULTS).duplicate(true)
+	var need_key := str(action["need"])
+	needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
+	member["needs"] = needs
+	cooldowns[action_id] = total_minute
+	member["action_cooldowns"] = cooldowns
+	member["last_action_label"] = str(action["label"])
+	member["last_action_minute"] = total_minute
+	return true
+
+
+func set_member_autonomy_enabled(plot_id: int, member_id: String, enabled: bool) -> bool:
+	if not occupied_homes.has(plot_id):
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	var members: Array = state.get("members", [])
+	for member_value in members:
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if str(member.get("id", "")) == member_id:
+			member["autonomy_enabled"] = enabled
+			state["members"] = members
+			residents_changed.emit(plot_id)
+			return true
+	return false
 
 func get_household_action_cooldown(plot_id: int, action_id: String) -> int:
 	if not occupied_homes.has(plot_id) or not HOUSEHOLD_ACTIONS.has(action_id):
