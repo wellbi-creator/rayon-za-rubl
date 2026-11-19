@@ -402,11 +402,11 @@ func _on_plot_selected(plot_id: int) -> void:
 			status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
 			build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
 		build_button.disabled = true
-		readiness_heading.visible = true
-		readiness_label.visible = true
-		readiness_selector.visible = true
-		readiness_note.visible = true
-		readiness_button.visible = not ready
+		readiness_heading.visible = current_family.is_empty()
+		readiness_label.visible = current_family.is_empty()
+		readiness_selector.visible = current_family.is_empty()
+		readiness_note.visible = current_family.is_empty()
+		readiness_button.visible = not ready and current_family.is_empty()
 		readiness_label.text = "Готовность дома: %d/8" % ready_count
 		if ready:
 			readiness_button.text = "Все проверки пройдены"
@@ -437,7 +437,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				else:
 					resident_label.text = "Все доступные семьи уже получили жильё."
 					resident_button.visible = false
-			resident_label.visible = true
+			resident_label.visible = current_family.is_empty()
 
 func _on_resident_button_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
