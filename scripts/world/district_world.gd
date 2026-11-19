@@ -103,14 +103,16 @@ func _draw_residents() -> void:
 			continue
 		var members := clampi(int(group.get("members_count", 0)), 0, 8)
 		var home_x := PLOT_RECTS[plot_id].position.x + 108.0
+		var home_y := PLOT_RECTS[plot_id].position.y + 106.0
+		var sidewalk_y := 325.0 if plot_id < 4 else 430.0
 		var route := PackedVector2Array([
-			Vector2(home_x, 251.0),
-			Vector2(home_x, 325.0),
-			Vector2(565.0, 325.0),
+			Vector2(home_x, home_y),
+			Vector2(home_x, sidewalk_y),
+			Vector2(565.0, sidewalk_y),
 			Vector2(565.0, 520.0),
-			Vector2(565.0, 325.0),
-			Vector2(home_x, 325.0),
-			Vector2(home_x, 251.0)
+			Vector2(565.0, sidewalk_y),
+			Vector2(home_x, sidewalk_y),
+			Vector2(home_x, home_y)
 		])
 		var total_length := 0.0
 		for i in range(route.size() - 1):
