@@ -358,10 +358,10 @@ func _clamp_camera_target() -> void:
 	var last: Vector2 = Grid.grid_to_world(Vector2i(MAP_WIDTH - 1, MAP_HEIGHT - 1), TILE)
 	var left_top: Vector2 = Grid.grid_to_world(Vector2i(0, MAP_HEIGHT - 1), TILE)
 	var right_bottom: Vector2 = Grid.grid_to_world(Vector2i(MAP_WIDTH - 1, 0), TILE)
-	var min_x := minf(first.x, last.x, left_top.x, right_bottom.x) - TILE.x * 0.9
-	var max_x := maxf(first.x, last.x, left_top.x, right_bottom.x) + TILE.x * 0.9
-	var min_y := minf(first.y, last.y, left_top.y, right_bottom.y) - 150.0
-	var max_y := maxf(first.y, last.y, left_top.y, right_bottom.y) + 90.0
+	var min_x := minf(minf(first.x, last.x), minf(left_top.x, right_bottom.x)) - TILE.x * 0.9
+	var max_x := maxf(maxf(first.x, last.x), maxf(left_top.x, right_bottom.x)) + TILE.x * 0.9
+	var min_y := minf(minf(first.y, last.y), minf(left_top.y, right_bottom.y)) - 150.0
+	var max_y := maxf(maxf(first.y, last.y), maxf(left_top.y, right_bottom.y)) + 90.0
 	var visible_half := get_viewport_rect().size * 0.5 / maxf(camera_target_zoom, 0.1)
 	var low_x := min_x + visible_half.x
 	var high_x := max_x - visible_half.x
