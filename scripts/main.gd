@@ -108,7 +108,7 @@ func _create_interface() -> void:
 	panel.offset_left = -342
 	panel.offset_top = 104
 	panel.offset_right = -18
-	panel.offset_bottom = 550
+	panel.offset_bottom = 620
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
 
@@ -244,6 +244,10 @@ func _format_money(value: int) -> String:
 	return result
 
 func _show_empty_selection() -> void:
+	readiness_heading.visible = false
+	readiness_label.visible = false
+	readiness_selector.visible = false
+	readiness_button.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
@@ -301,7 +305,8 @@ func _on_plot_selected(plot_id: int) -> void:
 			readiness_button.text = "Отметить этап выполненным"
 			readiness_button.disabled = false
 			var checklist := move_in_service.get_checklist(plot_id)
-			var selected_req := str(move_in_service.get_requirements()[readiness_selector.selected]["id"])
+			var selected_index := clampi(readiness_selector.selected, 0, move_in_service.get_requirements().size() - 1)
+			var selected_req := str(move_in_service.get_requirements()[selected_index]["id"])
 			if bool(checklist.get(selected_req, false)):
 				readiness_button.text = "Этап уже выполнен"
 				readiness_button.disabled = true
