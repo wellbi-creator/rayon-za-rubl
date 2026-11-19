@@ -13,6 +13,7 @@ var selected_plot_id: int = -1
 var construction_service: ConstructionService
 var selected_house_type: String = "ordinary"
 var house_type_selector: OptionButton
+var last_construction_save_second: int = -1
 var economy: EconomyService
 var save_service: SaveService
 var save_timer: Timer
@@ -305,7 +306,9 @@ func _on_construction_updated(plot_id: int, progress: float, stage: String) -> v
 		var project := construction_service.get_project(plot_id)
 		var remaining := maxi(0, int(ceil(float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))))
 		status_label.text = "%s • %d%% • осталось %d сек." % [stage, int(progress * 100.0), remaining]
-	if int(Time.get_ticks_msec() / 1000) % 5 == 0:
+	var current_second := int(Time.get_ticks_msec() / 1000)
+	if current_second % 5 == 0 and current_second != last_construction_save_second:
+		last_construction_save_second = current_second
 		_save_game()
 
 func _on_construction_completed(plot_id: int) -> void:
