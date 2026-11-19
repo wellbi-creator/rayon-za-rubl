@@ -24,6 +24,7 @@ var resident_groups: Array = []
 var transport_entries: Array[Dictionary] = []
 var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
+var _draw_callback_count := 0
 var _traffic_signal_timer := 0.0
 var _traffic_vertical_green := false
 const TRAFFIC_SIGNAL_PHASE_DURATION := 5.0
@@ -209,7 +210,23 @@ func _update_demo_traffic(delta: float) -> void:
 			"color": vehicle_color
 		})
 
+func get_render_diagnostic_text() -> String:
+	var viewport_size := get_viewport_rect().size
+	var camera_position := camera.global_position if camera != null else Vector2.ZERO
+	var camera_zoom := camera.zoom.x if camera != null else 0.0
+	var camera_current := camera.is_current() if camera != null else false
+	return "WORLD DEBUG  draw=%d  visible=%s  viewport=%.0fx%.0f  camera=%s  zoom=%.2f  current=%s" % [
+		_draw_callback_count,
+		str(is_visible_in_tree()),
+		viewport_size.x,
+		viewport_size.y,
+		str(Vector2i(roundi(camera_position.x), roundi(camera_position.y))),
+		camera_zoom,
+		str(camera_current)
+	]
+
 func _draw() -> void:
+	_draw_callback_count += 1
 	_draw_ground()
 	_draw_roads()
 	_draw_environment()
