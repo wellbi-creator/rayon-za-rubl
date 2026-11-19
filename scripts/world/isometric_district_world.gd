@@ -65,6 +65,7 @@ func _draw() -> void:
 	for plot_id in PLOT_CELLS.size():
 		_draw_plot(plot_id)
 	_draw_residents()
+	_draw_ambient_birds()
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
@@ -168,6 +169,7 @@ func _draw_house(ground: Vector2, repaired: bool) -> void:
 	draw_line(ground + Vector2(0, -42), ground + Vector2(35, -21), Color("#5f403b"), 1.4)
 	draw_rect(Rect2(ground + Vector2(20, -68), Vector2(8, 19)), Color("#8a5b4c"), true)
 	draw_rect(Rect2(ground + Vector2(18, -70), Vector2(12, 4)), Color("#62463f"), true)
+	_draw_chimney_smoke(ground + Vector2(24, -71))
 	var window_color := Color("#f4d77f") if repaired else Color("#8fb8bc")
 	window_color = window_color.lerp(Color("#f2cf78"), night_factor * 0.85)
 	_draw_iso_window(ground + Vector2(-21, -37), window_color)
@@ -272,8 +274,31 @@ func _draw_tree(pos: Vector2) -> void:
 	draw_circle(pos + Vector2(-9, -17), 10, Color("#638f5b"))
 	draw_circle(pos + Vector2(8, -20), 10, Color("#79a66a"))
 	draw_circle(pos + Vector2(-3, -25), 7, Color("#8bb477"))
-	draw_circle(pos + Vector2(-5, -15), 3, Color("#a4c47a", 0.55))
-	draw_circle(pos + Vector2(8, -19), 2.5, Color("#a4c47a", 0.45))
+	var leaf_sway := sin(construction_animation_time * 1.35 + pos.x * 0.025) * 2.0
+	draw_circle(pos + Vector2(-5 + leaf_sway, -15), 3, Color("#a4c47a", 0.55))
+	draw_circle(pos + Vector2(8 - leaf_sway * 0.7, -19), 2.5, Color("#a4c47a", 0.45))
+
+func _draw_chimney_smoke(origin: Vector2) -> void:
+	# Soft, slow puffs rise from the chimney; opacity stays low to preserve the cozy pixel-art look.
+	for puff_index in 3:
+		var phase := fposmod(construction_animation_time * 0.42 + float(puff_index) * 0.34, 1.0)
+		var drift := phase * 8.0 + sin(construction_animation_time * 0.7 + float(puff_index)) * 2.0
+		var puff_pos := origin + Vector2(drift, -phase * 23.0)
+		var alpha := (1.0 - phase) * 0.16
+		var puff_color := Color("#d9ddd0", alpha).lerp(Color("#8d9994", alpha * 0.75), night_factor)
+		draw_circle(puff_pos, 2.0 + phase * 2.0, puff_color)
+
+func _draw_ambient_birds() -> void:
+	if night_factor > 0.82:
+		return
+	# A few distant silhouettes cross the open space above the northern tree line.
+	for bird_index in 3:
+		var travel := fposmod(pedestrian_time * 17.0 + float(bird_index) * 245.0, 760.0)
+		var bird_pos := Vector2(-350.0 + travel, -62.0 + sin(pedestrian_time * 0.65 + float(bird_index) * 1.7) * 7.0)
+		var wing := sin(pedestrian_time * 5.0 + float(bird_index) * 2.0) * 3.0
+		var bird_color := Color("#35483f", 0.78).lerp(Color("#9ba99d", 0.7), night_factor)
+		draw_line(bird_pos + Vector2(-5, 0), bird_pos + Vector2(0, wing), bird_color, 1.5)
+		draw_line(bird_pos + Vector2(0, wing), bird_pos + Vector2(5, 0), bird_color, 1.5)
 
 func _draw_bush(pos: Vector2) -> void:
 	draw_circle(pos, 7, Color("#4d784d"))
