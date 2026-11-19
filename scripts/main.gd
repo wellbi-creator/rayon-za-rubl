@@ -448,9 +448,28 @@ func _on_plot_selected(plot_id: int) -> void:
 					var target_id := str(target_member.get("id", ""))
 					if target_id == str(member.get("id", "")):
 						continue
+					var pair_data := resident_service.get_targeted_relationship_data(selected_plot_id, str(member.get("id", "")), target_id)
+					if pair_data.is_empty():
+						continue
+					var pair_score := int(pair_data.get("score", 60))
+					var pair_status := str(pair_data.get("label", "Нейтральные"))
+					var pair_remaining := int(pair_data.get("cooldown_remaining", 0))
+					var pair_available := bool(pair_data.get("participants_available", false))
+					var pair_label := Label.new()
+					if pair_remaining > 0:
+						pair_label.text = "Связь: %s • %d/100 • разговор через %d игровых мин." % [pair_status, pair_score, pair_remaining]
+					elif not pair_available:
+						pair_label.text = "Связь: %s • %d/100 • оба должны быть дома или на прогулке" % [pair_status, pair_score]
+					else:
+						pair_label.text = "Связь: %s • %d/100 • разговор доступен" % [pair_status, pair_score]
+					pair_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					pair_label.add_theme_font_size_override("font_size", 10)
+					pair_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+					member_autonomy_container.add_child(pair_label)
 					var talk_button := Button.new()
 					talk_button.text = "%s → поговорить с %s" % [str(member.get("name", "Житель")), str(target_member.get("name", "родственником"))]
 					talk_button.custom_minimum_size = Vector2(0, 34)
+					talk_button.disabled = not bool(pair_data.get("available", false))
 					talk_button.add_theme_font_size_override("font_size", 11)
 					talk_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
 					talk_button.pressed.connect(_on_resident_talk_to_member_pressed.bind(str(member.get("id", "")), target_id))
