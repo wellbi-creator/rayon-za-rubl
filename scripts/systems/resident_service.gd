@@ -131,8 +131,10 @@ func _simulate_needs_minute(total_minute: int) -> void:
 		else:
 			needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055, 0.0, 100.0)
 		state["needs"] = needs
+		var activity := str(schedule["activity"])
+		_run_autonomous_action(state, total_minute, activity)
 		if minute_of_day % 60 == 0:
-			_update_mood_and_satisfaction(state, needs)
+			_update_mood_and_satisfaction(state, state.get("needs", needs))
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
 	var critical_count := 0
@@ -165,23 +167,68 @@ func apply_household_action(plot_id: int, action_id: String) -> bool:
 	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
 	var state: Dictionary = moved_families[family_id]
 	var activity := str(state.get("activity", "at_home"))
+	if not _apply_action_to_state(state, action_id, _get_total_game_minutes(), activity):
+		return false
+	_update_mood_and_satisfaction(state, state.get("needs", NEED_DEFAULTS))
+	residents_changed.emit(plot_id)
+	return true
+
+func _apply_action_to_state(state: Dictionary, action_id: String, total_minute: int, activity: String) -> bool:
+	if not HOUSEHOLD_ACTIONS.has(action_id):
+		return false
+	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
 	var allowed_activities: Array = action.get("allowed", [])
 	if not allowed_activities.has(activity):
 		return false
-	var now := _get_total_game_minutes()
 	var cooldowns: Dictionary = state.get("action_cooldowns", {}).duplicate(true)
 	var last_used := int(cooldowns.get(action_id, -1000000))
-	if now - last_used < int(action["cooldown"]):
+	if total_minute - last_used < int(action["cooldown"]):
 		return false
 	var needs: Dictionary = state.get("needs", NEED_DEFAULTS).duplicate(true)
 	var need_key := str(action["need"])
 	needs[need_key] = clampf(float(needs.get(need_key, 0.0)) + float(action["gain"]), 0.0, 100.0)
 	state["needs"] = needs
-	cooldowns[action_id] = now
+	cooldowns[action_id] = total_minute
 	state["action_cooldowns"] = cooldowns
-	_update_mood_and_satisfaction(state, needs)
+	return true
+
+func set_autonomy_enabled(plot_id: int, enabled: bool) -> bool:
+	if not occupied_homes.has(plot_id):
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	if not moved_families.has(family_id):
+		return false
+	var state: Dictionary = moved_families[family_id]
+	state["autonomy_enabled"] = enabled
 	residents_changed.emit(plot_id)
 	return true
+
+func is_autonomy_enabled(plot_id: int) -> bool:
+	if not occupied_homes.has(plot_id):
+		return false
+	var family_id := str(occupied_homes[plot_id])
+	var state: Dictionary = moved_families.get(family_id, {})
+	return bool(state.get("autonomy_enabled", true))
+
+func _run_autonomous_action(state: Dictionary, total_minute: int, activity: String) -> void:
+	if not bool(state.get("autonomy_enabled", true)):
+		return
+	var needs: Dictionary = state.get("needs", NEED_DEFAULTS)
+	var candidates: Array = []
+	if activity == "at_home":
+		if float(needs.get("hunger", 100.0)) < 55.0:
+			candidates.append("meal")
+		if float(needs.get("hygiene", 100.0)) < 45.0:
+			candidates.append("shower")
+		if float(needs.get("energy", 100.0)) < 35.0:
+			candidates.append("rest")
+		if float(needs.get("leisure", 100.0)) < 45.0:
+			candidates.append("leisure")
+	elif activity == "walking" and float(needs.get("leisure", 100.0)) < 45.0:
+		candidates.append("leisure")
+	for action_id in candidates:
+		if _apply_action_to_state(state, str(action_id), total_minute, activity):
+			return
 
 func get_household_action_cooldown(plot_id: int, action_id: String) -> int:
 	if not occupied_homes.has(plot_id) or not HOUSEHOLD_ACTIONS.has(action_id):
