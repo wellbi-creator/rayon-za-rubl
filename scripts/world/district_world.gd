@@ -1,5 +1,4 @@
 extends Node2D
-class_name DistrictWorld
 
 signal plot_selected(plot_id: int)
 
