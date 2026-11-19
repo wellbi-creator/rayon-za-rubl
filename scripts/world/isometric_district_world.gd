@@ -316,6 +316,8 @@ func _draw_lamp(pos: Vector2) -> void:
 		draw_circle(pos + Vector2(9, -29), 17.0, Color("#f3d98e", lamp_glow * 0.06))
 
 func _draw_residents() -> void:
+	# Collect visible pedestrians first so their feet are drawn in stable isometric depth order.
+	var draw_entries: Array[Dictionary] = []
 	for group in resident_groups:
 		if not group is Dictionary:
 			continue
@@ -333,10 +335,38 @@ func _draw_residents() -> void:
 			var phase := pedestrian_time * 1.4 + float(member_index) * 1.8 + float(plot_id) * 0.7
 			var pos: Vector2
 			if walking and route.size() > 1:
-				pos = _position_on_walk_route(route, pedestrian_time * 24.0 + float(member_index) * 31.0 + float(plot_id) * 13.0)
+				var route_distance := pedestrian_time * 24.0 + float(member_index) * 31.0 + float(plot_id) * 13.0
+				pos = _position_on_walk_route(route, route_distance)
 			else:
 				pos = home + Vector2(sin(phase) * 13.0, 15.0 + cos(phase * 0.7) * 2.0)
-			_draw_person(pos, member_index, walking, phase)
+			draw_entries.append({
+				"position": pos,
+				"variant": member_index,
+				"walking": walking,
+				"phase": phase,
+				"plot_id": plot_id,
+				"member_index": member_index
+			})
+	draw_entries.sort_custom(_resident_draw_order)
+	for entry in draw_entries:
+		_draw_person(
+			entry["position"],
+			int(entry["variant"]),
+			bool(entry["walking"]),
+			float(entry["phase"])
+		)
+
+func _resident_draw_order(a: Dictionary, b: Dictionary) -> bool:
+	# The ground contact point (feet), not the head, determines front-to-back order.
+	var pos_a: Vector2 = a.get("position", Vector2.ZERO)
+	var pos_b: Vector2 = b.get("position", Vector2.ZERO)
+	if not is_equal_approx(pos_a.y, pos_b.y):
+		return pos_a.y < pos_b.y
+	if not is_equal_approx(pos_a.x, pos_b.x):
+		return pos_a.x < pos_b.x
+	if int(a.get("plot_id", 0)) != int(b.get("plot_id", 0)):
+		return int(a.get("plot_id", 0)) < int(b.get("plot_id", 0))
+	return int(a.get("member_index", 0)) < int(b.get("member_index", 0))
 
 func _get_walk_route(plot_id: int) -> Array[Vector2]:
 	var home_cell: Vector2i = PLOT_CELLS[plot_id]
