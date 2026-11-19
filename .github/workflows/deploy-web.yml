@@ -46,12 +46,21 @@ jobs:
         run: godot --version
 
       - name: Import project resources
-        run: godot --headless --editor --path . --quit
+        run: godot --headless --editor --path . --quit --verbose
+
+      - name: Diagnose Web export preset
+        run: |
+          echo "=== Export preset ==="
+          cat export_presets.cfg
+          echo "=== Installed Web templates ==="
+          ls -lah "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          echo "=== Godot editor diagnostics ==="
+          godot --headless --editor --path . --quit --verbose 2>&1 | tee /tmp/godot-editor-diagnostics.log
 
       - name: Export Web build
         run: |
           mkdir -p build/web
-          godot --headless --path . --export-release "Web" build/web/index.html
+          godot --headless --verbose --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-web-export.log
           test -s build/web/index.html
 
       - name: Upload Pages artifact
