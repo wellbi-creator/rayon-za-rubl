@@ -485,6 +485,31 @@ func _on_plot_selected(plot_id: int) -> void:
 					shared_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cfca")))
 					shared_button.pressed.connect(_on_resident_shared_time_pressed.bind(str(member.get("id", "")), target_id))
 					member_autonomy_container.add_child(shared_button)
+			var family_event: Dictionary = current_family.get("active_event", {})
+			if not family_event.is_empty():
+				var event_heading := Label.new()
+				event_heading.text = str(family_event.get("title", "Семейное событие"))
+				event_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				event_heading.add_theme_font_size_override("font_size", 13)
+				event_heading.add_theme_color_override("font_color", Color("#f4d98d"))
+				member_autonomy_container.add_child(event_heading)
+				var event_description := Label.new()
+				event_description.text = str(family_event.get("description", "Семье нужна поддержка."))
+				event_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				event_description.add_theme_font_size_override("font_size", 11)
+				event_description.add_theme_color_override("font_color", Color("#e0e5d6"))
+				member_autonomy_container.add_child(event_description)
+				for choice_value in family_event.get("choices", []):
+					if not choice_value is Dictionary:
+						continue
+					var choice: Dictionary = choice_value
+					var choice_button := Button.new()
+					choice_button.text = str(choice.get("label", "Выбрать"))
+					choice_button.custom_minimum_size = Vector2(0, 36)
+					choice_button.add_theme_font_size_override("font_size", 11)
+					choice_button.add_theme_stylebox_override("normal", _button_style(Color("#e6c77d")))
+					choice_button.pressed.connect(_on_family_event_choice_pressed.bind(str(family_event.get("id", "")), str(choice.get("id", ""))))
+					member_autonomy_container.add_child(choice_button)
 			var member_summary := "\n".join(member_lines)
 			var history_lines := PackedStringArray()
 			var activity_history: Array = current_family.get("activity_history", [])
@@ -640,6 +665,17 @@ func _on_resident_shared_time_pressed(speaker_id: String, target_id: String) -> 
 			status_label.text = "Совместное время для этой пары будет доступно через %d игровых минут." % remaining
 		else:
 			status_label.text = "Оба жителя должны быть дома или на прогулке."
+
+
+func _on_family_event_choice_pressed(event_id: String, choice_id: String) -> void:
+	if selected_plot_id < 1 or event_id.is_empty() or choice_id.is_empty():
+		return
+	if resident_service.resolve_family_event(selected_plot_id, event_id, choice_id):
+		_save_game()
+		_on_plot_selected(selected_plot_id)
+		status_label.text = "Семейное событие завершено. Отношения, настроение и журнал обновлены."
+	else:
+		status_label.text = "Это семейное событие уже завершилось или выбор недоступен."
 
 
 func _on_household_action_pressed(action_id: String) -> void:
