@@ -4,6 +4,7 @@ const DistrictWorldScript = preload("res://scripts/world/district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
 const ConstructionServiceScript = preload("res://scripts/systems/construction_service.gd")
+const MoveInServiceScript = preload("res://scripts/systems/move_in_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -11,6 +12,11 @@ const BABA_QUEST_REWARD := 150000
 var world: DistrictWorld
 var selected_plot_id: int = -1
 var construction_service: ConstructionService
+var move_in_service: MoveInService
+var readiness_selector: OptionButton
+var readiness_button: Button
+var readiness_label: Label
+var readiness_heading: Label
 var selected_house_type: String = "ordinary"
 var house_type_selector: OptionButton
 var last_construction_save_second: int = -1
@@ -34,6 +40,10 @@ func _ready() -> void:
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
+	move_in_service = MoveInServiceScript.new()
+	add_child(move_in_service)
+	move_in_service.readiness_updated.connect(_on_readiness_updated)
+	move_in_service.house_ready.connect(_on_house_ready)
 	construction_service = ConstructionServiceScript.new()
 	add_child(construction_service)
 	construction_service.project_updated.connect(_on_construction_updated)
@@ -98,7 +108,7 @@ func _create_interface() -> void:
 	panel.offset_left = -342
 	panel.offset_top = 104
 	panel.offset_right = -18
-	panel.offset_bottom = 414
+	panel.offset_bottom = 550
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
 
@@ -150,6 +160,33 @@ func _create_interface() -> void:
 	build_button.add_theme_stylebox_override("hover", _button_style(Color("#f0d99d")))
 	build_button.add_theme_stylebox_override("disabled", _button_style(Color("#777e70")))
 	content.add_child(build_button)
+
+	readiness_heading = Label.new()
+	readiness_heading.text = "ПОДГОТОВКА К ЗАСЕЛЕНИЮ"
+	readiness_heading.add_theme_font_size_override("font_size", 14)
+	readiness_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+	readiness_heading.visible = false
+	content.add_child(readiness_heading)
+
+	readiness_label = Label.new()
+	readiness_label.text = "Готовность дома: 0/8"
+	readiness_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+	readiness_label.visible = false
+	content.add_child(readiness_label)
+
+	readiness_selector = OptionButton.new()
+	for requirement in move_in_service.get_requirements():
+		readiness_selector.add_item(str(requirement["label"]))
+	readiness_selector.visible = false
+	content.add_child(readiness_selector)
+
+	readiness_button = Button.new()
+	readiness_button.text = "Отметить этап выполненным"
+	readiness_button.custom_minimum_size = Vector2(0, 40)
+	readiness_button.visible = false
+	readiness_button.pressed.connect(_on_readiness_button_pressed)
+	readiness_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+	content.add_child(readiness_button)
 
 	var footer := Label.new()
 	footer.text = "Глава 1  •  Возвращение жизни"
@@ -246,10 +283,48 @@ func _on_plot_selected(plot_id: int) -> void:
 		build_button.text = "Строительство уже идёт"
 		build_button.disabled = true
 	else:
-		plot_description.text = "Дом построен. Подготовка к заселению появится в следующем этапе."
-		status_label.text = "Строительство завершено."
-		build_button.text = "Дом построен"
+		var ready_count := move_in_service.get_completed_count(plot_id)
+		var ready := move_in_service.is_ready(plot_id)
+		plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
+		status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
+		build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
 		build_button.disabled = true
+		readiness_heading.visible = true
+		readiness_label.visible = true
+		readiness_selector.visible = true
+		readiness_button.visible = not ready
+		readiness_label.text = "Готовность дома: %d/8" % ready_count
+		if ready:
+			readiness_button.text = "Все проверки пройдены"
+			readiness_button.disabled = true
+		else:
+			readiness_button.text = "Отметить этап выполненным"
+			readiness_button.disabled = false
+			var checklist := move_in_service.get_checklist(plot_id)
+			var selected_req := str(move_in_service.get_requirements()[readiness_selector.selected]["id"])
+			if bool(checklist.get(selected_req, false)):
+				readiness_button.text = "Этап уже выполнен"
+				readiness_button.disabled = true
+
+func _on_readiness_button_pressed() -> void:
+	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
+		return
+	var requirements := move_in_service.get_requirements()
+	var index := clampi(readiness_selector.selected, 0, requirements.size() - 1)
+	var requirement_id := str(requirements[index]["id"])
+	if move_in_service.complete_requirement(selected_plot_id, requirement_id):
+		_on_plot_selected(selected_plot_id)
+		_save_game()
+
+func _on_readiness_updated(plot_id: int, _completed_count: int, _total_count: int) -> void:
+	if selected_plot_id == plot_id:
+		_on_plot_selected(plot_id)
+
+func _on_house_ready(plot_id: int) -> void:
+	if selected_plot_id == plot_id:
+		_on_plot_selected(plot_id)
+		status_label.text = "Все проверки пройдены! Дом готов принять семью."
+	_save_game()
 
 func _on_house_type_selected(index: int) -> void:
 	selected_house_type = ["ordinary", "advanced", "premium"][clampi(index, 0, 2)]
@@ -326,7 +401,7 @@ func _save_game() -> void:
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
-		"construction": construction_service.get_save_data()
+		"construction": construction_service.get_save_data(),\n\t\t"move_in": move_in_service.get_save_data()
 	}
 	save_service.save_game(data)
 
@@ -340,7 +415,7 @@ func _load_game() -> void:
 	var world_data: Variant = data.get("world", {})
 	if world_data is Dictionary:
 		world.load_save_data(world_data)
-	var saved_at := int(data.get("saved_at", 0))
+	var move_in_data: Variant = data.get("move_in", {})\n	if move_in_data is Dictionary:\n\t\tmove_in_service.load_save_data(move_in_data)\n\tvar saved_at := int(data.get("saved_at", 0))
 	var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
 	var construction_data: Variant = data.get("construction", {})
 	if construction_data is Dictionary and not construction_data.is_empty():
