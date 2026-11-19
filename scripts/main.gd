@@ -398,7 +398,10 @@ func _on_plot_selected(plot_id: int) -> void:
 			autonomy_toggle_button.text = "Автономия: ВКЛ" if bool(current_family.get("autonomy_enabled", true)) else "Автономия: ВЫКЛ"
 			plot_description.text = "Дом заселён: здесь живёт %s. Выбери, чем помочь семье." % str(current_family["title"])
 			var needs: Dictionary = current_family.get("needs", {})
-			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%" % [
+			var last_action := str(current_family.get("last_action_label", "Пока действий не было"))
+			var action_source := str(current_family.get("last_action_source", ""))
+			var action_source_label := "Автономия" if action_source == "autonomous" else ("Игрок" if action_source == "player" else "История")
+			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s" % [
 				int(current_family["members_count"]),
 				str(current_family.get("activity_label", "Дома")),
 				int(needs.get("energy", 75.0)),
@@ -407,7 +410,9 @@ func _on_plot_selected(plot_id: int) -> void:
 				int(needs.get("leisure", 75.0)),
 				int(needs.get("home_comfort", 75.0)),
 				int(current_family.get("mood", 75)),
-				int(current_family.get("satisfaction", 75))
+				int(current_family.get("satisfaction", 75)),
+				action_source_label,
+				last_action
 			]
 			build_button.text = "Дом заселён"
 		else:
