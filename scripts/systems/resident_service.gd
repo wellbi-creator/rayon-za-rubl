@@ -136,7 +136,8 @@ func _simulate_needs_minute(total_minute: int) -> void:
 		var activity := str(schedule["activity"])
 		_run_autonomous_action(state, total_minute, activity)
 		if minute_of_day % 60 == 0:
-			_update_mood_and_satisfaction(state, state.get("needs", needs))
+			var updated_needs: Dictionary = state.get("needs", needs)
+			_update_mood_and_satisfaction(state, updated_needs)
 
 func _update_mood_and_satisfaction(state: Dictionary, needs: Dictionary) -> void:
 	var critical_count := 0
@@ -171,7 +172,8 @@ func apply_household_action(plot_id: int, action_id: String) -> bool:
 	var activity := str(state.get("activity", "at_home"))
 	if not _apply_action_to_state(state, action_id, _get_total_game_minutes(), activity):
 		return false
-	_update_mood_and_satisfaction(state, state.get("needs", NEED_DEFAULTS))
+	var updated_needs: Dictionary = state.get("needs", NEED_DEFAULTS)
+	_update_mood_and_satisfaction(state, updated_needs)
 	residents_changed.emit(plot_id)
 	return true
 
