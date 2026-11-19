@@ -449,7 +449,16 @@ func _on_plot_selected(plot_id: int) -> void:
 				talk_button.pressed.connect(_on_resident_talk_pressed.bind(str(member.get("id", ""))))
 				member_autonomy_container.add_child(talk_button)
 			var member_summary := "\n".join(member_lines)
-			status_label.text = "Жителей: %d • %s\nСреднее по семье — Энергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s\n\nПо каждому жителю:\n%s" % [
+			var history_lines := PackedStringArray()
+			var activity_history: Array = current_family.get("activity_history", [])
+			for event_value in activity_history:
+				if not event_value is Dictionary:
+					continue
+				var event: Dictionary = event_value
+				var source_label := "Автономия" if str(event.get("source", "")) == "autonomous" else "Игрок"
+				history_lines.append("День %d, %02d:%02d — %s (%s)" % [int(event.get("day", 1)), int(event.get("hour", 0)), int(event.get("minute", 0)), str(event.get("description", "Событие")), source_label])
+			var history_summary := "\n".join(history_lines) if not history_lines.is_empty() else "Пока событий не было."
+			status_label.text = "Жителей: %d • %s\nСреднее по семье — Энергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s\n\nЖурнал семьи (последние события):\n%s\n\nПо каждому жителю:\n%s" % [
 				int(current_family["members_count"]),
 				str(current_family.get("activity_label", "Дома")),
 				int(needs.get("energy", 75.0)),
@@ -461,6 +470,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				int(current_family.get("satisfaction", 75)),
 				action_source_label,
 				last_action,
+				history_summary,
 				member_summary
 			]
 			build_button.text = "Дом заселён"
