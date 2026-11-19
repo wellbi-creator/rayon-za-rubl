@@ -3,14 +3,16 @@ extends Node2D
 const DistrictWorldScript = preload("res://scripts/world/district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
-const BUILD_SECONDS := 600.0
+const ConstructionServiceScript = preload("res://scripts/systems/construction_service.gd")
+const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
 
 var world: DistrictWorld
 var selected_plot_id: int = -1
-var construction_plot_id: int = -1
-var construction_elapsed: float = 0.0
+var construction_service: ConstructionService
+var selected_house_type: String = "ordinary"
+var house_type_selector: OptionButton
 var economy: EconomyService
 var save_service: SaveService
 var save_timer: Timer
@@ -22,7 +24,6 @@ var plot_title: Label
 var plot_description: Label
 var build_button: Button
 var status_label: Label
-var build_timer: Timer
 var control_root: Control
 var hint_label: Label
 
@@ -32,11 +33,14 @@ func _ready() -> void:
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
+	construction_service = ConstructionServiceScript.new()
+	add_child(construction_service)
+	construction_service.project_updated.connect(_on_construction_updated)
+	construction_service.project_completed.connect(_on_construction_completed)
 	world = DistrictWorldScript.new()
 	add_child(world)
 	world.plot_selected.connect(_on_plot_selected)
 	_create_interface()
-	_create_timer()
 	_create_save_timer()
 	_load_game()
 	_update_balance()
@@ -48,12 +52,6 @@ func _create_save_timer() -> void:
 	save_timer.timeout.connect(_save_game)
 	add_child(save_timer)
 	save_timer.start()
-
-func _create_timer() -> void:
-	build_timer = Timer.new()
-	build_timer.wait_time = 1.0
-	build_timer.timeout.connect(_on_build_tick)
-	add_child(build_timer)
 
 func _create_interface() -> void:
 	var layer := CanvasLayer.new()
@@ -131,6 +129,15 @@ func _create_interface() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.add_theme_color_override("font_color", Color("#b9c9ae"))
 	content.add_child(status_label)
+
+	house_type_selector = OptionButton.new()
+	house_type_selector.add_item("Обычный дом — 10 минут")
+	house_type_selector.add_item("Продвинутый дом — 30 минут")
+	house_type_selector.add_item("Премиум-дом — 60 минут")
+	house_type_selector.set_item_disabled(1, true)
+	house_type_selector.set_item_disabled(2, true)
+	house_type_selector.item_selected.connect(_on_house_type_selected)
+	content.add_child(house_type_selector)
 
 	build_button = Button.new()
 	build_button.text = "Построить обычный дом"
@@ -231,8 +238,10 @@ func _on_plot_selected(plot_id: int) -> void:
 		build_button.text = "Построить обычный дом — 100 000 ₽"
 		build_button.disabled = economy.balance < 100000
 	elif kind == "building":
-		plot_description.text = "На участке уже работает строительная бригада."
-		status_label.text = "Строительство: %d%%" % int(float(world.plot_states[plot_id]["progress"]) * 100.0)
+		var project := construction_service.get_project(plot_id)
+		var progress := float(project.get("elapsed", 0.0)) / maxf(1.0, float(project.get("duration", 1.0)))
+		plot_description.text = "На участке работает бригада. Стадия: %s." % construction_service.get_stage(progress)
+		status_label.text = "Строительство: %d%%" % int(progress * 100.0)
 		build_button.text = "Строительство уже идёт"
 		build_button.disabled = true
 	else:
@@ -240,6 +249,11 @@ func _on_plot_selected(plot_id: int) -> void:
 		status_label.text = "Строительство завершено."
 		build_button.text = "Дом построен"
 		build_button.disabled = true
+
+func _on_house_type_selected(index: int) -> void:
+	selected_house_type = ["ordinary", "advanced", "premium"][clampi(index, 0, 2)]
+	if selected_plot_id >= 0:
+		_on_plot_selected(selected_plot_id)
 
 func _on_context_action_pressed() -> void:
 	if selected_plot_id == 0:
@@ -266,17 +280,39 @@ func _on_context_action_pressed() -> void:
 func _on_build_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "empty":
 		return
-	const BUILD_COST := 100000
-	if not economy.try_spend(BUILD_COST, "Строительство обычного дома"):
+	if not BUILD_COSTS.has(selected_house_type):
+		status_label.text = "Стоимость этого типа дома будет добавлена после балансировки экономики."
+		return
+	if construction_service.projects.size() >= construction_service.crew_count:
+		status_label.text = "Все строительные бригады заняты. Для параллельной стройки понадобится ещё бригада."
+		return
+	var build_cost := int(BUILD_COSTS[selected_house_type])
+	if not economy.try_spend(build_cost, "Строительство обычного дома"):
 		status_label.text = "Недостаточно средств."
 		return
-	construction_plot_id = selected_plot_id
-	construction_elapsed = 0.0
-	world.set_plot_building(construction_plot_id, 0.0)
-	status_label.text = "Бригада приступила к работе. Осталось 10 минут."
-	build_button.disabled = true
-	build_timer.start()
+	if not construction_service.start_project(selected_plot_id, selected_house_type):
+		economy.add_money(build_cost, "Возврат: стройка не запущена")
+		status_label.text = "Не удалось назначить строительную бригаду."
+		return
+	world.set_plot_building(selected_plot_id, 0.0)
+	status_label.text = "Бригада приступила к работе. Подготовка участка."
 	_on_plot_selected(selected_plot_id)
+	_save_game()
+
+func _on_construction_updated(plot_id: int, progress: float, stage: String) -> void:
+	world.set_plot_building(plot_id, progress)
+	if selected_plot_id == plot_id:
+		var project := construction_service.get_project(plot_id)
+		var remaining := maxi(0, int(ceil(float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))))
+		status_label.text = "%s • %d%% • осталось %d сек." % [stage, int(progress * 100.0), remaining]
+	if int(Time.get_ticks_msec() / 1000) % 5 == 0:
+		_save_game()
+
+func _on_construction_completed(plot_id: int) -> void:
+	world.finish_plot(plot_id)
+	if selected_plot_id == plot_id:
+		_on_plot_selected(plot_id)
+		status_label.text = "Дом готов! Следующий этап — подготовка к заселению."
 	_save_game()
 
 func _save_game() -> void:
@@ -287,8 +323,7 @@ func _save_game() -> void:
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
-		"construction_plot_id": construction_plot_id,
-		"construction_elapsed": construction_elapsed
+		"construction": construction_service.get_save_data()
 	}
 	save_service.save_game(data)
 
@@ -302,40 +337,27 @@ func _load_game() -> void:
 	var world_data: Variant = data.get("world", {})
 	if world_data is Dictionary:
 		world.load_save_data(world_data)
-	var saved_plot := int(data.get("construction_plot_id", -1))
-	var saved_elapsed := float(data.get("construction_elapsed", 0.0))
-	if saved_plot >= 1 and saved_plot < world.plot_states.size() and world.get_plot_kind(saved_plot) == "building":
-		var saved_at := int(data.get("saved_at", 0))
-		var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
-		construction_plot_id = saved_plot
-		construction_elapsed = minf(BUILD_SECONDS, saved_elapsed + float(offline_seconds))
-		if construction_elapsed >= BUILD_SECONDS:
-			world.finish_plot(construction_plot_id)
-			construction_plot_id = -1
-			construction_elapsed = 0.0
-		else:
-			world.set_plot_building(construction_plot_id, construction_elapsed / BUILD_SECONDS)
-			build_timer.start()
+	var saved_at := int(data.get("saved_at", 0))
+	var offline_seconds := maxi(0, int(Time.get_unix_time_from_system()) - saved_at)
+	var construction_data: Variant = data.get("construction", {})
+	if construction_data is Dictionary and not construction_data.is_empty():
+		construction_service.load_save_data(construction_data, offline_seconds)
+	else:
+		var legacy_plot := int(data.get("construction_plot_id", -1))
+		if legacy_plot >= 1 and legacy_plot < world.plot_states.size() and world.get_plot_kind(legacy_plot) == "building":
+			if construction_service.start_project(legacy_plot, "ordinary"):
+				var project: Dictionary = construction_service.projects[legacy_plot]
+				project["elapsed"] = minf(600.0, float(data.get("construction_elapsed", 0.0)) + float(offline_seconds))
+				if float(project["elapsed"]) >= 600.0:
+					construction_service.projects.erase(legacy_plot)
+					world.finish_plot(legacy_plot)
+	for key in construction_service.projects.keys():
+		var plot_id := int(key)
+		var project: Dictionary = construction_service.get_project(plot_id)
+		var progress := float(project.get("elapsed", 0.0)) / maxf(1.0, float(project.get("duration", 1.0)))
+		world.set_plot_building(plot_id, progress)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE:
 		_save_game()
 
-func _on_build_tick() -> void:
-	construction_elapsed += 1.0
-	var progress := construction_elapsed / BUILD_SECONDS
-	world.set_plot_building(construction_plot_id, progress)
-	if int(construction_elapsed) % 5 == 0:
-		_save_game()
-	if selected_plot_id == construction_plot_id:
-		status_label.text = "Строительство: %d%%  •  Осталось %d сек." % [
-			int(progress * 100.0), int(BUILD_SECONDS - construction_elapsed)
-		]
-	if construction_elapsed >= BUILD_SECONDS:
-		build_timer.stop()
-		world.finish_plot(construction_plot_id)
-		if selected_plot_id == construction_plot_id:
-			status_label.text = "Дом готов! Следующий этап — подготовка к заселению."
-		construction_plot_id = -1
-		construction_elapsed = 0.0
-		_save_game()
