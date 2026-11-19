@@ -17,6 +17,7 @@ var readiness_selector: OptionButton
 var readiness_button: Button
 var readiness_label: Label
 var readiness_heading: Label
+var readiness_note: Label
 var selected_house_type: String = "ordinary"
 var house_type_selector: OptionButton
 var last_construction_save_second: int = -1
@@ -178,7 +179,16 @@ func _create_interface() -> void:
 	for requirement in move_in_service.get_requirements():
 		readiness_selector.add_item(str(requirement["label"]))
 	readiness_selector.visible = false
+	readiness_selector.item_selected.connect(_on_readiness_option_selected)
 	content.add_child(readiness_selector)
+
+	readiness_note = Label.new()
+	readiness_note.text = "Прототип: отметки без списания денег. Стоимость работ будет сбалансирована отдельно."
+	readiness_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	readiness_note.add_theme_font_size_override("font_size", 11)
+	readiness_note.add_theme_color_override("font_color", Color("#c9d0b9"))
+	readiness_note.visible = false
+	content.add_child(readiness_note)
 
 	readiness_button = Button.new()
 	readiness_button.text = "Отметить этап выполненным"
@@ -247,6 +257,7 @@ func _show_empty_selection() -> void:
 	readiness_heading.visible = false
 	readiness_label.visible = false
 	readiness_selector.visible = false
+	readiness_note.visible = false
 	readiness_button.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
@@ -296,6 +307,7 @@ func _on_plot_selected(plot_id: int) -> void:
 		readiness_heading.visible = true
 		readiness_label.visible = true
 		readiness_selector.visible = true
+		readiness_note.visible = true
 		readiness_button.visible = not ready
 		readiness_label.text = "Готовность дома: %d/8" % ready_count
 		if ready:
@@ -310,6 +322,10 @@ func _on_plot_selected(plot_id: int) -> void:
 			if bool(checklist.get(selected_req, false)):
 				readiness_button.text = "Этап уже выполнен"
 				readiness_button.disabled = true
+
+func _on_readiness_option_selected(_index: int) -> void:
+	if selected_plot_id >= 1 and world.get_plot_kind(selected_plot_id) == "built":
+		_on_plot_selected(selected_plot_id)
 
 func _on_readiness_button_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
