@@ -27,6 +27,8 @@ var traffic_time: float = 0.0
 var car_positions: Array[float] = [80.0, 880.0]
 var baba_home_repaired: bool = false
 var construction_animation_time: float = 0.0
+var pedestrian_time: float = 0.0
+var resident_groups: Array = []
 
 func _ready() -> void:
 	for i in PLOT_RECTS.size():
@@ -41,6 +43,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	traffic_time += delta
 	construction_animation_time += delta
+	pedestrian_time += delta
 	car_positions[0] = wrapf(car_positions[0] + delta * 72.0, -150.0, 1450.0)
 	car_positions[1] = wrapf(car_positions[1] - delta * 54.0, -150.0, 1450.0)
 	queue_redraw()
@@ -85,6 +88,54 @@ func _draw() -> void:
 	_draw_neighborhood_details()
 	_draw_car(Vector2(car_positions[0], 354), Color("#c96e4e"), false)
 	_draw_car(Vector2(car_positions[1], 397), Color("#d7d6c9"), true)
+	_draw_residents()
+
+func set_resident_groups(groups: Array) -> void:
+	resident_groups = groups.duplicate(true)
+	queue_redraw()
+
+func _draw_residents() -> void:
+	for group in resident_groups:
+		if not group is Dictionary:
+			continue
+		var plot_id := int(group.get("plot_id", -1))
+		if plot_id < 1 or plot_id >= PLOT_RECTS.size():
+			continue
+		var members := clampi(int(group.get("members_count", 0)), 0, 8)
+		var home_x := PLOT_RECTS[plot_id].position.x + 108.0
+		var home_y := PLOT_RECTS[plot_id].position.y + 106.0
+		var sidewalk_y := 325.0 if plot_id < 4 else 430.0
+		var route := PackedVector2Array([
+			Vector2(home_x, home_y),
+			Vector2(home_x, sidewalk_y),
+			Vector2(565.0, sidewalk_y),
+			Vector2(565.0, 520.0),
+			Vector2(565.0, sidewalk_y),
+			Vector2(home_x, sidewalk_y),
+			Vector2(home_x, home_y)
+		])
+		var total_length := 0.0
+		for i in range(route.size() - 1):
+			total_length += route[i].distance_to(route[i + 1])
+		for member_index in members:
+			var distance := fposmod(pedestrian_time * 34.0 + float(member_index) * 31.0, maxf(1.0, total_length))
+			var person_position := route[0]
+			for i in range(route.size() - 1):
+				var segment_length := route[i].distance_to(route[i + 1])
+				if distance <= segment_length:
+					person_position = route[i].lerp(route[i + 1], distance / maxf(1.0, segment_length))
+					break
+				distance -= segment_length
+			_draw_pedestrian(person_position, member_index)
+
+func _draw_pedestrian(pos: Vector2, variant: int) -> void:
+	var shirt_colors := [Color("#d58c68"), Color("#6e91a3"), Color("#d5bd78")]
+	var shirt: Color = shirt_colors[variant % shirt_colors.size()]
+	draw_ellipse(pos + Vector2(1, 7), Vector2(5, 2.5), Color("#34443a", 0.28))
+	draw_circle(pos + Vector2(0, -5), 3.2, Color("#e7c6a3"))
+	draw_rect(Rect2(pos + Vector2(-2.8, -2), Vector2(5.6, 8)), shirt, true)
+	draw_line(pos + Vector2(-1.5, 5), pos + Vector2(-2.5, 9), Color("#39433f"), 1.8)
+	draw_line(pos + Vector2(1.5, 5), pos + Vector2(2.5, 9), Color("#39433f"), 1.8)
 
 func _draw_plot(plot_id: int) -> void:
 	var rect := PLOT_RECTS[plot_id]

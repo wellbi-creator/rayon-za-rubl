@@ -66,6 +66,17 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 func get_occupied_home_count() -> int:
 	return occupied_homes.size()
 
+func get_resident_display_data() -> Array:
+	var result: Array = []
+	for plot_id in occupied_homes:
+		var family_id := str(occupied_homes[plot_id])
+		var profile: Dictionary = FAMILY_CATALOG.get(family_id, {})
+		result.append({
+			"plot_id": int(plot_id),
+			"members_count": int(profile.get("members_count", 0))
+		})
+	return result
+
 func get_total_resident_count() -> int:
 	var total := 0
 	for family_id in moved_families:
