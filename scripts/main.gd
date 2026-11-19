@@ -116,7 +116,7 @@ func _create_interface() -> void:
 	panel.offset_left = -342
 	panel.offset_top = 104
 	panel.offset_right = -18
-	panel.offset_bottom = 620
+	panel.offset_bottom = 680
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
 
@@ -331,9 +331,15 @@ func _on_plot_selected(plot_id: int) -> void:
 	else:
 		var ready_count := move_in_service.get_completed_count(plot_id)
 		var ready := move_in_service.is_ready(plot_id)
-		plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
-		status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
-		build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
+		var current_family := resident_service.get_family_at_plot(plot_id)
+		if not current_family.is_empty():
+			plot_description.text = "Дом заселён: здесь живёт %s." % str(current_family["title"])
+			status_label.text = "Дом заселён • жителей: %d" % int(current_family["members_count"])
+			build_button.text = "Дом заселён"
+		else:
+			plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
+			status_label.text = "Дом готов к заселению!" if ready else "Подготовка дома: %d из 8 этапов" % ready_count
+			build_button.text = "Дом готов к заселению" if ready else "Строительство завершено"
 		build_button.disabled = true
 		readiness_heading.visible = true
 		readiness_label.visible = true
@@ -355,7 +361,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				readiness_button.disabled = true
 
 		if ready:
-			var resident_family := resident_service.get_family_at_plot(plot_id)
+			var resident_family := current_family
 			if not resident_family.is_empty():
 				resident_label.text = "%s уже живёт здесь. Жителей: %d. Настроение: %d%% • Удовлетворённость: %d%%" % [resident_family["title"], int(resident_family["members_count"]), int(resident_family["mood"]), int(resident_family["satisfaction"])]
 				resident_button.visible = false
