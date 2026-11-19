@@ -102,14 +102,16 @@ func _create_interface() -> void:
 
 	# Temporary on-screen diagnostics for the blank-world report on mobile Web.
 	render_diagnostic_label = Label.new()
-	render_diagnostic_label.position = Vector2(18, -42)
-	render_diagnostic_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	render_diagnostic_label.custom_minimum_size = Vector2(620, 30)
-	render_diagnostic_label.add_theme_font_size_override("font_size", 12)
-	render_diagnostic_label.add_theme_color_override("font_color", Color("#fff1a8"))
-	render_diagnostic_label.add_theme_color_override("font_outline_color", Color("#17251f"))
-	render_diagnostic_label.add_theme_constant_override("outline_size", 4)
+	render_diagnostic_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	render_diagnostic_label.position = Vector2(18, 82)
+	render_diagnostic_label.custom_minimum_size = Vector2(900, 38)
+	render_diagnostic_label.text = "WORLD DEBUG: waiting for render data..."
+	render_diagnostic_label.add_theme_font_size_override("font_size", 16)
+	render_diagnostic_label.add_theme_color_override("font_color", Color("#fff36b"))
+	render_diagnostic_label.add_theme_color_override("font_outline_color", Color("#102018"))
+	render_diagnostic_label.add_theme_constant_override("outline_size", 6)
 	render_diagnostic_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	render_diagnostic_label.z_index = 100
 	root.add_child(render_diagnostic_label)
 
 	var top_panel := PanelContainer.new()
