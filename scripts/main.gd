@@ -20,6 +20,7 @@ var game_time: GameTime
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
+var household_actions_heading: Label
 var household_actions_grid: GridContainer
 var household_action_buttons: Dictionary = {}
 var readiness_selector: OptionButton
@@ -234,12 +235,12 @@ func _create_interface() -> void:
 	resident_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 	content.add_child(resident_button)
 
-	var actions_heading := Label.new()
-	actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
-	actions_heading.add_theme_font_size_override("font_size", 13)
-	actions_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
-	actions_heading.visible = false
-	content.add_child(actions_heading)
+	household_actions_heading = Label.new()
+	household_actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
+	household_actions_heading.add_theme_font_size_override("font_size", 13)
+	household_actions_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+	household_actions_heading.visible = false
+	content.add_child(household_actions_heading)
 
 	household_actions_grid = GridContainer.new()
 	household_actions_grid.columns = 2
@@ -327,6 +328,7 @@ func _show_empty_selection() -> void:
 	resident_label.visible = false
 	resident_button.visible = false
 	household_actions_grid.visible = false
+	household_actions_heading.visible = false
 	plot_title.text = "Выбери участок"
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
@@ -344,6 +346,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	resident_label.visible = false
 	resident_button.visible = false
 	household_actions_grid.visible = false
+	household_actions_heading.visible = false
 	plot_title.text = plot_name
 	if kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
@@ -379,6 +382,7 @@ func _on_plot_selected(plot_id: int) -> void:
 		var current_family := resident_service.get_family_at_plot(plot_id)
 		if not current_family.is_empty():
 			household_actions_grid.visible = true
+			household_actions_heading.visible = true
 			plot_description.text = "Дом заселён: здесь живёт %s. Выбери, чем помочь семье." % str(current_family["title"])
 			var needs: Dictionary = current_family.get("needs", {})
 			status_label.text = "Жителей: %d • %s\nЭнергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%" % [
