@@ -186,7 +186,7 @@ func _update_demo_traffic(delta: float) -> void:
 		var next_distance := distance + current_speed * delta * float(direction)
 		if not green_for_vehicle and distance_to_stop > 0.0 and (stop_line - next_distance) * float(direction) < 0.0:
 			next_distance = stop_line
-		if not green_for_vehicle and distance_to_stop > 0.0 and distance_to_stop <= 1.0:
+		if not green_for_vehicle and distance_to_stop >= -0.5 and distance_to_stop <= 1.0:
 			current_speed = 0.0
 			next_distance = stop_line
 		vehicle["current_speed"] = current_speed
@@ -275,7 +275,7 @@ func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
 
 func _draw_transport_entry(entry: Dictionary) -> void:
-	# A compact data-driven vehicle sprite; actual traffic movement is a later stage.
+	# A compact data-driven vehicle sprite for the signal-controlled traffic demo.
 	var ground: Vector2 = entry.get("position", Vector2.ZERO)
 	var body_color: Color = entry.get("color", Color("#587b8a"))
 	var facing: float = float(entry.get("rotation", 0.0))
