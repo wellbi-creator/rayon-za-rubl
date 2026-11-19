@@ -165,7 +165,8 @@ func apply_household_action(plot_id: int, action_id: String) -> bool:
 	var action: Dictionary = HOUSEHOLD_ACTIONS[action_id]
 	var state: Dictionary = moved_families[family_id]
 	var activity := str(state.get("activity", "at_home"))
-	if not (action["allowed"] as Array).has(activity):
+	var allowed_activities: Array = action.get("allowed", [])
+	if not allowed_activities.has(activity):
 		return false
 	var now := _get_total_game_minutes()
 	var cooldowns: Dictionary = state.get("action_cooldowns", {}).duplicate(true)
