@@ -91,6 +91,39 @@ func _relationship_key(first_id: String, second_id: String) -> String:
 	return "%s|%s" % [ids[0], ids[1]]
 
 
+func _record_relationship_milestones(state: Dictionary, first_id: String, second_id: String, previous_score: int, new_score: int, source: String, total_minute: int) -> void:
+	var thresholds := [
+		{"value": 70, "direction": "up", "description": "отношения стали хорошими"},
+		{"value": 85, "direction": "up", "description": "отношения стали очень хорошими"},
+		{"value": 45, "direction": "down", "description": "отношения стали напряжёнными"},
+		{"value": 35, "direction": "down", "description": "отношения стали очень напряжёнными"}
+	]
+	var first_name := first_id
+	var second_name := second_id
+	for member_value in state.get("members", []):
+		if not member_value is Dictionary:
+			continue
+		var member: Dictionary = member_value
+		if str(member.get("id", "")) == first_id:
+			first_name = str(member.get("name", first_id))
+		elif str(member.get("id", "")) == second_id:
+			second_name = str(member.get("name", second_id))
+	var recorded: Dictionary = state.get("relationship_milestones", {}).duplicate(true)
+	var pair_key := _relationship_key(first_id, second_id)
+	for threshold_value in thresholds:
+		var threshold: Dictionary = threshold_value
+		var value := int(threshold["value"])
+		var direction := str(threshold["direction"])
+		var crossed := previous_score < value and new_score >= value if direction == "up" else previous_score >= value and new_score < value
+		var milestone_key := "%s|%s|%d" % [pair_key, direction, value]
+		if not crossed or bool(recorded.get(milestone_key, false)):
+			continue
+		recorded[milestone_key] = true
+		var description := "%s и %s: %s (%d/100)" % [first_name, second_name, str(threshold["description"]), new_score]
+		_record_family_event(state, description, source, total_minute)
+	state["relationship_milestones"] = recorded
+
+
 func _create_relationships(members: Array) -> Dictionary:
 	var relationships: Dictionary = {}
 	for i in range(members.size()):
@@ -368,7 +401,8 @@ func move_family_in(family_id: String, plot_id: int, house_ready: bool) -> bool:
 		"last_action_minute": -1,
 		"needs": NEED_DEFAULTS.duplicate(true),
 		"members": _create_member_states(family_id, NEED_DEFAULTS),
-		"activity_history": []
+		"activity_history": [],
+		"relationship_milestones": {}
 	}
 	moved_families[family_id]["relationships"] = _create_relationships(moved_families[family_id]["members"])
 	last_simulated_total_minute = _get_total_game_minutes()
@@ -544,7 +578,10 @@ func talk_to_member(plot_id: int, speaker_id: String, target_id: String) -> bool
 		return false
 	var relationships: Dictionary = state.get("relationships", {}).duplicate(true)
 	var key := _relationship_key(speaker_id, target_id)
-	relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)) + 3, 0, 100)
+	var previous_score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+	var new_score := clampi(previous_score + 3, 0, 100)
+	relationships[key] = new_score
+	_record_relationship_milestones(state, speaker_id, target_id, previous_score, new_score, "player", total_minute)
 	speaker["mood"] = clampi(int(speaker.get("mood", 75)) + 1, 0, 100)
 	speaker["satisfaction"] = clampi(int(speaker.get("satisfaction", 75)) + 1, 0, 100)
 	target["mood"] = clampi(int(target.get("mood", 75)) + 1, 0, 100)
@@ -753,7 +790,10 @@ func _run_autonomous_social_interaction(state: Dictionary, total_minute: int) ->
 			if other_id == speaker_id or str(other.get("activity", "")) not in ["at_home", "walking"]:
 				continue
 			var key := _relationship_key(speaker_id, other_id)
-			relationships[key] = clampi(int(relationships.get(key, RELATIONSHIP_DEFAULT)) + 1, 0, 100)
+			var previous_score := int(relationships.get(key, RELATIONSHIP_DEFAULT))
+			var new_score := clampi(previous_score + 1, 0, 100)
+			relationships[key] = new_score
+			_record_relationship_milestones(state, speaker_id, other_id, previous_score, new_score, "autonomous", total_minute)
 			other["mood"] = clampi(int(other.get("mood", 75)) + 1, 0, 100)
 			other["satisfaction"] = clampi(int(other.get("satisfaction", 75)) + 1, 0, 100)
 			participants += 1
@@ -919,6 +959,10 @@ func load_save_data(data: Dictionary) -> void:
 					restored["activity_history"] = []
 				else:
 					restored["activity_history"] = restored["activity_history"].duplicate(true)
+				if not restored.get("relationship_milestones", {}) is Dictionary:
+					restored["relationship_milestones"] = {}
+				else:
+					restored["relationship_milestones"] = restored["relationship_milestones"].duplicate(true)
 				restored["autonomy_enabled"] = bool(restored.get("autonomy_enabled", true))
 				if not restored.has("needs") or not restored["needs"] is Dictionary:
 					restored["needs"] = NEED_DEFAULTS.duplicate(true)
