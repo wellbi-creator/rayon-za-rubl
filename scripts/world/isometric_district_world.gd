@@ -911,6 +911,10 @@ func add_road_cell(cell: Vector2i) -> bool:
 func can_remove_road_cell(cell: Vector2i) -> bool:
 	return road_path_network != null and road_path_network.can_remove_road_cell(cell)
 
+func is_player_built_road_cell(cell: Vector2i) -> bool:
+	# The original cross-shaped road is part of the starting district, not a paid upgrade.
+	return cell.y != 3 and cell.x != 4
+
 func remove_road_cell(cell: Vector2i) -> bool:
 	if not can_remove_road_cell(cell):
 		return false
