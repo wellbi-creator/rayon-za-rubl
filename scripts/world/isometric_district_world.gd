@@ -325,6 +325,7 @@ func _draw_ground() -> void:
 			fill = fill.lerp(Color("#344b4b"), night_factor * 0.62)
 			var edge := Color("#a4b78d", 0.48).lerp(Color("#607c7a", 0.6), night_factor)
 			_draw_diamond(center, TILE, fill, edge, 1.0)
+			_draw_ground_texture(center, x, y)
 			if (x * 3 + y * 5) % 7 == 0:
 				_draw_grass_detail(center + Vector2(float((x * 17) % 35) - 17.0, float((y * 11) % 15) - 7.0))
 
@@ -371,6 +372,44 @@ func _draw_roads() -> void:
 			var p: Vector2 = Grid.grid_to_world(cell, TILE)
 			draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
 
+func _draw_ground_texture(center: Vector2, cell_x: int, cell_y: int) -> void:
+	# Deterministic soft ground accents: no per-frame random allocation or visual flicker.
+	var seed_value := cell_x * 37 + cell_y * 61
+	var speckle := Color("#d6d6a5", 0.16).lerp(Color("#89998a", 0.12), night_factor)
+	for detail_index in 3:
+		var dx := float(posmod(seed_value + detail_index * 19, 53)) - 26.0
+		var dy := float(posmod(seed_value * 3 + detail_index * 11, 19)) - 9.0
+		draw_circle(center + Vector2(dx, dy), 1.1 + float(detail_index % 2) * 0.45, speckle)
+	if posmod(seed_value, 5) == 0:
+		var stone_pos := center + Vector2(float(posmod(seed_value * 7, 41)) - 20.0, float(posmod(seed_value * 11, 15)) - 7.0)
+		draw_ellipse(stone_pos, Vector2(3.0, 1.5), Color("#c4c5a8", 0.22))
+
+func _draw_park_fountain(center: Vector2) -> void:
+	draw_ellipse(center + Vector2(0, 5), Vector2(17, 7), Color("#354b43", 0.34))
+	draw_ellipse(center + Vector2(0, 1), Vector2(15, 7), Color("#c7c0a4"))
+	draw_ellipse(center + Vector2(0, 0), Vector2(12, 5), Color("#5b9eaa"))
+	draw_ellipse(center + Vector2(0, -1), Vector2(8, 3), Color("#8dc5c6", 0.9))
+	draw_line(center + Vector2(0, -2), center + Vector2(-2, -12), Color("#a7d9d6", 0.8), 1.5)
+	draw_line(center + Vector2(0, -2), center + Vector2(3, -10), Color("#a7d9d6", 0.8), 1.5)
+	draw_circle(center + Vector2(-2, -12), 1.6, Color("#c5e7d8", 0.85))
+	draw_circle(center + Vector2(3, -10), 1.4, Color("#c5e7d8", 0.8))
+
+func _draw_park_bench(center: Vector2, facing: float) -> void:
+	var direction := Vector2(1.0, 0.35 * facing)
+	var a := center - direction * 9.0
+	var b := center + direction * 9.0
+	draw_line(a + Vector2(0, 3), b + Vector2(0, 3), Color("#594535"), 4.0)
+	draw_line(a, b, Color("#b17b4e"), 4.0)
+	draw_line(a + Vector2(0, -2), b + Vector2(0, -2), Color("#d2a16a"), 1.0)
+
+func _draw_flower(center: Vector2, variant: int) -> void:
+	var petals := [Color("#e7c4a5"), Color("#e9d78d"), Color("#d9a8b2"), Color("#d5d8e5")]
+	var petal: Color = petals[posmod(variant, petals.size())]
+	draw_line(center + Vector2(0, 3), center + Vector2(0, -1), Color("#527b4e"), 1.0)
+	draw_circle(center + Vector2(-2, 0), 1.7, petal)
+	draw_circle(center + Vector2(2, 0), 1.7, petal)
+	draw_circle(center + Vector2(0, -2), 1.7, petal)
+	draw_circle(center, 1.1, Color("#e7c36f"))
 func _draw_grass_detail(pos: Vector2) -> void:
 	var blade_color := _get_leaf_palette()[2]
 	blade_color.a = 0.42
@@ -389,10 +428,18 @@ func _draw_road_cell(cell: Vector2i) -> void:
 	var inner_road_color := Color("#303b40") if is_asphalt else Color("#59615f")
 	var inner_edge_color := Color("#aeb9b4") if is_asphalt else Color("#737c75")
 	_draw_diamond(center, TILE, road_base.lerp(Color("#626b68"), night_factor * 0.5), Color("#ded4bd"), 1.0)
-	_draw_diamond(center, TILE * Vector2(0.86, 0.82), inner_road_color.lerp(Color("#303c43"), night_factor * 0.45), inner_edge_color, 1.0)
-	var curb_color := Color("#d8cdb4").lerp(Color("#82908c"), night_factor * 0.6)
-	draw_line(center + Vector2(-52, -2), center + Vector2(0, 25), curb_color, 1.4)
-	draw_line(center + Vector2(0, 25), center + Vector2(52, -2), curb_color, 1.4)
+	_draw_diamond(center + Vector2(0, 1), TILE * Vector2(0.91, 0.86), Color("#d0c8b2").lerp(Color("#87918a"), night_factor * 0.35), Color("#e7ddc8", 0.72), 1.0)
+	_draw_diamond(center, TILE * Vector2(0.82, 0.74), inner_road_color.lerp(Color("#303c43"), night_factor * 0.45), inner_edge_color, 1.0)
+	var curb_color := Color("#e6dcc6").lerp(Color("#82908c"), night_factor * 0.6)
+	draw_line(center + Vector2(-52, -2), center + Vector2(0, 25), curb_color, 1.8)
+	draw_line(center + Vector2(0, 25), center + Vector2(52, -2), curb_color, 1.8)
+	# Fine paving joints on the sidewalk give the road network a finished urban edge.
+	for seam in [-0.5, 0.0, 0.5]:
+		draw_line(center + Vector2(-43.0 * (1.0 - absf(seam)), seam * 17.0 - 1.0), center + Vector2(43.0 * (1.0 - absf(seam)), seam * 17.0 - 1.0), Color("#f0e8d5", 0.20), 0.8)
+	if cell == Vector2i(4, 3):
+		for stripe in 5:
+			var stripe_x := -28.0 + float(stripe) * 14.0
+			draw_line(center + Vector2(stripe_x, -10), center + Vector2(stripe_x + 5, -2), Color("#eee8d8", 0.88), 3.0)
 	if is_asphalt:
 		var horizontal := road_path_network.is_road_cell(cell + Vector2i(-1, 0)) or road_path_network.is_road_cell(cell + Vector2i(1, 0))
 		var vertical := road_path_network.is_road_cell(cell + Vector2i(0, -1)) or road_path_network.is_road_cell(cell + Vector2i(0, 1))
@@ -405,11 +452,18 @@ func _draw_environment() -> void:
 	for cell in road_path_network.get_road_cells():
 		if road_lamp_cells.has(cell):
 			_draw_lamp(Grid.grid_to_world(cell, TILE) + Vector2(0, -10))
-	# Park greenery between the lower plots.
+	# Small neighborhood square: planted beds, a lit fountain and seating.
 	var park: Vector2 = Grid.grid_to_world(Vector2i(5, 5), TILE)
-	_draw_diamond(park, TILE * Vector2(0.72, 0.58), Color("#719565"), Color("#9ab27e"), 1.0)
-	for offset in [Vector2(-18, -4), Vector2(13, 5), Vector2(0, 13)]:
+	_draw_diamond(park, TILE * Vector2(0.78, 0.64), Color("#668b5d"), Color("#b0c58d"), 1.4)
+	_draw_diamond(park + Vector2(0, 2), TILE * Vector2(0.52, 0.38), Color("#b7ad87"), Color("#d8cba8"), 1.0)
+	for offset in [Vector2(-28, -4), Vector2(27, -3), Vector2(-7, 15)]:
 		_draw_bush(park + offset)
+	_draw_park_fountain(park + Vector2(0, -2))
+	_draw_park_bench(park + Vector2(-24, 15), -1.0)
+	_draw_park_bench(park + Vector2(25, 12), 1.0)
+	for flower_index in 6:
+		var flower_pos := park + Vector2(-34.0 + float(flower_index) * 13.0, -18.0 + sin(float(flower_index) * 1.4) * 3.0)
+		_draw_flower(flower_pos, flower_index)
 
 func _draw_plot(plot_id: int) -> void:
 	var cell := PLOT_CELLS[plot_id]
@@ -607,10 +661,13 @@ func _draw_tree(pos: Vector2) -> void:
 		pos + Vector2(3, 20), pos + Vector2(-3, 20)
 	]), Color("#76543a"))
 	var leaves := _get_leaf_palette()
-	draw_circle(pos + Vector2(0, -13), 17, leaves[0])
-	draw_circle(pos + Vector2(-9, -17), 10, leaves[1])
-	draw_circle(pos + Vector2(8, -20), 10, leaves[2])
-	draw_circle(pos + Vector2(-3, -25), 7, leaves[3])
+	draw_circle(pos + Vector2(0, -13), 18, leaves[0])
+	draw_circle(pos + Vector2(-10, -16), 11, leaves[1])
+	draw_circle(pos + Vector2(9, -19), 11, leaves[2])
+	draw_circle(pos + Vector2(-3, -26), 8, leaves[3])
+	draw_circle(pos + Vector2(2, -11), 12, leaves[0].lightened(0.06))
+	draw_circle(pos + Vector2(-12, -22), 4, leaves[3].lightened(0.08))
+	draw_circle(pos + Vector2(11, -25), 3, leaves[3].lightened(0.08))
 	var leaf_sway := sin(construction_animation_time * 1.35 + pos.x * 0.025) * 2.0
 	var leaf_highlight := leaves[3]
 	leaf_highlight.a = 0.55
