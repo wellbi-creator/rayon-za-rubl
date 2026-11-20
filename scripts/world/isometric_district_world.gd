@@ -783,9 +783,9 @@ func _draw_construction(ground: Vector2, progress: float) -> void:
 		for row in range(1, int(wall_h / 8.0) + 1):
 			var y := 1.0 - float(row) * 8.0
 			draw_line(ground + Vector2(-24, y - 12), ground + Vector2(24, y - 12), Color("#a9785b"), 1.0)
-	if phase >= 3:
+	if phase >= 4:
 		var roof_h := 42.0
-		var roof_progress := clampf((p - 0.55) / 0.17, 0.0, 1.0)
+		var roof_progress := clampf((p - 0.72) / 0.14, 0.0, 1.0)
 		var roof_color := Color("#875647").lerp(Color("#70443b"), roof_progress)
 		draw_colored_polygon(PackedVector2Array([
 			ground + Vector2(-34, -20), ground + Vector2(0, -40),
@@ -795,7 +795,7 @@ func _draw_construction(ground: Vector2, progress: float) -> void:
 			ground + Vector2(0, -40), ground + Vector2(34, -20),
 			ground + Vector2(34, -20 - roof_h * 0.35), ground + Vector2(0, -40 - roof_h * 0.35)
 		]), Color("#70443b"))
-	if phase >= 4:
+	if phase >= 3:
 		_draw_iso_window(ground + Vector2(-20, -32), Color("#91b8bd"))
 		_draw_iso_window(ground + Vector2(8, -20), Color("#91b8bd"))
 	if phase >= 5:
