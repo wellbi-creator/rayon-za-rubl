@@ -46,6 +46,9 @@ var build_button: Button
 var status_label: Label
 var control_root: Control
 var hint_label: Label
+var transaction_popup: PopupPanel
+var transaction_rows: VBoxContainer
+var transaction_summary_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -94,6 +97,7 @@ func _create_interface() -> void:
 	layer.add_child(root)
 	control_root = root
 	root.resized.connect(_on_interface_resized)
+	_create_transaction_history_popup()
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -146,6 +150,14 @@ func _create_interface() -> void:
 	heading.add_theme_font_size_override("font_size", 17)
 	heading.add_theme_color_override("font_color", Color("#f4e8c8"))
 	content.add_child(heading)
+
+	var transaction_button := Button.new()
+	transaction_button.text = "₽  ЖУРНАЛ ОПЕРАЦИЙ"
+	transaction_button.custom_minimum_size = Vector2(0, 40)
+	transaction_button.add_theme_stylebox_override("normal", _button_style(Color("#d8c58e")))
+	transaction_button.add_theme_stylebox_override("hover", _button_style(Color("#ead7a5")))
+	transaction_button.pressed.connect(_on_transaction_history_pressed)
+	content.add_child(transaction_button)
 
 	plot_title = Label.new()
 	plot_title.text = "Выбери участок"
@@ -278,6 +290,127 @@ func _create_interface() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color("#a9b8a3"))
 	content.add_child(footer)
+
+
+func _create_transaction_history_popup() -> void:
+	transaction_popup = PopupPanel.new()
+	transaction_popup.title = "Журнал денежных операций"
+	transaction_popup.size = Vector2i(560, 380)
+	transaction_popup.transient = true
+	transaction_popup.exclusive = true
+	add_child(transaction_popup)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	transaction_popup.add_child(panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	panel.add_child(content)
+
+	var header := HBoxContainer.new()
+	content.add_child(header)
+
+	var title := Label.new()
+	title.text = "ДЕНЬГИ РАЙОНА"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(title)
+
+	var close_button := Button.new()
+	close_button.text = "✕"
+	close_button.custom_minimum_size = Vector2(42, 34)
+	close_button.pressed.connect(transaction_popup.hide)
+	header.add_child(close_button)
+
+	transaction_summary_label = Label.new()
+	transaction_summary_label.add_theme_color_override("font_color", Color("#f4d98d"))
+	content.add_child(transaction_summary_label)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(500, 250)
+	content.add_child(scroll)
+
+	transaction_rows = VBoxContainer.new()
+	transaction_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	transaction_rows.add_theme_constant_override("separation", 6)
+	scroll.add_child(transaction_rows)
+
+
+func _on_transaction_history_pressed() -> void:
+	_refresh_transaction_history()
+	transaction_popup.popup_centered(Vector2i(560, 380))
+
+
+func _refresh_transaction_history() -> void:
+	if transaction_rows == null or economy == null:
+		return
+	var entries := economy.get_transaction_history()
+	transaction_summary_label.text = "Баланс района: ₽ %s  •  операций: %d" % [
+		_format_money(economy.balance),
+		entries.size()
+	]
+	for child in transaction_rows.get_children():
+		transaction_rows.remove_child(child)
+		child.queue_free()
+
+	if entries.is_empty():
+		var empty_label := Label.new()
+		empty_label.text = "Пока операций нет. Доходы и расходы появятся здесь."
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+		transaction_rows.add_child(empty_label)
+		return
+
+	for index in range(entries.size() - 1, -1, -1):
+		var entry: Dictionary = entries[index]
+		var amount := int(entry.get("amount", 0))
+		var reason := str(entry.get("reason", "Операция"))
+		var stamp := int(entry.get("timestamp", 0))
+		var date_data := Time.get_datetime_dict_from_unix_time(stamp)
+		var date_text := "%02d.%02d.%04d  •  %02d:%02d" % [
+			int(date_data.get("day", 1)),
+			int(date_data.get("month", 1)),
+			int(date_data.get("year", 1970)),
+			int(date_data.get("hour", 0)),
+			int(date_data.get("minute", 0))
+		]
+
+		var row_panel := PanelContainer.new()
+		row_panel.add_theme_stylebox_override("panel", _panel_style(Color("#354b40"), 0.9))
+		transaction_rows.add_child(row_panel)
+
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row_panel.add_child(row)
+
+		var details := VBoxContainer.new()
+		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		details.add_theme_constant_override("separation", 2)
+		row.add_child(details)
+
+		var reason_label := Label.new()
+		reason_label.text = reason
+		reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		reason_label.add_theme_color_override("font_color", Color("#f4e8c8"))
+		details.add_child(reason_label)
+
+		var date_label := Label.new()
+		date_label.text = date_text
+		date_label.add_theme_font_size_override("font_size", 11)
+		date_label.add_theme_color_override("font_color", Color("#b9c9ae"))
+		details.add_child(date_label)
+
+		var amount_label := Label.new()
+		var sign := "+" if amount > 0 else "−"
+		amount_label.text = "%s ₽%s" % [sign, _format_money(absi(amount))]
+		amount_label.add_theme_font_size_override("font_size", 15)
+		amount_label.add_theme_color_override("font_color", Color("#a9d58d") if amount > 0 else Color("#f0a18d"))
+		amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(amount_label)
 
 
 func _on_interface_resized() -> void:
