@@ -84,25 +84,27 @@ func process_daily_maintenance(day: int, economy: EconomyService) -> bool:
 	var processed := false
 	for service in SERVICES:
 		var service_id := str(service["id"])
-		if day <= int(last_maintenance_day.get(service_id, 1)):
+		var last_day := int(last_maintenance_day.get(service_id, 1))
+		if day <= last_day:
 			continue
-		last_maintenance_day[service_id] = day
 		var employee_count := get_employee_count(service_id)
+		last_maintenance_day[service_id] = day
 		if employee_count <= 0:
 			continue
 		processed = true
-		if not is_automatic_maintenance_enabled(service_id):
-			service_quality[service_id] = maxi(0, get_service_quality_percent(service_id) - 2)
-			continue
-		if get_service_quality_percent(service_id) >= 100:
-			continue
-		var cost := get_maintenance_cost(service_id)
-		if economy == null or not economy.try_spend(cost, "Плановое обслуживание: %s" % str(service["label"])):
-			service_quality[service_id] = maxi(0, get_service_quality_percent(service_id) - 3)
-			continue
-		var quality_gain := 3 + roundi(float(get_service_efficiency_percent(service_id)) / 20.0)
-		service_quality[service_id] = mini(100, get_service_quality_percent(service_id) + quality_gain)
-		record_work_order(service_id, day, cost)
+		for maintenance_day in range(last_day + 1, day + 1):
+			if not is_automatic_maintenance_enabled(service_id):
+				service_quality[service_id] = maxi(0, get_service_quality_percent(service_id) - 2)
+				continue
+			var worn_quality := maxi(0, get_service_quality_percent(service_id) - 2)
+			service_quality[service_id] = worn_quality
+			var cost := get_maintenance_cost(service_id)
+			if economy == null or not economy.try_spend(cost, "Плановое обслуживание: %s" % str(service["label"])):
+				service_quality[service_id] = maxi(0, worn_quality - 1)
+				continue
+			var quality_gain := 3 + roundi(float(get_service_efficiency_percent(service_id)) / 20.0)
+			service_quality[service_id] = mini(100, worn_quality + quality_gain)
+			record_work_order(service_id, maintenance_day, cost)
 	return processed
 
 func get_hire_cost(service_id: String) -> int:
@@ -185,6 +187,8 @@ func process_day(day: int, economy: EconomyService) -> bool:
 func initialize_day(day: int) -> void:
 	last_payroll_day = maxi(1, day)
 	unpaid_wages = 0
+	for service in SERVICES:
+		last_maintenance_day[str(service["id"])] = last_payroll_day
 
 func get_save_data() -> Dictionary:
 	return {
