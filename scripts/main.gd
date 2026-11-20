@@ -257,6 +257,7 @@ func _create_interface() -> void:
 	panel.offset_bottom = 680
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
+	panel.visible = false
 
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
@@ -1481,6 +1482,13 @@ func _open_district_panel() -> void:
 		district_scroll.queue_redraw()
 
 
+func _hide_district_panel() -> void:
+	if district_panel == null or not is_instance_valid(district_panel):
+		return
+	district_panel.hide()
+	district_panel.visible = false
+
+
 func _on_navigation_map_pressed() -> void:
 	_open_district_panel()
 	status_label.text = "Карта района. Выбери участок, чтобы открыть его действия."
@@ -1518,12 +1526,13 @@ func _on_interface_resized() -> void:
 		quickbar_panel.offset_bottom = -6.0
 		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
-		var panel_width := clampf(viewport_size.x * (0.50 if phone_landscape else (0.46 if compact else 0.34)), 280.0, 480.0)
+		var panel_width := clampf(viewport_size.x * (0.58 if phone_landscape else (0.54 if compact else 0.42)), 300.0, 560.0)
 		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 		district_panel.offset_left = -panel_width - 8.0
 		district_panel.offset_top = 72.0 if phone_landscape else (82.0 if compact else 104.0)
 		district_panel.offset_right = -8.0
-		district_panel.offset_bottom = -66.0 if phone_landscape else -84.0
+		# Stop exactly above the bottom quickbar; never cover its touch targets.
+		district_panel.offset_bottom = -76.0 if phone_landscape or compact else -86.0
 	if top_hud_panel != null:
 		for hud_child in top_hud_panel.get_children():
 			if hud_child is HBoxContainer:
