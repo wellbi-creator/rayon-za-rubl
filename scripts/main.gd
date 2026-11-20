@@ -11,6 +11,7 @@ const DistrictUpkeepServiceScript = preload("res://scripts/systems/district_upke
 const MunicipalServicesServiceScript = preload("res://scripts/systems/municipal_services_service.gd")
 const DistrictProgressionServiceScript = preload("res://scripts/systems/district_progression_service.gd")
 const DistrictEventServiceScript = preload("res://scripts/systems/district_event_service.gd")
+const WeatherServiceScript = preload("res://scripts/systems/weather_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -25,6 +26,7 @@ var upkeep_service: DistrictUpkeepService
 var municipal_services: MunicipalServicesService
 var progression_service: DistrictProgressionService
 var district_event_service: DistrictEventService
+var weather_service: WeatherService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
@@ -71,6 +73,7 @@ var district_event_title_label: Label
 var district_event_description_label: Label
 var district_event_choices: VBoxContainer
 var district_event_status_label: Label
+var weather_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -79,11 +82,13 @@ func _ready() -> void:
 	municipal_services = MunicipalServicesServiceScript.new()
 	progression_service = DistrictProgressionServiceScript.new()
 	district_event_service = DistrictEventServiceScript.new()
+	weather_service = WeatherServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
 	game_time = GameTimeScript.new()
 	add_child(game_time)
+	weather_service.initialize_day(game_time.get_day())
 	game_time.time_changed.connect(_on_game_time_changed)
 	resident_service = ResidentServiceScript.new()
 	add_child(resident_service)
@@ -160,6 +165,15 @@ func _create_interface() -> void:
 	hint_label.add_theme_font_size_override("font_size", 13)
 	hint_label.add_theme_color_override("font_color", Color("#f6f0d9"))
 	root.add_child(hint_label)
+	var weather_panel := PanelContainer.new()
+	weather_panel.position = Vector2(18, 116)
+	weather_panel.custom_minimum_size = Vector2(220, 34)
+	weather_panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.88))
+	root.add_child(weather_panel)
+	weather_label = Label.new()
+	weather_label.add_theme_font_size_override("font_size", 12)
+	weather_label.add_theme_color_override("font_color", Color("#d9e6c8"))
+	weather_panel.add_child(weather_label)
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -841,12 +855,24 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
 		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
+		var weather_changed := weather_service.process_day(day) if weather_service != null else false
 		if event_spawned:
 			_show_district_event()
-		if upkeep_processed or payroll_processed or event_spawned:
+		if upkeep_processed or payroll_processed or event_spawned or weather_changed:
 			_save_game()
 		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
 			_show_district_event()
+	_apply_weather_state()
+
+func _apply_weather_state() -> void:
+	if weather_service == null:
+		return
+	if weather_label != null:
+		weather_label.text = "%s  •  %s" % [weather_service.get_season_label(), weather_service.get_weather_label()]
+	if world != null:
+		world.set_season(weather_service.season_id)
+		world.set_weather(weather_service.weather_id)
+
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
@@ -1364,6 +1390,7 @@ func _save_game() -> void:
 		"municipal_services": municipal_services.get_save_data(),
 		"district_progression": progression_service.get_save_data(),
 		"district_events": district_event_service.get_save_data(),
+		"weather": weather_service.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -1418,6 +1445,11 @@ func _load_game() -> void:
 		district_event_service.load_save_data(event_data)
 	else:
 		district_event_service.initialize_day(game_time.get_day())
+	var weather_data: Variant = data.get("weather", {})
+	if weather_data is Dictionary and not weather_data.is_empty():
+		weather_service.load_save_data(weather_data)
+	else:
+		weather_service.initialize_day(game_time.get_day())
 	# Backfill one-time achievements for milestones completed in older saves.
 	if baba_wiring_repaired:
 		progression_service.unlock_achievement("baba_helper")
