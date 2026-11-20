@@ -31,6 +31,13 @@ func get_business(plot_id: int) -> Dictionary:
 		return {}
 	return businesses[plot_id].duplicate(true)
 
+func get_business_visual_data() -> Dictionary:
+	var result: Dictionary = {}
+	for key in businesses.keys():
+		var business: Dictionary = businesses[key]
+		result[int(key)] = bool(business.get("active", false))
+	return result
+
 func open_business(plot_id: int, economy: EconomyService) -> bool:
 	if plot_id < 1 or plot_id >= 6 or economy == null or businesses.has(plot_id):
 		return false
