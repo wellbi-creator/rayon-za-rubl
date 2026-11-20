@@ -21,6 +21,11 @@ const SERVICES := [
 var employees: Dictionary = {}
 var last_payroll_day: int = 1
 var unpaid_wages: int = 0
+var total_wages_accrued: Dictionary = {}
+var total_wages_paid: Dictionary = {}
+var unpaid_wages_by_service: Dictionary = {}
+var total_equipment_spent: Dictionary = {}
+var total_maintenance_spent: Dictionary = {}
 var work_orders_completed: Dictionary = {}
 var last_work_day: Dictionary = {}
 var total_work_spent: Dictionary = {}
@@ -37,6 +42,11 @@ func _init() -> void:
 	for service in SERVICES:
 		var service_id := str(service["id"])
 		employees[service_id] = 0
+		total_wages_accrued[service_id] = 0
+		total_wages_paid[service_id] = 0
+		unpaid_wages_by_service[service_id] = 0
+		total_equipment_spent[service_id] = 0
+		total_maintenance_spent[service_id] = 0
 		work_orders_completed[service_id] = 0
 		last_work_day[service_id] = 0
 		total_work_spent[service_id] = 0
@@ -92,6 +102,7 @@ func upgrade_equipment(service_id: String, economy: EconomyService) -> bool:
 	if not economy.try_spend(cost, "Оборудование: %s" % str(_get_definition(service_id)["label"])):
 		return false
 	equipment_levels[service_id] = get_equipment_level(service_id) + 1
+	total_equipment_spent[service_id] = get_total_equipment_spent(service_id) + cost
 	return true
 
 func get_service_quality_percent(service_id: String) -> int:
@@ -233,6 +244,7 @@ func process_daily_maintenance(day: int, economy: EconomyService) -> bool:
 			var quality_gain := 3 + roundi(float(get_service_efficiency_percent(service_id)) / 20.0)
 			service_quality[service_id] = mini(100, worn_quality + quality_gain)
 			record_work_order(service_id, maintenance_day, cost)
+			total_maintenance_spent[service_id] = get_total_maintenance_spent(service_id) + cost
 	return processed
 
 func get_hire_cost(service_id: String) -> int:
@@ -258,6 +270,45 @@ func get_total_daily_payroll() -> int:
 
 func get_unpaid_wages() -> int:
 	return unpaid_wages
+
+func get_total_wages_accrued(service_id: String) -> int:
+	return maxi(0, int(total_wages_accrued.get(service_id, 0)))
+
+func get_total_wages_paid(service_id: String) -> int:
+	return maxi(0, int(total_wages_paid.get(service_id, 0)))
+
+func get_unpaid_wages_for_service(service_id: String) -> int:
+	return maxi(0, int(unpaid_wages_by_service.get(service_id, 0)))
+
+func get_total_equipment_spent(service_id: String) -> int:
+	return maxi(0, int(total_equipment_spent.get(service_id, 0)))
+
+func get_total_maintenance_spent(service_id: String) -> int:
+	return maxi(0, int(total_maintenance_spent.get(service_id, 0)))
+
+func get_total_wages_accrued_all() -> int:
+	var total := 0
+	for service in SERVICES:
+		total += get_total_wages_accrued(str(service["id"]))
+	return total
+
+func get_total_wages_paid_all() -> int:
+	var total := 0
+	for service in SERVICES:
+		total += get_total_wages_paid(str(service["id"]))
+	return total
+
+func get_total_equipment_spent_all() -> int:
+	var total := 0
+	for service in SERVICES:
+		total += get_total_equipment_spent(str(service["id"]))
+	return total
+
+func get_total_maintenance_spent_all() -> int:
+	var total := 0
+	for service in SERVICES:
+		total += get_total_maintenance_spent(str(service["id"]))
+	return total
 
 func get_work_orders_completed(service_id: String) -> int:
 	return int(work_orders_completed.get(service_id, 0))
@@ -313,12 +364,30 @@ func process_day(day: int, economy: EconomyService) -> bool:
 	var elapsed_days := day - last_payroll_day
 	if elapsed_days <= 0:
 		return false
-	unpaid_wages += get_total_daily_payroll() * elapsed_days
+	for service in SERVICES:
+		var service_id := str(service["id"])
+		var accrued := get_employee_count(service_id) * get_daily_salary(service_id) * elapsed_days
+		total_wages_accrued[service_id] = get_total_wages_accrued(service_id) + accrued
+		unpaid_wages_by_service[service_id] = get_unpaid_wages_for_service(service_id) + accrued
+		unpaid_wages += accrued
 	last_payroll_day = day
 	if unpaid_wages > 0 and economy != null and economy.balance > 0:
 		var payment := mini(unpaid_wages, economy.balance)
 		if payment > 0 and economy.try_spend(payment, "Зарплата коммунальных служб"):
-			unpaid_wages -= payment
+			var remaining_payment := payment
+			for service in SERVICES:
+				if remaining_payment <= 0:
+					break
+				var service_id := str(service["id"])
+				var service_debt := get_unpaid_wages_for_service(service_id)
+				var service_payment := mini(remaining_payment, service_debt)
+				if service_payment <= 0:
+					continue
+				unpaid_wages_by_service[service_id] = service_debt - service_payment
+				total_wages_paid[service_id] = get_total_wages_paid(service_id) + service_payment
+				remaining_payment -= service_payment
+			# Any remainder settles legacy debt from saves that predate per-service accounting.
+			unpaid_wages = maxi(0, unpaid_wages - payment)
 	return true
 
 func initialize_day(day: int) -> void:
@@ -333,6 +402,11 @@ func get_save_data() -> Dictionary:
 		"employees": employees.duplicate(true),
 		"last_payroll_day": last_payroll_day,
 		"unpaid_wages": unpaid_wages,
+		"total_wages_accrued": total_wages_accrued.duplicate(true),
+		"total_wages_paid": total_wages_paid.duplicate(true),
+		"unpaid_wages_by_service": unpaid_wages_by_service.duplicate(true),
+		"total_equipment_spent": total_equipment_spent.duplicate(true),
+		"total_maintenance_spent": total_maintenance_spent.duplicate(true),
 		"work_orders_completed": work_orders_completed.duplicate(true),
 		"last_work_day": last_work_day.duplicate(true),
 		"total_work_spent": total_work_spent.duplicate(true),
@@ -353,6 +427,11 @@ func load_save_data(data: Dictionary) -> void:
 		employees[service_id] = clampi(saved_count, 0, MAX_EMPLOYEES_PER_SERVICE)
 	last_payroll_day = maxi(1, int(data.get("last_payroll_day", 1)))
 	unpaid_wages = maxi(0, int(data.get("unpaid_wages", 0)))
+	var saved_wages_accrued: Variant = data.get("total_wages_accrued", {})
+	var saved_wages_paid: Variant = data.get("total_wages_paid", {})
+	var saved_wages_unpaid: Variant = data.get("unpaid_wages_by_service", {})
+	var saved_equipment_spent: Variant = data.get("total_equipment_spent", {})
+	var saved_maintenance_spent: Variant = data.get("total_maintenance_spent", {})
 	var saved_work_orders: Variant = data.get("work_orders_completed", {})
 	var saved_last_work_day: Variant = data.get("last_work_day", {})
 	var saved_work_spent: Variant = data.get("total_work_spent", {})
@@ -365,6 +444,11 @@ func load_save_data(data: Dictionary) -> void:
 	last_infrastructure_day = maxi(last_payroll_day, int(data.get("last_infrastructure_day", last_payroll_day)))
 	for service in SERVICES:
 		var service_id := str(service["id"])
+		total_wages_accrued[service_id] = maxi(0, int(saved_wages_accrued.get(service_id, 0))) if saved_wages_accrued is Dictionary else 0
+		total_wages_paid[service_id] = maxi(0, int(saved_wages_paid.get(service_id, 0))) if saved_wages_paid is Dictionary else 0
+		unpaid_wages_by_service[service_id] = maxi(0, int(saved_wages_unpaid.get(service_id, 0))) if saved_wages_unpaid is Dictionary else 0
+		total_equipment_spent[service_id] = maxi(0, int(saved_equipment_spent.get(service_id, 0))) if saved_equipment_spent is Dictionary else 0
+		total_maintenance_spent[service_id] = maxi(0, int(saved_maintenance_spent.get(service_id, 0))) if saved_maintenance_spent is Dictionary else 0
 		work_orders_completed[service_id] = maxi(0, int(saved_work_orders.get(service_id, 0))) if saved_work_orders is Dictionary else 0
 		last_work_day[service_id] = maxi(0, int(saved_last_work_day.get(service_id, 0))) if saved_last_work_day is Dictionary else 0
 		total_work_spent[service_id] = maxi(0, int(saved_work_spent.get(service_id, 0))) if saved_work_spent is Dictionary else 0
