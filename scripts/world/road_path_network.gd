@@ -21,14 +21,14 @@ func configure(width: int, height: int, road_y: int, road_x: int) -> void:
 	_road_surfaces.clear()
 	if horizontal_road_y >= 0 and horizontal_road_y < map_height:
 		for x in range(map_width):
-			var cell := Vector2i(x, horizontal_road_y)
-			_road_cells[cell] = true
-			_road_surfaces[cell] = "standard"
+			var horizontal_cell := Vector2i(x, horizontal_road_y)
+			_road_cells[horizontal_cell] = true
+			_road_surfaces[horizontal_cell] = "standard"
 	if vertical_road_x >= 0 and vertical_road_x < map_width:
 		for y in range(map_height):
-			var cell := Vector2i(vertical_road_x, y)
-			_road_cells[cell] = true
-			_road_surfaces[cell] = "standard"
+			var vertical_cell := Vector2i(vertical_road_x, y)
+			_road_cells[vertical_cell] = true
+			_road_surfaces[vertical_cell] = "standard"
 
 func is_road_cell(cell: Vector2i) -> bool:
 	return _road_cells.has(cell)
