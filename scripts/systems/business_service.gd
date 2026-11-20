@@ -19,10 +19,16 @@ const BUSINESS_UPGRADE_COSTS := [35000, 75000]
 const BUSINESS_UPGRADE_DAILY_COST := 500
 const BUSINESS_BASE_ATTRACTION := 100
 const BUSINESS_UPGRADE_ATTRACTION := 25
+const BUSINESS_DAILY_RENT := {
+	"corner_shop": 3500,
+	"bakery": 4500,
+	"cafe": 5500
+}
 
 var businesses: Dictionary = {}
 var last_processed_day: int = 1
 var unpaid_operating_costs: int = 0
+var total_rent_received: int = 0
 
 func initialize_day(day: int) -> void:
 	last_processed_day = maxi(1, day)
@@ -49,6 +55,35 @@ func get_business_upgrade_cost(plot_id: int) -> int:
 		return 0
 	return int(BUSINESS_UPGRADE_COSTS[level])
 
+func is_business_leased(plot_id: int) -> bool:
+	var business := get_business(plot_id)
+	return bool(business.get("leased", false))
+
+func get_daily_rent(plot_id: int) -> int:
+	var business := get_business(plot_id)
+	if business.is_empty():
+		return 0
+	var business_type := str(business.get("type", SUPPORTED_BUSINESS))
+	return int(BUSINESS_DAILY_RENT.get(business_type, BUSINESS_DAILY_RENT[SUPPORTED_BUSINESS]))
+
+func lease_business(plot_id: int) -> bool:
+	if not businesses.has(plot_id) or is_business_leased(plot_id):
+		return false
+	var business: Dictionary = businesses[plot_id]
+	business["leased"] = true
+	business["active"] = true
+	businesses[plot_id] = business
+	return true
+
+func terminate_business_lease(plot_id: int) -> bool:
+	if not businesses.has(plot_id) or not is_business_leased(plot_id):
+		return false
+	var business: Dictionary = businesses[plot_id]
+	business["leased"] = false
+	business["active"] = false
+	businesses[plot_id] = business
+	return true
+
 func get_business_daily_expenses(plot_id: int) -> int:
 	var business := get_business(plot_id)
 	if business.is_empty():
@@ -62,7 +97,7 @@ func purchase_business_upgrade(plot_id: int, economy: EconomyService) -> bool:
 		return false
 	var upgrade_level := get_business_upgrade_level(plot_id)
 	var upgrade_cost := get_business_upgrade_cost(plot_id)
-	if upgrade_cost <= 0 or not economy.try_spend(upgrade_cost, "Улучшение заведения"):
+	if upgrade_cost <= 0 or is_business_leased(plot_id) or not economy.try_spend(upgrade_cost, "Улучшение заведения"):
 		return false
 	var business: Dictionary = businesses[plot_id]
 	business["upgrade_level"] = upgrade_level + 1
@@ -133,7 +168,7 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 	return true
 
 func set_business_active(plot_id: int, active: bool) -> bool:
-	if not businesses.has(plot_id):
+	if not businesses.has(plot_id) or is_business_leased(plot_id):
 		return false
 	var business: Dictionary = businesses[plot_id]
 	business["active"] = active
@@ -150,7 +185,7 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 	var active_plot_ids: Array[int] = []
 	for key in businesses.keys():
 		var business: Dictionary = businesses[key]
-		if bool(business.get("active", false)):
+		if bool(business.get("active", false)) and not bool(business.get("leased", false)):
 			active_plot_ids.append(int(key))
 	active_plot_ids.sort()
 	var active_count := active_plot_ids.size()
@@ -190,6 +225,16 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 			var business: Dictionary = businesses[plot_id]
 			daily_expenses += get_daily_expenses(str(business.get("type", SUPPORTED_BUSINESS))) + get_business_upgrade_level(plot_id) * BUSINESS_UPGRADE_DAILY_COST
 		unpaid_operating_costs += daily_expenses * elapsed_days
+	var daily_rent_income := 0
+	for key in businesses.keys():
+		var business: Dictionary = businesses[key]
+		if bool(business.get("leased", false)):
+			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
+			daily_rent_income += int(BUSINESS_DAILY_RENT.get(business_type, BUSINESS_DAILY_RENT[SUPPORTED_BUSINESS]))
+	if daily_rent_income > 0:
+		var rent_payment := daily_rent_income * elapsed_days
+		economy.add_money(rent_payment, "Арендная плата за коммерческие помещения")
+		total_rent_received += rent_payment
 	if unpaid_operating_costs > 0 and economy.balance > 0:
 		var payment := mini(unpaid_operating_costs, economy.balance)
 		if payment > 0 and economy.try_spend(payment, "Операционные расходы магазинов"):
@@ -203,6 +248,7 @@ func get_save_data() -> Dictionary:
 		saved_businesses.append({
 			"plot_id": int(key),
 			"type": str(business.get("type", SUPPORTED_BUSINESS)),
+			"leased": bool(business.get("leased", false)),
 			"upgrade_level": clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(business.get("active", false)),
 			"opened_day": maxi(1, int(business.get("opened_day", 1))),
@@ -212,13 +258,15 @@ func get_save_data() -> Dictionary:
 	return {
 		"businesses": saved_businesses,
 		"last_processed_day": last_processed_day,
-		"unpaid_operating_costs": unpaid_operating_costs
+		"unpaid_operating_costs": unpaid_operating_costs,
+		"total_rent_received": total_rent_received
 	}
 
 func load_save_data(data: Dictionary) -> void:
 	businesses.clear()
 	last_processed_day = maxi(1, int(data.get("last_processed_day", 1)))
 	unpaid_operating_costs = maxi(0, int(data.get("unpaid_operating_costs", 0)))
+	total_rent_received = maxi(0, int(data.get("total_rent_received", 0)))
 	var saved_businesses: Variant = data.get("businesses", [])
 	if not saved_businesses is Array:
 		return
@@ -231,6 +279,7 @@ func load_save_data(data: Dictionary) -> void:
 			continue
 		businesses[plot_id] = {
 			"type": business_type,
+			"leased": bool(entry.get("leased", false)),
 			"upgrade_level": clampi(int(entry.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(entry.get("active", false)),
 			"opened_day": maxi(1, int(entry.get("opened_day", 1))),
