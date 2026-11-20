@@ -42,7 +42,6 @@ func process_day(day: int) -> bool:
 	if day <= current_day:
 		return false
 	var previous_season := season_id
-	var previous_weather := weather_id
 	current_day = day
 	season_id = _get_season_for_day(day)
 	if season_id != previous_season or day >= next_weather_day:
