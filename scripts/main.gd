@@ -921,6 +921,23 @@ func _button_style(color: Color) -> StyleBoxFlat:
 func _update_balance() -> void:
 	balance_label.text = "₽ %s" % _format_money(economy.balance)
 
+func _get_average_resident_satisfaction() -> float:
+	if resident_service == null:
+		return 75.0
+	var total := 0.0
+	var count := 0
+	for family_value in resident_service.get_resident_display_data():
+		if not family_value is Dictionary:
+			continue
+		var family: Dictionary = family_value
+		for member_value in family.get("members", []):
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			total += float(member.get("satisfaction", 75))
+			count += 1
+	return total / float(count) if count > 0 else 75.0
+
 func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if game_time_label != null:
 		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
@@ -933,7 +950,7 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		weather_processed = weather_service.process_day(day)
 	var business_processed := false
 	if not is_loading_game and business_service != null and economy != null:
-		business_processed = business_service.process_day(day, economy)
+		business_processed = business_service.process_day(day, economy, resident_service.get_total_resident_count(), _get_average_resident_satisfaction(), progression_service.reputation, weather_service.weather_id)
 	_apply_weather_state()
 	if not is_loading_game and resident_service != null:
 		resident_service.update_time(hour, minute, day)
@@ -1354,11 +1371,15 @@ func _on_plot_selected(plot_id: int) -> void:
 					resident_button.visible = false
 					resident_label.visible = false
 					var active := bool(business.get("active", false))
-					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
+					var daily_customers := int(business.get("last_daily_customers", 80))
+					var daily_revenue := int(business.get("last_daily_revenue", business_service.get_daily_revenue()))
+					var daily_profit := daily_revenue - business_service.get_daily_expenses()
+					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
-						_format_money(business_service.get_daily_revenue()),
+						daily_customers,
+						_format_money(daily_revenue),
 						_format_money(business_service.get_daily_expenses()),
-						_format_money(business_service.get_daily_profit()),
+						_format_money(daily_profit),
 						_format_money(business_service.unpaid_operating_costs)
 					]
 					business_button.text = "Приостановить магазин" if active else "Возобновить магазин"
