@@ -42,6 +42,7 @@ var business_button: Button
 var business_upgrade_button: Button
 var business_lease_button: Button
 var business_type_selector: OptionButton
+var business_schedule_selector: OptionButton
 var business_status_label: Label
 var household_actions_heading: Label
 var household_actions_grid: GridContainer
@@ -398,6 +399,15 @@ func _create_interface() -> void:
 		business_type_selector.add_item("%s — ₽ %s" % [business_service.get_business_type_title(type_id), _format_money(business_service.get_opening_cost(type_id))])
 		business_type_selector.set_item_metadata(business_type_selector.item_count - 1, type_id)
 	content.add_child(business_type_selector)
+
+	business_schedule_selector = OptionButton.new()
+	business_schedule_selector.add_theme_font_size_override("font_size", 11)
+	business_schedule_selector.item_selected.connect(_on_business_schedule_selected)
+	business_schedule_selector.visible = false
+	for schedule_id in business_service.get_business_schedule_ids():
+		business_schedule_selector.add_item(business_service.get_business_schedule_title(schedule_id))
+		business_schedule_selector.set_item_metadata(business_schedule_selector.item_count - 1, schedule_id)
+	content.add_child(business_schedule_selector)
 
 	business_button = Button.new()
 	business_button.text = "Открыть магазин"
@@ -1332,6 +1342,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	business_upgrade_button.visible = false
 	business_lease_button.visible = false
 	business_type_selector.visible = false
+	business_schedule_selector.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
 	member_autonomy_container.visible = false
@@ -1576,6 +1587,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				business_status_label.visible = true
 				business_button.visible = true
 				if business.is_empty():
+					business_schedule_selector.visible = false
 					business_status_label.text = "Выбери специализацию помещения. У каждого заведения своя стоимость открытия, средний чек и ежедневные расходы."
 					business_type_selector.visible = true
 					var selected_type := str(business_type_selector.get_item_metadata(business_type_selector.selected))
@@ -1604,23 +1616,32 @@ func _on_plot_selected(plot_id: int) -> void:
 					var lifetime_expenses := int(business.get("total_operating_costs", 0))
 					var lifetime_result := lifetime_revenue - lifetime_expenses
 					var lifetime_rent := int(business.get("total_rent_received", 0))
+					var schedule_id := business_service.get_business_schedule(plot_id)
+					var schedule_title := business_service.get_business_schedule_title(schedule_id)
+					business_schedule_selector.visible = not leased
+					for schedule_index in business_schedule_selector.item_count:
+						if str(business_schedule_selector.get_item_metadata(schedule_index)) == schedule_id:
+							business_schedule_selector.select(schedule_index)
+							break
 					if leased:
-						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено от этого помещения: ₽ %s\nОбщая аренда района: ₽ %s\nРепутация: %d/100 (%s)\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
+						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено от этого помещения: ₽ %s\nОбщая аренда района: ₽ %s\nРепутация: %d/100 (%s)\nГрафик арендатора: %s\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
 							business_title.to_upper(),
 							_format_money(daily_rent),
 							_format_money(lifetime_rent),
 							_format_money(business_service.total_rent_received),
 							business_reputation,
 							reputation_trend,
+							schedule_title,
 							upgrade_level
 						]
 					else:
-						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день • всего: %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nЗа всё время: выручка ₽ %s • расходы ₽ %s • итог %s ₽\nДолг по расходам: ₽ %s" % [
+						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: %s\nПосетители: %d/день • всего: %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nЗа всё время: выручка ₽ %s • расходы ₽ %s • итог %s ₽\nДолг по расходам: ₽ %s" % [
 							business_title.to_upper(),
 							"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 							business_reputation,
 							reputation_trend,
 							upgrade_level,
+							schedule_title,
 							daily_customers,
 							_format_money(lifetime_customers),
 							_format_money(daily_revenue),
@@ -1646,6 +1667,19 @@ func _on_plot_selected(plot_id: int) -> void:
 					else:
 						business_upgrade_button.text = "Максимальная привлекательность"
 						business_upgrade_button.disabled = true
+
+func _on_business_schedule_selected(index: int) -> void:
+	if selected_plot_id < 1 or index < 0 or index >= business_schedule_selector.item_count:
+		return
+	var schedule_id := str(business_schedule_selector.get_item_metadata(index))
+	if not business_service.set_business_schedule(selected_plot_id, schedule_id):
+		status_label.text = "Не удалось изменить график работы."
+		return
+	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
+	status_label.text = "График заведения изменён: %s. Новые расходы и доля спроса применятся со следующих игровых суток." % business_service.get_business_schedule_title(schedule_id)
+	_save_game()
+	_on_plot_selected(selected_plot_id)
+
 
 func _on_business_lease_pressed() -> void:
 	if selected_plot_id < 1:

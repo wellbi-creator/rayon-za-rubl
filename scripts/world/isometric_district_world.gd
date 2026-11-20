@@ -438,8 +438,18 @@ func _draw_plot(plot_id: int) -> void:
 		"built":
 			_draw_house(center, true)
 			if business_plots.has(plot_id):
-				var shop_active := bool(business_plots[plot_id])
-				_draw_shop_sign(center, shop_active and business_current_hour >= 8 and business_current_hour < 20)
+				var business_value: Variant = business_plots[plot_id]
+				var shop_active := false
+				var open_hour := 8
+				var close_hour := 20
+				if business_value is Dictionary:
+					shop_active = bool(business_value.get("active", false))
+					open_hour = clampi(int(business_value.get("open_hour", 8)), 0, 23)
+					close_hour = clampi(int(business_value.get("close_hour", 20)), 0, 24)
+				else:
+					shop_active = bool(business_value)
+				var is_open_now := business_current_hour >= open_hour and business_current_hour < close_hour
+				_draw_shop_sign(center, shop_active and is_open_now)
 		_:
 			_draw_garden(center)
 
