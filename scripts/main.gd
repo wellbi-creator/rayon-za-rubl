@@ -875,6 +875,8 @@ func _apply_weather_state() -> void:
 	if world != null:
 		world.set_season(weather_service.season_id)
 		world.set_weather(weather_service.weather_id)
+	if resident_service != null:
+		resident_service.set_environment(weather_service.season_id, weather_service.weather_id)
 
 
 func _on_balance_changed(_new_balance: int) -> void:
