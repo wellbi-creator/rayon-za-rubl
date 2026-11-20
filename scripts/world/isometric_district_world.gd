@@ -27,6 +27,7 @@ var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
 var player_built_road_cells: Dictionary = {}
+var road_lamp_cells: Dictionary = {}
 var road_build_mode := false
 var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
@@ -52,6 +53,8 @@ var weather_animation_time := 0.0
 func _ready() -> void:
 	road_path_network = RoadPathNetwork.new()
 	road_path_network.configure(MAP_WIDTH, MAP_HEIGHT, 3, 4)
+	for lamp_cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
+		road_lamp_cells[lamp_cell] = true
 	for i in PLOT_CELLS.size():
 		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0})
 	camera = Camera2D.new()
@@ -324,6 +327,8 @@ func _draw_roads() -> void:
 			preview_valid = can_remove_road_cell(road_preview_cell)
 		elif road_edit_action == "upgrade":
 			preview_valid = can_upgrade_road_surface(road_preview_cell)
+		elif road_edit_action == "lamp":
+			preview_valid = can_add_road_lamp(road_preview_cell)
 		else:
 			preview_valid = can_build_road_cell(road_preview_cell)
 		var preview_color := Color("#d97870", 0.34)
@@ -335,6 +340,9 @@ func _draw_roads() -> void:
 			elif road_edit_action == "upgrade":
 				preview_color = Color("#78acd4", 0.4)
 				preview_outline = Color("#b8e0ff")
+			elif road_edit_action == "lamp":
+				preview_color = Color("#e7c56f", 0.4)
+				preview_outline = Color("#fff0a8")
 			else:
 				preview_color = Color("#8bd39b", 0.38)
 				preview_outline = Color("#c6f0c8")
@@ -382,8 +390,9 @@ func _draw_road_cell(cell: Vector2i) -> void:
 			draw_line(center + Vector2(0, -6), center + Vector2(0, 6), Color("#e8dfbd", 0.82), 1.4)
 
 func _draw_environment() -> void:
-	for cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
-		_draw_lamp(Grid.grid_to_world(cell, TILE) + Vector2(0, -10))
+	for cell in road_path_network.get_road_cells():
+		if road_lamp_cells.has(cell):
+			_draw_lamp(Grid.grid_to_world(cell, TILE) + Vector2(0, -10))
 	# Park greenery between the lower plots.
 	var park: Vector2 = Grid.grid_to_world(Vector2i(5, 5), TILE)
 	_draw_diamond(park, TILE * Vector2(0.72, 0.58), Color("#719565"), Color("#9ab27e"), 1.0)
@@ -896,7 +905,7 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 
 func set_road_build_mode(enabled: bool, action: String = "build") -> void:
 	road_build_mode = enabled
-	road_edit_action = action if action in ["build", "remove", "upgrade"] else "build"
+	road_edit_action = action if action in ["build", "remove", "upgrade", "lamp"] else "build"
 	road_preview_cell = Vector2i(-1, -1)
 	queue_redraw()
 
@@ -946,12 +955,23 @@ func upgrade_road_surface(cell: Vector2i) -> bool:
 func is_player_built_road_cell(cell: Vector2i) -> bool:
 	return player_built_road_cells.has(cell)
 
+func can_add_road_lamp(cell: Vector2i) -> bool:
+	return road_path_network != null and road_path_network.is_road_cell(cell) and not road_lamp_cells.has(cell)
+
+func add_road_lamp(cell: Vector2i) -> bool:
+	if not can_add_road_lamp(cell):
+		return false
+	road_lamp_cells[cell] = true
+	queue_redraw()
+	return true
+
 func remove_road_cell(cell: Vector2i) -> bool:
 	if not can_remove_road_cell(cell):
 		return false
 	var removed := road_path_network.remove_road_cell(cell)
 	if removed:
 		player_built_road_cells.erase(cell)
+		road_lamp_cells.erase(cell)
 		queue_redraw()
 	return removed
 
@@ -960,11 +980,16 @@ func get_save_data() -> Dictionary:
 	for cell in road_path_network.get_road_cells():
 		if player_built_road_cells.has(cell):
 			saved_player_roads.append({"x": cell.x, "y": cell.y})
+	var saved_road_lamps: Array[Dictionary] = []
+	for cell in road_path_network.get_road_cells():
+		if road_lamp_cells.has(cell):
+			saved_road_lamps.append({"x": cell.x, "y": cell.y})
 	return {
 		"plot_states": plot_states.duplicate(true),
 		"baba_home_repaired": baba_home_repaired,
 		"road_network": road_path_network.get_save_data(),
-		"player_built_road_cells": saved_player_roads
+		"player_built_road_cells": saved_player_roads,
+		"road_lamps": saved_road_lamps
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -984,6 +1009,18 @@ func load_save_data(data: Dictionary) -> void:
 		for cell in road_path_network.get_road_cells():
 			if cell.y != 3 and cell.x != 4:
 				player_built_road_cells[cell] = true
+	road_lamp_cells.clear()
+	var saved_road_lamps: Variant = data.get("road_lamps", [])
+	if data.has("road_lamps") and saved_road_lamps is Array:
+		for entry in saved_road_lamps:
+			if entry is Dictionary:
+				var lamp_cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
+				if road_path_network.is_road_cell(lamp_cell):
+					road_lamp_cells[lamp_cell] = true
+	else:
+		for lamp_cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
+			if road_path_network.is_road_cell(lamp_cell):
+				road_lamp_cells[lamp_cell] = true
 	var saved_plots: Variant = data.get("plot_states", [])
 	if saved_plots is Array and saved_plots.size() == PLOT_CELLS.size():
 		plot_states.clear()
