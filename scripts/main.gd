@@ -257,6 +257,7 @@ func _create_interface() -> void:
 	panel.offset_bottom = 680
 	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.96))
 	root.add_child(panel)
+	panel.visible = false
 
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
@@ -682,6 +683,7 @@ func _create_business_portfolio_popup() -> void:
 
 
 func _on_business_portfolio_pressed() -> void:
+	_hide_district_panel()
 	_refresh_business_portfolio()
 	_polish_context_panel(business_portfolio_popup)
 	_show_responsive_popup(business_portfolio_popup, Vector2i(600, 500))
@@ -794,6 +796,7 @@ func _create_finance_popup() -> void:
 	content.add_child(finance_summary_label)
 
 func _on_finance_pressed() -> void:
+	_hide_district_panel()
 	_refresh_finance_summary()
 	_polish_context_panel(finance_popup)
 	_show_responsive_popup(finance_popup, Vector2i(560, 390))
@@ -1050,6 +1053,7 @@ func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: b
 
 
 func _on_progression_pressed() -> void:
+	_hide_district_panel()
 	_refresh_progression_popup()
 	_polish_context_panel(progression_popup)
 	_show_responsive_popup(progression_popup, Vector2i(560, 470))
@@ -1113,6 +1117,7 @@ func _award_district_progress(experience_gain: int, reputation_gain: int, reason
 
 
 func _on_municipal_services_pressed() -> void:
+	_hide_district_panel()
 	_refresh_municipal_services()
 	_polish_context_panel(municipal_popup)
 	_show_responsive_popup(municipal_popup, Vector2i(560, 470))
@@ -1330,6 +1335,7 @@ func _on_municipal_fire_pressed(service_id: String) -> void:
 
 
 func _on_transaction_history_pressed() -> void:
+	_hide_district_panel()
 	_refresh_transaction_history()
 	_polish_context_panel(transaction_popup)
 	_show_responsive_popup(transaction_popup, Vector2i(560, 380))
@@ -1481,6 +1487,13 @@ func _open_district_panel() -> void:
 		district_scroll.queue_redraw()
 
 
+func _hide_district_panel() -> void:
+	if district_panel == null or not is_instance_valid(district_panel):
+		return
+	district_panel.hide()
+	district_panel.visible = false
+
+
 func _on_navigation_map_pressed() -> void:
 	_open_district_panel()
 	status_label.text = "Карта района. Выбери участок, чтобы открыть его действия."
@@ -1518,12 +1531,13 @@ func _on_interface_resized() -> void:
 		quickbar_panel.offset_bottom = -6.0
 		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
-		var panel_width := clampf(viewport_size.x * (0.50 if phone_landscape else (0.46 if compact else 0.34)), 280.0, 480.0)
+		var panel_width := clampf(viewport_size.x * (0.58 if phone_landscape else (0.54 if compact else 0.42)), 300.0, 560.0)
 		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 		district_panel.offset_left = -panel_width - 8.0
 		district_panel.offset_top = 72.0 if phone_landscape else (82.0 if compact else 104.0)
 		district_panel.offset_right = -8.0
-		district_panel.offset_bottom = -66.0 if phone_landscape else -84.0
+		# Stop exactly above the bottom quickbar; never cover its touch targets.
+		district_panel.offset_bottom = -76.0 if phone_landscape or compact else -86.0
 	if top_hud_panel != null:
 		for hud_child in top_hud_panel.get_children():
 			if hud_child is HBoxContainer:
@@ -1727,6 +1741,7 @@ func _show_empty_selection() -> void:
 	build_button.disabled = true
 
 func _on_road_tool_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "build"
 	world.set_road_build_mode(enabled, "build")
 	road_tool_button.text = "ЗАКРЫТЬ" if enabled else "ДОРОГИ"
@@ -1736,6 +1751,7 @@ func _on_road_tool_pressed() -> void:
 	road_tool_status_label.text = "Строительство: зелёная клетка — можно проложить дорогу. Цена — 5 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_remove_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "remove"
 	world.set_road_build_mode(enabled, "remove")
 	road_remove_button.text = "ЗАКРЫТЬ" if enabled else "СНЕСТИ"
@@ -1745,6 +1761,7 @@ func _on_road_remove_pressed() -> void:
 	road_tool_status_label.text = "Демонтаж: оранжевая клетка — можно снять сегмент. Возврат за построенную дорогу — 2 500 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_asphalt_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "upgrade"
 	world.set_road_build_mode(enabled, "upgrade")
 	road_asphalt_button.text = "ЗАКРЫТЬ" if enabled else "АСФАЛЬТ"
@@ -1754,6 +1771,7 @@ func _on_road_asphalt_pressed() -> void:
 	road_tool_status_label.text = "Асфальтирование: голубая клетка — можно улучшить покрытие. Цена — 12 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_lamp_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "lamp"
 	world.set_road_build_mode(enabled, "lamp")
 	road_lamp_button.text = "ЗАКРЫТЬ" if enabled else "ФОНАРИ"
