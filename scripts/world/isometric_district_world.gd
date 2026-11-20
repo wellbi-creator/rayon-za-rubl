@@ -29,6 +29,7 @@ var road_path_network: RoadPathNetwork
 var player_built_road_cells: Dictionary = {}
 var road_lamp_cells: Dictionary = {}
 var business_plots: Dictionary = {}
+var business_current_hour := 12
 var road_build_mode := false
 var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
@@ -418,13 +419,14 @@ func _draw_plot(plot_id: int) -> void:
 		"built":
 			_draw_house(center, true)
 			if business_plots.has(plot_id):
-				_draw_shop_sign(center, bool(business_plots[plot_id]))
+				var shop_active := bool(business_plots[plot_id])
+				_draw_shop_sign(center, shop_active and business_current_hour >= 8 and business_current_hour < 20)
 		_:
 			_draw_garden(center)
 
-func _draw_shop_sign(ground: Vector2, active: bool) -> void:
-	var sign_color := Color("#e0bd70") if active else Color("#8b9389")
-	var sign_text_color := Color("#354638") if active else Color("#343b38")
+func _draw_shop_sign(ground: Vector2, open_now: bool) -> void:
+	var sign_color := Color("#e0bd70") if open_now else Color("#8b9389")
+	var sign_text_color := Color("#354638") if open_now else Color("#343b38")
 	var sign_origin := ground + Vector2(7, -52)
 	# A small timber-framed sign and striped awning distinguish a shop from a home.
 	draw_line(sign_origin + Vector2(4, 10), sign_origin + Vector2(4, 17), Color("#614a36"), 2.0)
@@ -432,12 +434,12 @@ func _draw_shop_sign(ground: Vector2, active: bool) -> void:
 	draw_rect(Rect2(sign_origin - Vector2(2, 2), Vector2(33, 14)), Color("#493d31"), true)
 	draw_rect(Rect2(sign_origin, Vector2(29, 10)), sign_color, true)
 	draw_rect(Rect2(sign_origin + Vector2(1, 1), Vector2(27, 8)), sign_color.lightened(0.12), false, 1.0)
-	draw_string(ThemeDB.fallback_font, sign_origin + Vector2(2, 7.5), "МАГАЗИН", HORIZONTAL_ALIGNMENT_LEFT, 26.0, 6, sign_text_color)
+	draw_string(ThemeDB.fallback_font, sign_origin + Vector2(2, 7.5), "ОТКРЫТО" if open_now else "ЗАКРЫТО", HORIZONTAL_ALIGNMENT_LEFT, 26.0, 6, sign_text_color)
 	var awning_origin := ground + Vector2(3, -23)
 	draw_colored_polygon(PackedVector2Array([
 		awning_origin, awning_origin + Vector2(17, 8),
 		awning_origin + Vector2(17, 13), awning_origin + Vector2(0, 5)
-	]), Color("#9b5d4d") if active else Color("#777d78"))
+	]), Color("#9b5d4d") if open_now else Color("#777d78"))
 	draw_line(awning_origin + Vector2(4, 2), awning_origin + Vector2(4, 8), Color("#f0d8ad", 0.85), 1.2)
 	draw_line(awning_origin + Vector2(11, 5), awning_origin + Vector2(11, 11), Color("#f0d8ad", 0.85), 1.2)
 
@@ -724,6 +726,8 @@ func _collect_resident_draw_entries() -> Array[Dictionary]:
 		var plot_id := int(key)
 		if plot_id < 1 or plot_id >= PLOT_CELLS.size() or not bool(business_plots[key]):
 			continue
+		if business_current_hour < 8 or business_current_hour >= 20:
+			continue
 		if str(plot_states[plot_id].get("kind", "empty")) != "built":
 			continue
 		var route := _get_walk_route(plot_id)
@@ -935,8 +939,9 @@ func set_resident_groups(groups: Array) -> void:
 	resident_groups = groups.duplicate(true)
 	queue_redraw()
 
-func set_business_plots(entries: Dictionary) -> void:
+func set_business_plots(entries: Dictionary, current_hour: int = 12) -> void:
 	business_plots = entries.duplicate(true)
+	business_current_hour = clampi(current_hour, 0, 23)
 	queue_redraw()
 
 func set_transport_entries(entries: Array) -> void:

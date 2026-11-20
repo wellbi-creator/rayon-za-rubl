@@ -123,7 +123,7 @@ func _ready() -> void:
 	_create_save_timer()
 	_load_game()
 	world.set_resident_groups(resident_service.get_resident_display_data())
-	world.set_business_plots(business_service.get_business_visual_data())
+	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
 	_update_balance()
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
@@ -926,6 +926,8 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
 	if world != null:
 		world.set_time_of_day(hour, minute)
+		if business_service != null:
+			world.set_business_plots(business_service.get_business_visual_data(), hour)
 	var weather_processed := false
 	if not is_loading_game and weather_service != null:
 		weather_processed = weather_service.process_day(day)
@@ -1352,7 +1354,7 @@ func _on_plot_selected(plot_id: int) -> void:
 					resident_button.visible = false
 					resident_label.visible = false
 					var active := bool(business.get("active", false))
-					business_status_label.text = "МАГАЗИН У ДОМА • %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
+					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 						_format_money(business_service.get_daily_revenue()),
 						_format_money(business_service.get_daily_expenses()),
@@ -1379,7 +1381,7 @@ func _on_business_action_pressed() -> void:
 		if not business_service.set_business_active(selected_plot_id, next_active):
 			return
 		status_label.text = "Магазин %s." % ("возобновил работу" if next_active else "приостановлен")
-	world.set_business_plots(business_service.get_business_visual_data())
+	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
 	_save_game()
 	_on_plot_selected(selected_plot_id)
 
