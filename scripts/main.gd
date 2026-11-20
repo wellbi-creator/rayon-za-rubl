@@ -1586,6 +1586,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				business_status_label.visible = true
 				business_button.visible = true
 				if business.is_empty():
+					business_schedule_selector.visible = false
 					business_status_label.text = "Выбери специализацию помещения. У каждого заведения своя стоимость открытия, средний чек и ежедневные расходы."
 					business_type_selector.visible = true
 					var selected_type := str(business_type_selector.get_item_metadata(business_type_selector.selected))
