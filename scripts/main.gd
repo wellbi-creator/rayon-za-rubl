@@ -390,6 +390,7 @@ func _create_interface() -> void:
 
 	business_type_selector = OptionButton.new()
 	business_type_selector.add_theme_font_size_override("font_size", 11)
+	business_type_selector.item_selected.connect(_on_business_type_selected)
 	business_type_selector.visible = false
 	for type_id in business_service.get_business_type_ids():
 		business_type_selector.add_item("%s — ₽ %s" % [business_service.get_business_type_title(type_id), _format_money(business_service.get_opening_cost(type_id))])
@@ -1576,11 +1577,20 @@ func _on_plot_selected(plot_id: int) -> void:
 						daily_customers,
 						_format_money(daily_revenue),
 						_format_money(daily_expenses),
-						"+" if daily_profit >= 0 else "−" + _format_money(absi(daily_profit)),
+						"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
 						_format_money(business_service.unpaid_operating_costs)
 					]
 					business_button.text = "Приостановить магазин" if active else "Возобновить магазин"
 					business_button.disabled = false
+
+func _on_business_type_selected(index: int) -> void:
+	if index < 0 or index >= business_type_selector.item_count:
+		return
+	var selected_type := str(business_type_selector.get_item_metadata(index))
+	var opening_cost := business_service.get_opening_cost(selected_type)
+	business_button.text = "Открыть: %s — ₽ %s" % [business_service.get_business_type_title(selected_type), _format_money(opening_cost)]
+	business_button.disabled = economy.balance < opening_cost
+
 
 func _on_business_action_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
