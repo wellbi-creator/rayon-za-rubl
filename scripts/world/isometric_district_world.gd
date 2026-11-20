@@ -319,13 +319,16 @@ func _draw_roads() -> void:
 		_draw_road_cell(cell)
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
-		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_build_road_cell(road_preview_cell)
+		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_upgrade_road_surface(road_preview_cell) if road_edit_action == "upgrade" else can_build_road_cell(road_preview_cell)
 		var preview_color := Color("#d97870", 0.34)
 		var preview_outline := Color("#ffc0b7")
 		if preview_valid:
 			if road_edit_action == "remove":
 				preview_color = Color("#e6b56f", 0.38)
 				preview_outline = Color("#ffe0a8")
+			elif road_edit_action == "upgrade":
+				preview_color = Color("#78acd4", 0.4)
+				preview_outline = Color("#b8e0ff")
 			else:
 				preview_color = Color("#8bd39b", 0.38)
 				preview_outline = Color("#c6f0c8")
@@ -887,7 +890,7 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 
 func set_road_build_mode(enabled: bool, action: String = "build") -> void:
 	road_build_mode = enabled
-	road_edit_action = "remove" if action == "remove" else "build"
+	road_edit_action = action if action in ["build", "remove", "upgrade"] else "build"
 	road_preview_cell = Vector2i(-1, -1)
 	queue_redraw()
 
