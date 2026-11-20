@@ -224,7 +224,7 @@ func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
 
 func _draw_transport_entry(entry: Dictionary) -> void:
-	# A compact data-driven vehicle sprite; actual traffic movement is a later stage.
+	# Small layered car silhouette. All details follow the route heading and fade together at route edges.
 	var ground: Vector2 = entry.get("position", Vector2.ZERO)
 	var body_color: Color = entry.get("color", Color("#587b8a"))
 	var facing: float = float(entry.get("rotation", 0.0))
@@ -236,16 +236,32 @@ func _draw_transport_entry(entry: Dictionary) -> void:
 	for point in local_points:
 		points.append(ground + point.rotated(facing))
 	draw_ellipse(ground + Vector2(1, 4), Vector2(13, 5), Color("#26352f", 0.28))
+	# Wheels sit just outside the body silhouette.
+	for wheel_offset in [Vector2(-7, -4.2), Vector2(7, -4.2), Vector2(-7, 4.2), Vector2(7, 4.2)]:
+		draw_circle(ground + wheel_offset.rotated(facing), 2.0, Color("#263238", 0.92))
 	draw_colored_polygon(points, body_color)
 	draw_line(points[0], points[1], body_color.lightened(0.22), 1.2)
 	draw_line(points[1], points[2], body_color.lightened(0.3), 1.2)
 	draw_line(points[2], points[3], body_color.darkened(0.18), 1.2)
+	# Front and rear glass panels make the vehicle readable at the current camera scale.
 	draw_colored_polygon(PackedVector2Array([
-		ground + Vector2(-5, -2).rotated(facing),
-		ground + Vector2(0, -4).rotated(facing),
-		ground + Vector2(5, -2).rotated(facing),
-		ground + Vector2(0, 1).rotated(facing)
-	]), Color("#b9d5d4"))
+		ground + Vector2(-1, -3.8).rotated(facing),
+		ground + Vector2(5, -3.4).rotated(facing),
+		ground + Vector2(8, 0).rotated(facing),
+		ground + Vector2(2, 0.2).rotated(facing)
+	]), Color("#b9d5d4", 0.94))
+	draw_colored_polygon(PackedVector2Array([
+		ground + Vector2(-7, -3.2).rotated(facing),
+		ground + Vector2(-2, -3.8).rotated(facing),
+		ground + Vector2(-1, 0.2).rotated(facing),
+		ground + Vector2(-7, 0.4).rotated(facing)
+	]), Color("#8eafb0", 0.9))
+	# Subtle bumpers and paired lights remain aligned for both travel directions.
+	draw_line(ground + Vector2(10, 0).rotated(facing), ground + Vector2(12, 0).rotated(facing), Color("#e6d7ad"), 1.5)
+	draw_circle(ground + Vector2(10, -2.1).rotated(facing), 1.0, Color("#f5e5ad"))
+	draw_circle(ground + Vector2(10, 2.1).rotated(facing), 1.0, Color("#f5e5ad"))
+	draw_circle(ground + Vector2(-10, -2.1).rotated(facing), 0.9, Color("#bd6c62"))
+	draw_circle(ground + Vector2(-10, 2.1).rotated(facing), 0.9, Color("#bd6c62"))
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
