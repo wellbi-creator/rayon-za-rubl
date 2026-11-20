@@ -1076,7 +1076,7 @@ func load_save_data(data: Dictionary) -> void:
 		if saved_cells is Array and saved_width <= MAP_WIDTH and saved_height <= MAP_HEIGHT and (saved_width < MAP_WIDTH or saved_height < MAP_HEIGHT):
 			# Reconnect the new arterial to the original central junction even if a player
 			# had previously removed one of the old eastern terminal road cells.
-			for x in range(5, MAP_WIDTH):
+			for x in range(4, MAP_WIDTH):
 				var horizontal_exists := false
 				for horizontal_entry in saved_cells:
 					if horizontal_entry is Dictionary and int(horizontal_entry.get("x", -1)) == x and int(horizontal_entry.get("y", -1)) == 3:
