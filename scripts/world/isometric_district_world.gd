@@ -27,6 +27,7 @@ var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
 var road_build_mode := false
+var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
 var baba_home_repaired := false
 var construction_animation_time := 0.0
@@ -317,9 +318,9 @@ func _draw_roads() -> void:
 		_draw_road_cell(cell)
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
-		var preview_valid := can_build_road_cell(road_preview_cell)
-		var preview_color := Color("#8bd39b", 0.38) if preview_valid else Color("#d97870", 0.34)
-		var preview_outline := Color("#c6f0c8") if preview_valid else Color("#ffc0b7")
+		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_build_road_cell(road_preview_cell)
+		var preview_color := Color("#e6b56f", 0.38) if road_edit_action == "remove" and preview_valid else Color("#8bd39b", 0.38) if preview_valid else Color("#d97870", 0.34)
+		var preview_outline := Color("#ffe0a8") if road_edit_action == "remove" and preview_valid else Color("#c6f0c8") if preview_valid else Color("#ffc0b7")
 		_draw_diamond(preview_center, TILE * Vector2(0.88, 0.76), preview_color, preview_outline, 3.0)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
@@ -862,8 +863,9 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 		return []
 	return road_path_network.get_route(start_road_cell, end_road_cell, TILE)
 
-func set_road_build_mode(enabled: bool) -> void:
+func set_road_build_mode(enabled: bool, action: String = "build") -> void:
 	road_build_mode = enabled
+	road_edit_action = "remove" if action == "remove" else "build"
 	road_preview_cell = Vector2i(-1, -1)
 	queue_redraw()
 
@@ -894,6 +896,17 @@ func add_road_cell(cell: Vector2i) -> bool:
 	if added:
 		queue_redraw()
 	return added
+
+func can_remove_road_cell(cell: Vector2i) -> bool:
+	return road_path_network != null and road_path_network.can_remove_road_cell(cell)
+
+func remove_road_cell(cell: Vector2i) -> bool:
+	if not can_remove_road_cell(cell):
+		return false
+	var removed := road_path_network.remove_road_cell(cell)
+	if removed:
+		queue_redraw()
+	return removed
 
 func get_save_data() -> Dictionary:
 	return {
