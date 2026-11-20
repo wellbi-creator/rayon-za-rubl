@@ -9,6 +9,7 @@ const ResidentServiceScript = preload("res://scripts/systems/resident_service.gd
 const GameTimeScript = preload("res://scripts/systems/game_time.gd")
 const DistrictUpkeepServiceScript = preload("res://scripts/systems/district_upkeep_service.gd")
 const MunicipalServicesServiceScript = preload("res://scripts/systems/municipal_services_service.gd")
+const DistrictProgressionServiceScript = preload("res://scripts/systems/district_progression_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -21,6 +22,7 @@ var resident_service: ResidentService
 var game_time: GameTime
 var upkeep_service: DistrictUpkeepService
 var municipal_services: MunicipalServicesService
+var progression_service: DistrictProgressionService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
@@ -58,12 +60,17 @@ var municipal_popup: PopupPanel
 var municipal_rows: VBoxContainer
 var municipal_summary_label: Label
 var municipal_status_label: Label
+var progression_popup: PopupPanel
+var progression_summary_label: Label
+var progression_achievements_rows: VBoxContainer
+var progression_events_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
 	add_child(economy)
 	upkeep_service = DistrictUpkeepServiceScript.new()
 	municipal_services = MunicipalServicesServiceScript.new()
+	progression_service = DistrictProgressionServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
@@ -110,6 +117,7 @@ func _create_interface() -> void:
 	root.resized.connect(_on_interface_resized)
 	_create_transaction_history_popup()
 	_create_municipal_services_popup()
+	_create_progression_popup()
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -167,7 +175,7 @@ func _create_interface() -> void:
 	management_buttons.add_theme_constant_override("separation", 8)
 	content.add_child(management_buttons)
 	var transaction_button := Button.new()
-	transaction_button.text = "ЖУРНАЛ ОПЕРАЦИЙ"
+	transaction_button.text = "ЖУРНАЛ"
 	transaction_button.custom_minimum_size = Vector2(0, 40)
 	transaction_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	transaction_button.add_theme_font_size_override("font_size", 11)
@@ -182,6 +190,14 @@ func _create_interface() -> void:
 	municipal_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 	municipal_button.pressed.connect(_on_municipal_services_pressed)
 	management_buttons.add_child(municipal_button)
+	var progression_button := Button.new()
+	progression_button.text = "ПРОГРЕСС"
+	progression_button.custom_minimum_size = Vector2(0, 40)
+	progression_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progression_button.add_theme_font_size_override("font_size", 10)
+	progression_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
+	progression_button.pressed.connect(_on_progression_pressed)
+	management_buttons.add_child(progression_button)
 
 	plot_title = Label.new()
 	plot_title.text = "Выбери участок"
@@ -418,6 +434,124 @@ func _create_municipal_services_popup() -> void:
 	scroll.add_child(municipal_rows)
 
 
+func _create_progression_popup() -> void:
+	progression_popup = PopupPanel.new()
+	progression_popup.title = "Развитие района"
+	progression_popup.size = Vector2i(560, 470)
+	progression_popup.transient = true
+	progression_popup.exclusive = true
+	add_child(progression_popup)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	progression_popup.add_child(panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	var title := Label.new()
+	title.text = "РАЗВИТИЕ И ДОСТИЖЕНИЯ"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "✕"
+	close_button.custom_minimum_size = Vector2(42, 34)
+	close_button.pressed.connect(progression_popup.hide)
+	header.add_child(close_button)
+
+	progression_summary_label = Label.new()
+	progression_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	progression_summary_label.add_theme_color_override("font_color", Color("#f4d98d"))
+	content.add_child(progression_summary_label)
+
+	var achievements_heading := Label.new()
+	achievements_heading.text = "ДОСТИЖЕНИЯ"
+	achievements_heading.add_theme_font_size_override("font_size", 13)
+	achievements_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+	content.add_child(achievements_heading)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(500, 250)
+	content.add_child(scroll)
+	progression_achievements_rows = VBoxContainer.new()
+	progression_achievements_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progression_achievements_rows.add_theme_constant_override("separation", 6)
+	scroll.add_child(progression_achievements_rows)
+
+	progression_events_label = Label.new()
+	progression_events_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	progression_events_label.add_theme_font_size_override("font_size", 11)
+	progression_events_label.add_theme_color_override("font_color", Color("#c9d0b9"))
+	content.add_child(progression_events_label)
+
+
+func _on_progression_pressed() -> void:
+	_refresh_progression_popup()
+	progression_popup.popup_centered(Vector2i(560, 470))
+
+
+func _refresh_progression_popup() -> void:
+	if progression_achievements_rows == null or progression_service == null:
+		return
+	var level := progression_service.get_level()
+	var next_level_xp := progression_service.get_experience_needed()
+	var progress_xp := progression_service.get_experience_progress()
+	var xp_text := "максимальный уровень" if next_level_xp <= 0 else "%d / %d XP до следующего уровня" % [progress_xp, next_level_xp]
+	progression_summary_label.text = "Уровень района: %d\nОпыт: %d XP  •  %s\nРепутация: %d / 100" % [
+		level,
+		progression_service.experience,
+		xp_text,
+		progression_service.reputation
+	]
+	for child in progression_achievements_rows.get_children():
+		progression_achievements_rows.remove_child(child)
+		child.queue_free()
+	var unlocked_count := 0
+	for achievement in progression_service.get_achievements():
+		var unlocked := bool(achievement.get("unlocked", false))
+		if unlocked:
+			unlocked_count += 1
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", _panel_style(Color("#354b40"), 0.9))
+		progression_achievements_rows.add_child(row)
+		var info := VBoxContainer.new()
+		info.add_theme_constant_override("separation", 2)
+		row.add_child(info)
+		var achievement_title := Label.new()
+		achievement_title.text = "%s  %s" % ["✓" if unlocked else "○", str(achievement.get("title", "Достижение"))]
+		achievement_title.add_theme_color_override("font_color", Color("#f4d98d") if unlocked else Color("#e0e5d6"))
+		info.add_child(achievement_title)
+		var description := Label.new()
+		description.text = str(achievement.get("description", ""))
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.add_theme_font_size_override("font_size", 11)
+		description.add_theme_color_override("font_color", Color("#c9d0b9"))
+		info.add_child(description)
+	progression_events_label.text = "Открыто достижений: %d / %d" % [unlocked_count, progression_service.get_achievements().size()]
+	var events := progression_service.get_recent_events()
+	if not events.is_empty():
+		var last_event: Dictionary = events[events.size() - 1]
+		progression_events_label.text += "\nПоследний вклад: %s  •  +%d XP  •  репутация %+d" % [
+			str(last_event.get("reason", "Развитие района")),
+			int(last_event.get("experience", 0)),
+			int(last_event.get("reputation", 0))
+		]
+
+
+func _award_district_progress(experience_gain: int, reputation_gain: int, reason: String) -> void:
+	progression_service.add_progress(experience_gain, reputation_gain, reason)
+	if progression_achievements_rows != null:
+		_refresh_progression_popup()
+	_save_game()
+
+
 func _on_municipal_services_pressed() -> void:
 	_refresh_municipal_services()
 	municipal_popup.popup_centered(Vector2i(560, 470))
@@ -470,6 +604,8 @@ func _refresh_municipal_services() -> void:
 func _on_municipal_hire_pressed(service_id: String) -> void:
 	var hire_cost := municipal_services.get_hire_cost(service_id)
 	if municipal_services.hire_employee(service_id, economy):
+		if municipal_services.get_total_employee_count() == 1 and progression_service.unlock_achievement("first_worker"):
+			_award_district_progress(25, 2, "Нанят первый работник коммунальной службы")
 		municipal_status_label.text = "Сотрудник принят. Найм оплачен: ₽ %s." % _format_money(hire_cost)
 		_save_game()
 	else:
@@ -886,6 +1022,8 @@ func _on_resident_button_pressed() -> void:
 		return
 	var family_id := str(available_families[0]["id"])
 	if resident_service.move_family_in(family_id, selected_plot_id, move_in_service.is_ready(selected_plot_id)):
+		_award_district_progress(80, 10, "Заселение новой семьи")
+		progression_service.unlock_achievement("first_family")
 		_on_plot_selected(selected_plot_id)
 		status_label.text = "Семья заселилась! В районе появились первые соседи."
 		_save_game()
@@ -1031,6 +1169,8 @@ func _on_readiness_updated(plot_id: int, _completed_count: int, _total_count: in
 		_on_plot_selected(plot_id)
 
 func _on_house_ready(plot_id: int) -> void:
+	_award_district_progress(50, 5, "Дом полностью подготовлен к заселению")
+	progression_service.unlock_achievement("first_ready_home")
 	if selected_plot_id == plot_id:
 		_on_plot_selected(plot_id)
 		status_label.text = "Все проверки пройдены! Дом готов принять семью."
@@ -1054,6 +1194,8 @@ func _on_context_action_pressed() -> void:
 				status_label.text = "Не хватает денег на материалы и работу электрика."
 				return
 			baba_wiring_repaired = true
+			_award_district_progress(100, 10, "Помощь Бабе Зине")
+			progression_service.unlock_achievement("baba_helper")
 			world.set_baba_home_repaired(true)
 			economy.add_money(BABA_QUEST_REWARD, "Награда за помощь Бабе Зине")
 			_on_plot_selected(0)
@@ -1098,6 +1240,8 @@ func _on_construction_updated(plot_id: int, progress: float, stage: String) -> v
 
 func _on_construction_completed(plot_id: int) -> void:
 	world.finish_plot(plot_id)
+	_award_district_progress(120, 5, "Завершено строительство дома")
+	progression_service.unlock_achievement("first_house")
 	if selected_plot_id == plot_id:
 		_on_plot_selected(plot_id)
 		status_label.text = "Дом готов! Следующий этап — подготовка к заселению."
@@ -1111,6 +1255,7 @@ func _save_game() -> void:
 		"economy_transactions": economy.get_transaction_history(),
 		"district_upkeep": upkeep_service.get_save_data(),
 		"municipal_services": municipal_services.get_save_data(),
+		"district_progression": progression_service.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -1157,6 +1302,9 @@ func _load_game() -> void:
 		municipal_services.load_save_data(municipal_data)
 	else:
 		municipal_services.initialize_day(game_time.get_day())
+	var progression_data: Variant = data.get("district_progression", {})
+	if progression_data is Dictionary:
+		progression_service.load_save_data(progression_data)
 	is_loading_game = false
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
