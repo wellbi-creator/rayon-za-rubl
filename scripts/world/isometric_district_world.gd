@@ -319,7 +319,13 @@ func _draw_roads() -> void:
 		_draw_road_cell(cell)
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
-		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_upgrade_road_surface(road_preview_cell) if road_edit_action == "upgrade" else can_build_road_cell(road_preview_cell)
+		var preview_valid := false
+		if road_edit_action == "remove":
+			preview_valid = can_remove_road_cell(road_preview_cell)
+		elif road_edit_action == "upgrade":
+			preview_valid = can_upgrade_road_surface(road_preview_cell)
+		else:
+			preview_valid = can_build_road_cell(road_preview_cell)
 		var preview_color := Color("#d97870", 0.34)
 		var preview_outline := Color("#ffc0b7")
 		if preview_valid:
