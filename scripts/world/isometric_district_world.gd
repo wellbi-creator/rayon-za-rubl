@@ -1074,10 +1074,25 @@ func load_save_data(data: Dictionary) -> void:
 		var saved_height := int(migrated_road_data.get("map_height", MAP_HEIGHT))
 		var saved_cells: Variant = migrated_road_data.get("cells", [])
 		if saved_cells is Array and saved_width <= MAP_WIDTH and saved_height <= MAP_HEIGHT and (saved_width < MAP_WIDTH or saved_height < MAP_HEIGHT):
-			for x in range(saved_width, MAP_WIDTH):
-				saved_cells.append({"x": x, "y": 3, "surface": "standard"})
+			# Reconnect the new arterial to the original central junction even if a player
+			# had previously removed one of the old eastern terminal road cells.
+			for x in range(5, MAP_WIDTH):
+				var horizontal_exists := false
+				for existing in saved_cells:
+					if existing is Dictionary and int(existing.get("x", -1)) == x and int(existing.get("y", -1)) == 3:
+						horizontal_exists = true
+						break
+				if not horizontal_exists:
+					saved_cells.append({"x": x, "y": 3, "surface": "standard"})
 			for y in range(MAP_HEIGHT):
-				if y != 3:
+				if y == 3:
+					continue
+				var vertical_exists := false
+				for existing in saved_cells:
+					if existing is Dictionary and int(existing.get("x", -1)) == 10 and int(existing.get("y", -1)) == y:
+						vertical_exists = true
+						break
+				if not vertical_exists:
 					saved_cells.append({"x": 10, "y": y, "surface": "standard"})
 			migrated_road_data["map_width"] = MAP_WIDTH
 			migrated_road_data["map_height"] = MAP_HEIGHT
