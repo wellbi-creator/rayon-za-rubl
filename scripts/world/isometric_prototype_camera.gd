@@ -1,135 +1,86 @@
 extends Camera3D
 
-## Standalone prototype camera with an on-screen input diagnostic.
+## Standalone prototype camera: mouse drag / wheel, one-finger pan, two-finger pinch.
 @export var pan_speed: float = 0.018
 @export var min_zoom: float = 11.0
 @export var max_zoom: float = 30.0
 
-var _dragging := false
-var _touch_positions: Array[Vector2] = []
-var _has_screen_touch := false
-
-var _screen_touch_events := 0
-var _screen_drag_events := 0
-var _mouse_button_events := 0
-var _mouse_motion_events := 0
-var _magnify_events := 0
-var _last_event := "Ожидание касания"
-var _diagnostic_label: Label
+var _mouse_dragging := false
+var _touch_points: Array[Vector2] = []
 
 func _ready() -> void:
 	projection = Camera3D.PROJECTION_ORTHOGONAL
 	size = 20.0
-	look_at(Vector3(0.0, 0.0, 0.0), Vector3.UP)
-	_diagnostic_label = get_node("../DiagnosticsLayer/DiagnosticsPanel/DiagnosticsLabel") as Label
-	_style_diagnostic_overlay()
-
-func _process(_delta: float) -> void:
-	if is_instance_valid(_diagnostic_label):
-		_diagnostic_label.text = _diagnostic_text()
+	look_at(Vector3.ZERO, Vector3.UP)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
-		_screen_touch_events += 1
-		_last_event = "SCREEN TOUCH: " + ("press" if event.pressed else "release") + " @ " + str(event.position)
-		_has_screen_touch = true
-		_dragging = false
-		if event.pressed:
-			_touch_positions.append(event.position)
-		else:
-			_remove_nearest_touch(event.position)
+		_handle_screen_touch(event)
 	elif event is InputEventScreenDrag:
-		_screen_drag_events += 1
-		_last_event = "SCREEN DRAG @ " + str(event.position) + " relative " + str(event.relative)
-		_has_screen_touch = true
-		_dragging = false
-		_handle_touch_drag(event)
-	elif event is InputEventMouseButton:
-		_mouse_button_events += 1
-		_last_event = "MOUSE BUTTON: " + str(event.button_index)
-		if not _has_screen_touch:
-			if event.button_index == MOUSE_BUTTON_LEFT:
-				_dragging = event.pressed
-			elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				size = maxf(min_zoom, size - 1.0)
-			elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				size = minf(max_zoom, size + 1.0)
-	elif event is InputEventMouseMotion:
-		_mouse_motion_events += 1
-		_last_event = "MOUSE MOTION relative " + str(event.relative)
-		if _dragging and not _has_screen_touch:
-			_pan(event.relative)
+		_handle_screen_drag(event)
 	elif event is InputEventMagnifyGesture:
-		_magnify_events += 1
-		_last_event = "MAGNIFY factor " + str(event.factor)
-		size = clampf(size / event.factor, min_zoom, max_zoom)
+		if event.factor > 0.0:
+			size = clampf(size / event.factor, min_zoom, max_zoom)
+	elif event is InputEventMouseButton:
+		_handle_mouse_button(event)
+	elif event is InputEventMouseMotion and _mouse_dragging:
+		_pan(event.relative)
 
-func _style_diagnostic_overlay() -> void:
-	if not is_instance_valid(_diagnostic_label):
-		return
-	var panel := _diagnostic_label.get_parent() as PanelContainer
-	if is_instance_valid(panel):
-		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var panel_style := StyleBoxFlat.new()
-		panel_style.bg_color = Color(0.015, 0.025, 0.045, 0.98)
-		panel_style.border_color = Color(0.25, 0.95, 0.72, 1.0)
-		panel_style.set_border_width_all(3)
-		panel_style.set_corner_radius_all(10)
-		panel_style.content_margin_left = 16.0
-		panel_style.content_margin_right = 16.0
-		panel_style.content_margin_top = 12.0
-		panel_style.content_margin_bottom = 12.0
-		panel.add_theme_stylebox_override("panel", panel_style)
-	_diagnostic_label.add_theme_font_size_override("font_size", 20)
-	_diagnostic_label.add_theme_color_override("font_color", Color(0.95, 1.0, 0.97, 1.0))
-	_diagnostic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_diagnostic_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+func _handle_screen_touch(event: InputEventScreenTouch) -> void:
+	if event.pressed:
+		_touch_points.append(event.position)
+	else:
+		_remove_touch_near(event.position)
 
-func _diagnostic_text() -> String:
-	return "INPUT DIAGNOSTICS\n" + \
-		"ScreenTouch: " + str(_screen_touch_events) + " | ScreenDrag: " + str(_screen_drag_events) + "\n" + \
-		"MouseButton: " + str(_mouse_button_events) + " | MouseMotion: " + str(_mouse_motion_events) + "\n" + \
-		"Magnify: " + str(_magnify_events) + " | Active fingers: " + str(_touch_positions.size()) + "\n" + \
-		"Camera size: " + str(snappedf(size, 0.1)) + "\n" + \
-		"Last: " + _last_event
-
-func _handle_touch_drag(event: InputEventScreenDrag) -> void:
-	var touch_index := _find_nearest_touch(event.position)
-	if touch_index == -1:
-		if _touch_positions.is_empty():
-			_pan(event.relative)
-			return
-		touch_index = 0
-
-	var previous_position: Vector2 = _touch_positions[touch_index]
-	if _touch_positions.size() >= 2:
-		var other_index := 1 - touch_index
-		if other_index >= 0 and other_index < _touch_positions.size():
-			var other_position: Vector2 = _touch_positions[other_index]
-			var old_distance := previous_position.distance_to(other_position)
-			var new_distance := event.position.distance_to(other_position)
-			if old_distance > 0.0 and new_distance > 0.0:
-				size = clampf(size * old_distance / new_distance, min_zoom, max_zoom)
-		_touch_positions[touch_index] = event.position
+func _handle_screen_drag(event: InputEventScreenDrag) -> void:
+	if _touch_points.is_empty():
+		# Recover if the browser starts delivering drag without a press event.
+		_touch_points.append(event.position)
 		return
 
-	_touch_positions[touch_index] = event.position
-	_pan(event.relative)
+	# Match by the finger's previous screen position, not event.index.
+	# This avoids depending on unstable touch IDs in some iOS Web exports.
+	var previous_position := event.position - event.relative
+	var moving_index := _nearest_touch_index(previous_position)
+	if moving_index < 0:
+		return
 
-func _find_nearest_touch(position: Vector2) -> int:
-	var best_index := -1
-	var best_distance := INF
-	for i in range(_touch_positions.size()):
-		var distance := _touch_positions[i].distance_squared_to(position)
-		if distance < best_distance:
-			best_distance = distance
-			best_index = i
-	return best_index
+	if _touch_points.size() == 1:
+		_touch_points[0] = event.position
+		_pan(event.relative)
+		return
 
-func _remove_nearest_touch(position: Vector2) -> void:
-	var touch_index := _find_nearest_touch(position)
-	if touch_index != -1:
-		_touch_positions.remove_at(touch_index)
+	# Two active fingers: update only the moving finger and derive zoom
+	# from the change in distance between the two touch points.
+	var other_index := 1 - moving_index
+	var old_distance := _touch_points[moving_index].distance_to(_touch_points[other_index])
+	var new_distance := event.position.distance_to(_touch_points[other_index])
+	if old_distance > 0.0 and new_distance > 0.0:
+		size = clampf(size * old_distance / new_distance, min_zoom, max_zoom)
+	_touch_points[moving_index] = event.position
+
+func _nearest_touch_index(position: Vector2) -> int:
+	var nearest_index := -1
+	var nearest_distance := INF
+	for i in range(_touch_points.size()):
+		var distance := _touch_points[i].distance_squared_to(position)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_index = i
+	return nearest_index
+
+func _remove_touch_near(position: Vector2) -> void:
+	var index := _nearest_touch_index(position)
+	if index >= 0:
+		_touch_points.remove_at(index)
+
+func _handle_mouse_button(event: InputEventMouseButton) -> void:
+	if event.button_index == MOUSE_BUTTON_LEFT:
+		_mouse_dragging = event.pressed
+	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		size = maxf(min_zoom, size - 1.0)
+	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		size = minf(max_zoom, size + 1.0)
 
 func _pan(relative: Vector2) -> void:
 	var scale := pan_speed * (size / 20.0)
