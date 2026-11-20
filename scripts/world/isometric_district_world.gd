@@ -420,11 +420,11 @@ func _draw_plot(plot_id: int) -> void:
 			_draw_house(center, true)
 			if business_plots.has(plot_id):
 				var shop_active := bool(business_plots[plot_id])
-				_draw_shop_sign(center, shop_active, shop_active and business_current_hour >= 8 and business_current_hour < 20)
+				_draw_shop_sign(center, shop_active and business_current_hour >= 8 and business_current_hour < 20)
 		_:
 			_draw_garden(center)
 
-func _draw_shop_sign(ground: Vector2, active: bool, open_now: bool) -> void:
+func _draw_shop_sign(ground: Vector2, open_now: bool) -> void:
 	var sign_color := Color("#e0bd70") if open_now else Color("#8b9389")
 	var sign_text_color := Color("#354638") if open_now else Color("#343b38")
 	var sign_origin := ground + Vector2(7, -52)
