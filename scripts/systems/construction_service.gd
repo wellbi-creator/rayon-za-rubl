@@ -22,6 +22,7 @@ const STAGES := [
 
 var crew_count: int = 1
 var projects: Dictionary = {}
+var weather_speed_multiplier: float = 1.0
 
 func _process(delta: float) -> void:
 	if projects.is_empty():
@@ -30,7 +31,7 @@ func _process(delta: float) -> void:
 	for key in projects.keys():
 		var plot_id := int(key)
 		var project: Dictionary = projects[key]
-		project["elapsed"] = minf(float(project["duration"]), float(project["elapsed"]) + delta)
+		project["elapsed"] = minf(float(project["duration"]), float(project["elapsed"]) + delta * weather_speed_multiplier)
 		var progress := float(project["elapsed"]) / float(project["duration"])
 		project_updated.emit(plot_id, progress, get_stage(progress))
 		if progress >= 1.0:
@@ -38,6 +39,12 @@ func _process(delta: float) -> void:
 	for plot_id in completed:
 		projects.erase(plot_id)
 		project_completed.emit(plot_id)
+
+func set_weather_speed_multiplier(value: float) -> void:
+	weather_speed_multiplier = clampf(value, 0.5, 1.0)
+
+func get_weather_speed_percent() -> int:
+	return roundi(weather_speed_multiplier * 100.0)
 
 func start_project(plot_id: int, house_type: String = "ordinary") -> bool:
 	if not HOUSE_TYPES.has(house_type) or projects.has(plot_id):

@@ -879,6 +879,18 @@ func _apply_weather_state() -> void:
 		world.set_weather(weather_service.weather_id)
 	if resident_service != null:
 		resident_service.set_environment(weather_service.season_id, weather_service.weather_id)
+	if construction_service != null:
+		var speed_multiplier := 1.0
+		match weather_service.weather_id:
+			"rain":
+				speed_multiplier = 0.9
+			"storm":
+				speed_multiplier = 0.75
+			"snow":
+				speed_multiplier = 0.9
+			"heatwave":
+				speed_multiplier = 0.95
+		construction_service.set_weather_speed_multiplier(speed_multiplier)
 
 
 func _on_balance_changed(_new_balance: int) -> void:
@@ -1371,7 +1383,8 @@ func _on_construction_updated(plot_id: int, progress: float, stage: String) -> v
 	world.set_plot_building(plot_id, progress)
 	if selected_plot_id == plot_id:
 		var project := construction_service.get_project(plot_id)
-		var remaining := maxi(0, int(ceil(float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))))
+		var remaining_work := maxf(0.0, float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))
+		var remaining := maxi(0, int(ceil(remaining_work / maxf(construction_service.weather_speed_multiplier, 0.01))))
 		status_label.text = "%s • %d%% • осталось %d сек." % [stage, int(progress * 100.0), remaining]
 	var current_second := int(Time.get_ticks_msec() / 1000)
 	if current_second % 5 == 0 and current_second != last_construction_save_second:
