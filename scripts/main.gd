@@ -1433,6 +1433,7 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	_apply_weather_state()
 	if not is_loading_game and resident_service != null:
 		resident_service.update_time(hour, minute, day)
+	_refresh_top_hud()
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		if world != null:
 			municipal_services.set_available_plot_ids(world.get_owned_plot_ids())
