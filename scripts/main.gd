@@ -1594,19 +1594,26 @@ func _on_plot_selected(plot_id: int) -> void:
 					var daily_customers := int(business.get("last_daily_customers", 80))
 					var daily_revenue := int(business.get("last_daily_revenue", business_service.get_daily_revenue()))
 					var upgrade_level := business_service.get_business_upgrade_level(plot_id)
+					var business_reputation := business_service.get_business_reputation(plot_id)
+					var reputation_change := business_service.get_business_reputation_change(plot_id)
+					var reputation_trend := "+1 за сутки" if reputation_change > 0 else ("−1 за сутки" if reputation_change < 0 else "без изменений")
 					var daily_expenses := business_service.get_business_daily_expenses(plot_id)
 					var daily_profit := daily_revenue - daily_expenses
 					if leased:
-						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено аренды всего: ₽ %s\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
+						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено аренды всего: ₽ %s\nРепутация: %d/100 (%s)\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
 							business_title.to_upper(),
 							_format_money(daily_rent),
 							_format_money(business_service.total_rent_received),
+							business_reputation,
+							reputation_trend,
 							upgrade_level
 						]
 					else:
-						business_status_label.text = "%s • %s\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
+						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
 							business_title.to_upper(),
 							"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
+							business_reputation,
+							reputation_trend,
 							upgrade_level,
 							daily_customers,
 							_format_money(daily_revenue),
