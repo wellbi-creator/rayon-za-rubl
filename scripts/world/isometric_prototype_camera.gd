@@ -21,7 +21,8 @@ func _ready() -> void:
 	projection = Camera3D.PROJECTION_ORTHOGONAL
 	size = 20.0
 	look_at(Vector3(0.0, 0.0, 0.0), Vector3.UP)
-	_create_diagnostic_overlay()
+	_diagnostic_label = get_node("../DiagnosticsLayer/DiagnosticsPanel/DiagnosticsLabel") as Label
+	_style_diagnostic_overlay()
 
 func _process(_delta: float) -> void:
 	if is_instance_valid(_diagnostic_label):
@@ -63,45 +64,26 @@ func _input(event: InputEvent) -> void:
 		_last_event = "MAGNIFY factor " + str(event.factor)
 		size = clampf(size / event.factor, min_zoom, max_zoom)
 
-func _create_diagnostic_overlay() -> void:
-	# Keep diagnostics in the game window itself, not under the Camera3D node.
-	var layer := CanvasLayer.new()
-	layer.name = "TouchInputDiagnostics"
-	layer.layer = 100
-	get_tree().root.add_child(layer)
-
-	var panel := PanelContainer.new()
-	panel.name = "DiagnosticsPanel"
-	panel.anchor_left = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_top = 0.0
-	panel.anchor_bottom = 0.0
-	panel.offset_left = -230.0
-	panel.offset_right = 230.0
-	panel.offset_top = 18.0
-	panel.offset_bottom = 198.0
-	panel.custom_minimum_size = Vector2(460.0, 180.0)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.025, 0.035, 0.055, 0.97)
-	panel_style.border_color = Color(0.25, 0.9, 0.75, 1.0)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(10)
-	panel_style.content_margin_left = 14.0
-	panel_style.content_margin_right = 14.0
-	panel_style.content_margin_top = 10.0
-	panel_style.content_margin_bottom = 10.0
-	panel.add_theme_stylebox_override("panel", panel_style)
-	layer.add_child(panel)
-
-	_diagnostic_label = Label.new()
-	_diagnostic_label.custom_minimum_size = Vector2(430.0, 155.0)
-	_diagnostic_label.add_theme_font_size_override("font_size", 17)
-	_diagnostic_label.add_theme_color_override("font_color", Color(0.92, 1.0, 0.96, 1.0))
+func _style_diagnostic_overlay() -> void:
+	if not is_instance_valid(_diagnostic_label):
+		return
+	var panel := _diagnostic_label.get_parent() as PanelContainer
+	if is_instance_valid(panel):
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var panel_style := StyleBoxFlat.new()
+		panel_style.bg_color = Color(0.015, 0.025, 0.045, 0.98)
+		panel_style.border_color = Color(0.25, 0.95, 0.72, 1.0)
+		panel_style.set_border_width_all(3)
+		panel_style.set_corner_radius_all(10)
+		panel_style.content_margin_left = 16.0
+		panel_style.content_margin_right = 16.0
+		panel_style.content_margin_top = 12.0
+		panel_style.content_margin_bottom = 12.0
+		panel.add_theme_stylebox_override("panel", panel_style)
+	_diagnostic_label.add_theme_font_size_override("font_size", 20)
+	_diagnostic_label.add_theme_color_override("font_color", Color(0.95, 1.0, 0.97, 1.0))
 	_diagnostic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_diagnostic_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(_diagnostic_label)
 
 func _diagnostic_text() -> String:
 	return "INPUT DIAGNOSTICS\n" + \
