@@ -1531,12 +1531,16 @@ func _on_interface_resized() -> void:
 		quickbar_panel.offset_bottom = -6.0
 		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
-		var panel_width := clampf(viewport_size.x * (0.58 if phone_landscape else (0.54 if compact else 0.42)), 300.0, 560.0)
-		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		district_panel.offset_left = -panel_width - 8.0
+		# Use the complete right half of the viewport instead of a capped card width.
+		# The panel reaches the right edge while remaining separate from the left play area.
+		district_panel.anchor_left = 0.48
+		district_panel.anchor_top = 0.0
+		district_panel.anchor_right = 1.0
+		district_panel.anchor_bottom = 0.0
+		district_panel.offset_left = 0.0
 		district_panel.offset_top = 72.0 if phone_landscape else (82.0 if compact else 104.0)
-		district_panel.offset_right = -8.0
-		# Stop exactly above the bottom quickbar; never cover its touch targets.
+		district_panel.offset_right = 0.0
+		# Stop above the bottom quickbar so its buttons remain fully tappable.
 		district_panel.offset_bottom = -76.0 if phone_landscape or compact else -86.0
 	if top_hud_panel != null:
 		for hud_child in top_hud_panel.get_children():
