@@ -1515,13 +1515,15 @@ func _on_interface_resized() -> void:
 				for item in hud_child.get_children():
 					if item is Label:
 						var label := item as Label
-						var base_size := 20 if label == null else label.get_theme_font_size("font_size")
+						if not label.has_meta("responsive_base_font_size"):
+							label.set_meta("responsive_base_font_size", label.get_theme_font_size("font_size"))
+						var base_size := int(label.get_meta("responsive_base_font_size"))
 						if phone_landscape:
 							label.add_theme_font_size_override("font_size", mini(base_size, 13))
 						elif compact:
 							label.add_theme_font_size_override("font_size", mini(base_size, 16))
 						else:
-							label.remove_theme_font_size_override("font_size")
+							label.add_theme_font_size_override("font_size", base_size)
 
 
 func _show_responsive_popup(popup: PopupPanel, preferred_size: Vector2i) -> void:
