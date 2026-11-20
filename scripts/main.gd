@@ -1,3 +1,5 @@
+extends Node2D
+
 func _input(event: InputEvent) -> void:
 	if district_panel == null or not is_instance_valid(district_panel) or not district_panel.visible:
 		return
@@ -18,7 +20,6 @@ func _input(event: InputEvent) -> void:
 		_hide_district_panel()
 
 
-extends Node2D
 
 const DistrictWorldScript = preload("res://scripts/world/isometric_district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
