@@ -14,8 +14,8 @@ const STAGES := [
 	{"at": 0.0, "id": "site", "label": "Подготовка участка"},
 	{"at": 0.12, "id": "foundation", "label": "Фундамент"},
 	{"at": 0.28, "id": "walls", "label": "Стены"},
-	{"at": 0.55, "id": "roof", "label": "Крыша"},
-	{"at": 0.72, "id": "windows", "label": "Окна и двери"},
+	{"at": 0.55, "id": "windows", "label": "Окна и двери"},
+	{"at": 0.72, "id": "roof", "label": "Крыша"},
 	{"at": 0.86, "id": "utilities", "label": "Коммуникации"},
 	{"at": 0.96, "id": "finish", "label": "Отделка"}
 ]
