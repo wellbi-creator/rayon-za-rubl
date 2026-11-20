@@ -166,19 +166,3 @@ size = 20.0
 rotation = Vector3(-0.85, -0.7, 0)
 light_energy = 1.15
 shadow_enabled = true
-
-[node name="DiagnosticsLayer" type="CanvasLayer" parent="."]
-layer = 100
-
-[node name="DiagnosticsPanel" type="PanelContainer" parent="DiagnosticsLayer"]
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 516.0
-offset_bottom = 226.0
-mouse_filter = 2
-
-[node name="DiagnosticsLabel" type="Label" parent="DiagnosticsLayer/DiagnosticsPanel"]
-custom_minimum_size = Vector2(470, 185)
-text = "INPUT DIAGNOSTICS\\nStarting..."
-autowrap_mode = 3
-mouse_filter = 2
