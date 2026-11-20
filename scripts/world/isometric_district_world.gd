@@ -229,6 +229,13 @@ func _draw_depth_sorted_world_objects() -> void:
 			"depth": resident["position"].y + 8.0,
 			"resident": resident
 		})
+	for customer in _collect_business_customer_draw_entries():
+		entries.append({
+			"kind": "customer",
+			"position": customer["position"],
+			"depth": customer["position"].y + 8.0,
+			"customer": customer
+		})
 	entries.sort_custom(_world_depth_order)
 	for entry in entries:
 		match str(entry.get("kind", "")):
@@ -246,6 +253,14 @@ func _draw_depth_sorted_world_objects() -> void:
 					bool(resident["walking"]),
 					float(resident["phase"])
 				)
+			"customer":
+				var customer: Dictionary = entry["customer"]
+				_draw_person(
+					customer["position"],
+					int(customer["variant"]),
+					true,
+					float(customer["phase"])
+				)
 
 func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	var depth_a := float(a.get("depth", 0.0))
@@ -256,7 +271,7 @@ func _world_depth_order(a: Dictionary, b: Dictionary) -> bool:
 	var pos_b: Vector2 = b.get("position", Vector2.ZERO)
 	if not is_equal_approx(pos_a.x, pos_b.x):
 		return pos_a.x < pos_b.x
-	var kind_order := {"tree": 0, "plot": 1, "resident": 2, "transport": 3}
+	var kind_order := {"tree": 0, "plot": 1, "resident": 2, "customer": 2, "transport": 3}
 	return int(kind_order.get(str(a.get("kind", "")), 0)) < int(kind_order.get(str(b.get("kind", "")), 0))
 
 func _draw_transport_entry(entry: Dictionary) -> void:
@@ -686,6 +701,27 @@ func _draw_lamp(pos: Vector2) -> void:
 	if lamp_glow > 0.04:
 		draw_circle(pos + Vector2(9, -29), 9.0 + sin(construction_animation_time * 2.0) * 1.0, Color("#f3d98e", lamp_glow * 0.22))
 		draw_circle(pos + Vector2(9, -29), 17.0, Color("#f3d98e", lamp_glow * 0.06))
+
+func _collect_business_customer_draw_entries() -> Array[Dictionary]:
+	var draw_entries: Array[Dictionary] = []
+	for key in business_plots.keys():
+		var plot_id := int(key)
+		if plot_id < 1 or plot_id >= PLOT_CELLS.size() or not bool(business_plots[key]):
+			continue
+		var shop_ground: Vector2 = Grid.grid_to_world(PLOT_CELLS[plot_id], TILE)
+		for visitor_index in range(2):
+			var phase := pedestrian_time * 1.1 + float(plot_id) * 1.7 + float(visitor_index) * PI
+			var side_offset := -11.0 if visitor_index == 0 else 11.0
+			var pos := shop_ground + Vector2(side_offset + sin(phase) * 13.0, 15.0 + cos(phase * 0.8) * 2.0)
+			draw_entries.append({
+				"position": pos,
+				"variant": (plot_id + visitor_index) % 3,
+				"phase": phase,
+				"plot_id": plot_id,
+				"visitor_index": visitor_index
+			})
+	return draw_entries
+
 
 func _collect_resident_draw_entries() -> Array[Dictionary]:
 	var draw_entries: Array[Dictionary] = []
