@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/isometric_prototype_camera.gd" id="1_camera"]
 [ext_resource type="Script" path="res://scripts/world/construction_visuals_3d.gd" id="2_construction"]
@@ -67,6 +67,21 @@ radius = 1.0
 height = 2.0
 radial_segments = 12
 rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StreetPoleMat"]
+albedo_color = Color(0.16, 0.18, 0.2, 1)
+metallic = 0.55
+roughness = 0.48
+
+[sub_resource type="StandardMaterial3D" id="StreetLampMat"]
+albedo_color = Color(1, 0.78, 0.43, 1)
+roughness = 0.38
+
+[sub_resource type="CylinderMesh" id="StreetPoleMesh"]
+top_radius = 0.1
+bottom_radius = 0.16
+height = 5.5
+radial_segments = 8
 
 [node name="District3DPrototype" type="Node3D"]
 script = ExtResource("2_construction")
@@ -154,6 +169,62 @@ mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoadMarkingMat")
 scale = Vector3(3.0, 0.025, 0.13)
 
+
+[node name="StreetLightWestNear" type="Node3D" parent="."]
+position = Vector3(-18, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="StreetLightWestNear"]
+position = Vector3(0, 2.75, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+
+[node name="LampHead" type="MeshInstance3D" parent="StreetLightWestNear"]
+position = Vector3(0, 5.25, -0.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetLampMat")
+scale = Vector3(1.0, 0.16, 0.3)
+
+[node name="StreetLightEastNear" type="Node3D" parent="."]
+position = Vector3(18, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="StreetLightEastNear"]
+position = Vector3(0, 2.75, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+
+[node name="LampHead" type="MeshInstance3D" parent="StreetLightEastNear"]
+position = Vector3(0, 5.25, -0.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetLampMat")
+scale = Vector3(1.0, 0.16, 0.3)
+
+[node name="StreetLightWestFar" type="Node3D" parent="."]
+position = Vector3(-18, 0, -6.45)
+
+[node name="Pole" type="MeshInstance3D" parent="StreetLightWestFar"]
+position = Vector3(0, 2.75, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+
+[node name="LampHead" type="MeshInstance3D" parent="StreetLightWestFar"]
+position = Vector3(0, 5.25, 0.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetLampMat")
+scale = Vector3(1.0, 0.16, 0.3)
+
+[node name="StreetLightEastFar" type="Node3D" parent="."]
+position = Vector3(18, 0, -6.45)
+
+[node name="Pole" type="MeshInstance3D" parent="StreetLightEastFar"]
+position = Vector3(0, 2.75, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+
+[node name="LampHead" type="MeshInstance3D" parent="StreetLightEastFar"]
+position = Vector3(0, 5.25, 0.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetLampMat")
+scale = Vector3(1.0, 0.16, 0.3)
 
 [node name="CrossStreetWest" type="MeshInstance3D" parent="."]
 position = Vector3(-35, 0.025, 0)
