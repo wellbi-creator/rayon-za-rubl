@@ -801,6 +801,7 @@ func _save_game() -> void:
 		return
 	var data := {
 		"balance": economy.balance,
+		"economy_transactions": economy.get_transaction_history(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -816,6 +817,9 @@ func _load_game() -> void:
 	if data.is_empty():
 		return
 	economy.set_balance(int(data.get("balance", 1000000)))
+	var transactions_data: Variant = data.get("economy_transactions", [])
+	if transactions_data is Array:
+		economy.load_transaction_history(transactions_data)
 	baba_notebook_opened = bool(data.get("baba_notebook_opened", false))
 	baba_wiring_repaired = bool(data.get("baba_wiring_repaired", false))
 	var world_data: Variant = data.get("world", {})
