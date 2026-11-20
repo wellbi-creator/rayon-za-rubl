@@ -8,7 +8,8 @@ const ACHIEVEMENTS := [
 	{"id": "first_house", "title": "Первый дом", "description": "Завершить строительство первого дома"},
 	{"id": "first_ready_home", "title": "Готов к жизни", "description": "Полностью подготовить дом к заселению"},
 	{"id": "first_family", "title": "Новые соседи", "description": "Заселить первую семью"},
-	{"id": "first_worker", "title": "Городские службы", "description": "Нанять первого работника коммунальной службы"}
+	{"id": "first_worker", "title": "Городские службы", "description": "Нанять первого работника коммунальной службы"},
+	{"id": "first_district_event", "title": "На связи с жителями", "description": "Принять решение по первому районному событию"}
 ]
 
 var experience: int = 0
