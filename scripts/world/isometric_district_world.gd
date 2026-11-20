@@ -319,6 +319,13 @@ func _draw_transport_entry(entry: Dictionary) -> void:
 	draw_circle(ground + Vector2(10, 2.1).rotated(facing), 1.0, Color("#f5e5ad"))
 	draw_circle(ground + Vector2(-10, -2.1).rotated(facing), 0.9, Color("#bd6c62"))
 	draw_circle(ground + Vector2(-10, 2.1).rotated(facing), 0.9, Color("#bd6c62"))
+	# Small side mirrors, door handles and soft headlamp bloom improve close-up readability.
+	draw_circle(ground + Vector2(1, -6.0).rotated(facing), 1.0, Color("#d9e8df", 0.9))
+	draw_circle(ground + Vector2(1, 6.0).rotated(facing), 1.0, Color("#d9e8df", 0.9))
+	draw_line(ground + Vector2(-1, 5.0).rotated(facing), ground + Vector2(5, 5.0).rotated(facing), body_color.darkened(0.22), 0.8)
+	if night_factor > 0.04:
+		draw_circle(ground + Vector2(12, -2.1).rotated(facing), 2.5, Color("#f6e6a7", night_factor * 0.16))
+		draw_circle(ground + Vector2(12, 2.1).rotated(facing), 2.5, Color("#f6e6a7", night_factor * 0.16))
 
 func _draw_ground() -> void:
 	for y in MAP_HEIGHT:
