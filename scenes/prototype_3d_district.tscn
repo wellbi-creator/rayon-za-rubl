@@ -104,6 +104,11 @@ height = 0.32
 radial_segments = 12
 rings = 6
 
+
+[sub_resource type="StandardMaterial3D" id="RoofTrimMat"]
+albedo_color = Color(0.20, 0.12, 0.12, 1)
+roughness = 0.82
+
 [sub_resource type="StandardMaterial3D" id="ShrubMat"]
 albedo_color = Color(0.24, 0.48, 0.25, 1)
 roughness = 1.0
@@ -686,6 +691,25 @@ rotation = Vector3(-0.55, 0, 0)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoofMat")
 scale = Vector3(6.1, 0.28, 3.35)
+
+
+[node name="RoofRidgeCap" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.92, 5)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(6.25, 0.2, 0.24)
+
+[node name="RoofFrontFascia" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.55, 2.36)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(6.3, 0.2, 0.22)
+
+[node name="RoofBackFascia" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.55, 7.64)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(6.3, 0.2, 0.22)
 
 [node name="TreeTrunkA" type="MeshInstance3D" parent="."]
 position = Vector3(-7, 0.95, 8)
