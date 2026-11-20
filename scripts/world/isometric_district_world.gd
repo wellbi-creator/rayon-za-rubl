@@ -319,8 +319,15 @@ func _draw_roads() -> void:
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
 		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_build_road_cell(road_preview_cell)
-		var preview_color := Color("#e6b56f", 0.38) if road_edit_action == "remove" and preview_valid else Color("#8bd39b", 0.38) if preview_valid else Color("#d97870", 0.34)
-		var preview_outline := Color("#ffe0a8") if road_edit_action == "remove" and preview_valid else Color("#c6f0c8") if preview_valid else Color("#ffc0b7")
+		var preview_color := Color("#d97870", 0.34)
+		var preview_outline := Color("#ffc0b7")
+		if preview_valid:
+			if road_edit_action == "remove":
+				preview_color = Color("#e6b56f", 0.38)
+				preview_outline = Color("#ffe0a8")
+			else:
+				preview_color = Color("#8bd39b", 0.38)
+				preview_outline = Color("#c6f0c8")
 		_draw_diamond(preview_center, TILE * Vector2(0.88, 0.76), preview_color, preview_outline, 3.0)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
