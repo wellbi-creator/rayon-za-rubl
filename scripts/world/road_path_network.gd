@@ -41,13 +41,17 @@ func add_road_cell(cell: Vector2i) -> bool:
 	_road_cells[cell] = true
 	return true
 
+func can_remove_road_cell(cell: Vector2i) -> bool:
+	if not is_road_cell(cell) or _road_cells.size() <= 1:
+		return false
+	var candidate_cells := _road_cells.duplicate()
+	candidate_cells.erase(cell)
+	return _are_all_road_cells_connected(candidate_cells)
+
 func remove_road_cell(cell: Vector2i) -> bool:
-	if not is_road_cell(cell):
+	if not can_remove_road_cell(cell):
 		return false
 	_road_cells.erase(cell)
-	if not _are_all_road_cells_connected(_road_cells):
-		_road_cells[cell] = true
-		return false
 	return true
 
 func _get_road_neighbor_count(cell: Vector2i) -> int:
