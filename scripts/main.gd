@@ -582,6 +582,7 @@ func _create_interface() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color("#a9b8a3"))
 	content.add_child(footer)
+	_polish_context_panel(content)
 	_on_interface_resized()
 	_refresh_top_hud()
 
@@ -1392,6 +1393,31 @@ func _refresh_transaction_history() -> void:
 		amount_label.add_theme_color_override("font_color", Color("#a9d58d") if amount > 0 else Color("#f0a18d"))
 		amount_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(amount_label)
+
+
+func _polish_context_panel(container: Control) -> void:
+	for child in container.get_children():
+		if child is Button:
+			var button := child as Button
+			var normal_style := button.get_theme_stylebox("normal") as StyleBoxFlat
+			var base_color := normal_style.bg_color if normal_style != null else Color("#a9c5e6")
+			button.add_theme_stylebox_override("hover", _button_state_style(base_color.lightened(0.12), false))
+			button.add_theme_stylebox_override("pressed", _button_state_style(base_color, true))
+			button.add_theme_stylebox_override("focus", _button_state_style(base_color.lightened(0.18), false))
+			button.add_theme_stylebox_override("disabled", _button_style(Color("#697789")))
+			button.add_theme_color_override("font_color", Color("#1d2b3c"))
+			button.add_theme_color_override("font_hover_color", Color("#17283a"))
+			button.add_theme_color_override("font_pressed_color", Color("#17283a"))
+			button.add_theme_color_override("font_disabled_color", Color("#c2c9cf"))
+		elif child is Label:
+			var label := child as Label
+			if label.text == label.text.to_upper() and label.text.length() >= 5:
+				label.add_theme_font_size_override("font_size", maxi(13, label.get_theme_font_size("font_size")))
+				label.add_theme_constant_override("outline_size", 1)
+				label.add_theme_color_override("font_outline_color", Color("#17251f", 0.72))
+		for grandchild in child.get_children():
+			if grandchild is Control:
+				_polish_context_panel(grandchild)
 
 
 func _add_navigation_button(container: VBoxContainer, caption: String, action: Callable) -> void:
