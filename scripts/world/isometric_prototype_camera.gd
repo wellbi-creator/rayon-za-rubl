@@ -1,16 +1,16 @@
 extends Camera3D
 
 ## Standalone prototype camera: mouse drag / wheel, one-finger pan, two-finger pinch.
-@export var pan_speed: float = 0.018
-@export var min_zoom: float = 11.0
-@export var max_zoom: float = 30.0
+@export var pan_speed: float = 0.028
+@export var min_zoom: float = 14.0
+@export var max_zoom: float = 72.0
 
 var _mouse_dragging := false
 var _touch_points: Array[Vector2] = []
 
 func _ready() -> void:
 	projection = Camera3D.PROJECTION_ORTHOGONAL
-	size = 20.0
+	size = 34.0
 	look_at(Vector3.ZERO, Vector3.UP)
 
 func _input(event: InputEvent) -> void:
@@ -83,8 +83,10 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 		size = minf(max_zoom, size + 1.0)
 
 func _pan(relative: Vector2) -> void:
-	var scale := pan_speed * (size / 20.0)
-	global_position -= global_basis.x * relative.x * scale
-	global_position += global_basis.z * relative.y * scale
-	global_position.x = clampf(global_position.x, -18.0, 18.0)
-	global_position.z = clampf(global_position.z, -18.0, 18.0)
+	var scale := pan_speed * (size / 34.0)
+	var horizontal_right := Vector3(global_basis.x.x, 0.0, global_basis.x.z).normalized()
+	var horizontal_forward := Vector3(global_basis.z.x, 0.0, global_basis.z.z).normalized()
+	global_position -= horizontal_right * relative.x * scale
+	global_position += horizontal_forward * relative.y * scale
+	global_position.x = clampf(global_position.x, -72.0, 72.0)
+	global_position.z = clampf(global_position.z, -52.0, 52.0)

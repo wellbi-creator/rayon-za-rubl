@@ -47,7 +47,7 @@ albedo_color = Color(0.18, 0.38, 0.22, 1)
 roughness = 1.0
 
 [sub_resource type="BoxMesh" id="GroundMesh"]
-size = Vector3(40, 0.2, 30)
+size = Vector3(160, 0.2, 120)
 
 [sub_resource type="BoxMesh" id="BoxMesh"]
 size = Vector3(1, 1, 1)
@@ -68,19 +68,80 @@ surface_material_override/0 = SubResource("GroundMat")
 position = Vector3(0, 0.025, -4)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoadMat")
-scale = Vector3(40, 0.15, 4.5)
+scale = Vector3(160, 0.15, 4.5)
 
 [node name="SidewalkNear" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.11, -1.55)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("SidewalkMat")
-scale = Vector3(40, 0.12, 0.65)
+scale = Vector3(160, 0.12, 0.65)
 
 [node name="SidewalkFar" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.11, -6.45)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("SidewalkMat")
 scale = Vector3(40, 0.12, 0.65)
+
+
+[node name="CrossStreetWest" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.025, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMat")
+scale = Vector3(4.5, 0.15, 120)
+
+[node name="CrossStreetEast" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.025, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMat")
+scale = Vector3(4.5, 0.15, 120)
+
+[node name="CrossWalkWestNear" type="MeshInstance3D" parent="."]
+position = Vector3(-32, 0.11, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(0.65, 0.12, 120)
+
+[node name="CrossWalkWestFar" type="MeshInstance3D" parent="."]
+position = Vector3(-38, 0.11, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(0.65, 0.12, 120)
+
+[node name="CrossWalkEastNear" type="MeshInstance3D" parent="."]
+position = Vector3(38, 0.11, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(0.65, 0.12, 120)
+
+[node name="CrossWalkEastFar" type="MeshInstance3D" parent="."]
+position = Vector3(32, 0.11, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(0.65, 0.12, 120)
+
+[node name="PlotWest" type="MeshInstance3D" parent="."]
+position = Vector3(-20, 0.025, 12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(13, 0.12, 13)
+
+[node name="PlotEast" type="MeshInstance3D" parent="."]
+position = Vector3(20, 0.025, 12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(13, 0.12, 13)
+
+[node name="PlotNorthWest" type="MeshInstance3D" parent="."]
+position = Vector3(-20, 0.025, 34)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(13, 0.12, 13)
+
+[node name="PlotNorthEast" type="MeshInstance3D" parent="."]
+position = Vector3(20, 0.025, 34)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(13, 0.12, 13)
 
 [node name="Plot" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.025, 5)
@@ -155,12 +216,12 @@ surface_material_override/0 = SubResource("LeavesMat")
 scale = Vector3(2.1, 2.1, 2.1)
 
 [node name="Camera3D" type="Camera3D" parent="."]
-position = Vector3(14, 13, 16)
+position = Vector3(0, 34, 42)
 rotation = Vector3(-0.615, 0.72, 0)
 script = ExtResource("1_camera")
 current = true
 projection = 1
-size = 20.0
+size = 34.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 rotation = Vector3(-0.85, -0.7, 0)
