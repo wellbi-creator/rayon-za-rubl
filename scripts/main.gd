@@ -237,7 +237,10 @@ func _create_interface() -> void:
 	road_tool_button.add_theme_font_size_override("font_size", 10)
 	road_tool_button.add_theme_stylebox_override("normal", _button_style(Color("#b8c7c0")))
 	road_tool_button.pressed.connect(_on_road_tool_pressed)
-	management_buttons.add_child(road_tool_button)
+	var road_buttons := HBoxContainer.new()
+	road_buttons.add_theme_constant_override("separation", 8)
+	content.add_child(road_buttons)
+	road_buttons.add_child(road_tool_button)
 	road_remove_button = Button.new()
 	road_remove_button.text = "СНЕСТИ"
 	road_remove_button.custom_minimum_size = Vector2(0, 40)
@@ -245,7 +248,7 @@ func _create_interface() -> void:
 	road_remove_button.add_theme_font_size_override("font_size", 10)
 	road_remove_button.add_theme_stylebox_override("normal", _button_style(Color("#d6a17f")))
 	road_remove_button.pressed.connect(_on_road_remove_pressed)
-	management_buttons.add_child(road_remove_button)
+	road_buttons.add_child(road_remove_button)
 
 	road_tool_status_label = Label.new()
 	road_tool_status_label.text = "Дороги: 5 000 ₽ за клетку. Включи режим, чтобы строить."
