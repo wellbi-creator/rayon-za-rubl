@@ -92,10 +92,11 @@ func get_choice_cost(choice_id: String, municipal_services: MunicipalServicesSer
 		return -1
 	var base_cost := maxi(0, int(choice.get("cost", 0)))
 	var service_id := str(active_event.get("service_id", ""))
-	var discount := clampi(int(active_event.get("discount_percent", 0)), 0, 80)
-	if municipal_services != null and municipal_services.get_employee_count(service_id) > 0:
-		return roundi(float(base_cost * (100 - discount)) / 100.0)
-	return base_cost
+	var maximum_discount := clampi(int(active_event.get("discount_percent", 0)), 0, 80)
+	var discount := 0
+	if municipal_services != null:
+		discount = municipal_services.get_service_discount_percent(service_id, maximum_discount)
+	return roundi(float(base_cost * (100 - discount)) / 100.0)
 
 func resolve_choice(choice_id: String, day: int, economy: EconomyService, municipal_services: MunicipalServicesService) -> Dictionary:
 	if active_event.is_empty():
