@@ -112,7 +112,7 @@ func resolve_choice(choice_id: String, day: int, economy: EconomyService, munici
 	var reason := "Решение события: %s" % title
 	var result := {
 		"success": true,
-		"message": "Событие решено: %s. Репутация %+d." % [title, int(choice.get("reputation", 0))],
+		"message": "Событие решено: %s. Изменение репутации: %d." % [title, int(choice.get("reputation", 0))],
 		"reason": reason,
 		"experience": maxi(0, int(choice.get("experience", 0))),
 		"reputation": int(choice.get("reputation", 0)),
