@@ -93,19 +93,28 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 	if elapsed_days <= 0:
 		return false
 	last_processed_day = day
-	var active_count := 0
-	var daily_customers := get_daily_customer_count(resident_count, average_satisfaction, reputation, weather_id)
-	var daily_revenue := daily_customers * CUSTOMER_SPEND
+	var active_plot_ids: Array[int] = []
 	for key in businesses.keys():
 		var business: Dictionary = businesses[key]
-		if not bool(business.get("active", false)):
-			continue
-		active_count += 1
-		business["last_daily_customers"] = daily_customers
-		business["last_daily_revenue"] = daily_revenue
-		businesses[key] = business
+		if bool(business.get("active", false)):
+			active_plot_ids.append(int(key))
+	active_plot_ids.sort()
+	var active_count := active_plot_ids.size()
 	if active_count > 0:
-		economy.add_money(active_count * daily_revenue * elapsed_days, "Выручка магазинов района")
+		var total_daily_customers := get_daily_customer_count(resident_count, average_satisfaction, reputation, weather_id)
+		var customers_per_store := int(total_daily_customers / active_count)
+		var extra_customers := total_daily_customers % active_count
+		var total_daily_revenue := 0
+		for index in range(active_count):
+			var plot_id := active_plot_ids[index]
+			var store_customers := customers_per_store + (1 if index < extra_customers else 0)
+			var store_revenue := store_customers * CUSTOMER_SPEND
+			var business: Dictionary = businesses[plot_id]
+			business["last_daily_customers"] = store_customers
+			business["last_daily_revenue"] = store_revenue
+			businesses[plot_id] = business
+			total_daily_revenue += store_revenue
+		economy.add_money(total_daily_revenue * elapsed_days, "Выручка магазинов района")
 		unpaid_operating_costs += active_count * DAILY_OPERATING_COST * elapsed_days
 	if unpaid_operating_costs > 0 and economy.balance > 0:
 		var payment := mini(unpaid_operating_costs, economy.balance)
