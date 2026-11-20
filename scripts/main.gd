@@ -1403,7 +1403,7 @@ func _refresh_transaction_history() -> void:
 		row.add_child(amount_label)
 
 
-func _polish_context_panel(container: Control) -> void:
+func _polish_context_panel(container: Node) -> void:
 	for child in container.get_children():
 		if child is PanelContainer:
 			var card := child as PanelContainer
