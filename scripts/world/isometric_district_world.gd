@@ -1078,8 +1078,8 @@ func load_save_data(data: Dictionary) -> void:
 			# had previously removed one of the old eastern terminal road cells.
 			for x in range(5, MAP_WIDTH):
 				var horizontal_exists := false
-				for existing in saved_cells:
-					if existing is Dictionary and int(existing.get("x", -1)) == x and int(existing.get("y", -1)) == 3:
+				for horizontal_entry in saved_cells:
+					if horizontal_entry is Dictionary and int(horizontal_entry.get("x", -1)) == x and int(horizontal_entry.get("y", -1)) == 3:
 						horizontal_exists = true
 						break
 				if not horizontal_exists:
@@ -1088,8 +1088,8 @@ func load_save_data(data: Dictionary) -> void:
 				if y == 3:
 					continue
 				var vertical_exists := false
-				for existing in saved_cells:
-					if existing is Dictionary and int(existing.get("x", -1)) == 10 and int(existing.get("y", -1)) == y:
+				for vertical_entry in saved_cells:
+					if vertical_entry is Dictionary and int(vertical_entry.get("x", -1)) == 10 and int(vertical_entry.get("y", -1)) == y:
 						vertical_exists = true
 						break
 				if not vertical_exists:
