@@ -528,6 +528,11 @@ func _draw_shop_sign(ground: Vector2, open_now: bool) -> void:
 
 
 func _draw_house(ground: Vector2, repaired: bool) -> void:
+	# Front garden, stepping-stone path and soft footprint shadow.
+	_draw_diamond(ground + Vector2(0, 17), Vector2(58, 25), Color("#789765", 0.88), Color("#a9b985", 0.65), 1.0)
+	_draw_diamond(ground + Vector2(5, 19), Vector2(15, 19), Color("#c7b99a"), Color("#ded2b8"), 0.8)
+	for step_index in 3:
+		draw_ellipse(ground + Vector2(5, 13 + float(step_index) * 5), Vector2(3.2, 1.6), Color("#e2d7bf", 0.88))
 	# Footprint shadow and two facade planes; the base point stays on the plot cell.
 	draw_colored_polygon(PackedVector2Array([
 		ground + Vector2(-39, -3), ground + Vector2(0, -21),
@@ -564,6 +569,13 @@ func _draw_house(ground: Vector2, repaired: bool) -> void:
 	window_color = window_color.lerp(Color("#f2cf78"), night_factor * 0.85)
 	_draw_iso_window(ground + Vector2(-21, -37), window_color)
 	_draw_iso_window(ground + Vector2(8, -25), window_color)
+	# Painted window frames and small flower boxes catch the warm facade light.
+	draw_line(ground + Vector2(-22, -37), ground + Vector2(-11, -31), Color("#f0dfc0"), 1.2)
+	draw_line(ground + Vector2(-17, -34), ground + Vector2(-17, -20), Color("#f0dfc0"), 1.0)
+	draw_line(ground + Vector2(7, -25), ground + Vector2(18, -19), Color("#e6d2b3"), 1.2)
+	draw_line(ground + Vector2(12, -22), ground + Vector2(12, -8), Color("#e6d2b3"), 1.0)
+	draw_line(ground + Vector2(-23, -19), ground + Vector2(-12, -13), Color("#8b5c45"), 2.0)
+	draw_line(ground + Vector2(6, -7), ground + Vector2(17, -1), Color("#8b5c45"), 2.0)
 	if night_factor > 0.05:
 		draw_circle(ground + Vector2(-16, -28), 10.0, Color("#f7d98b", night_factor * 0.10))
 		draw_circle(ground + Vector2(13, -16), 10.0, Color("#f7d98b", night_factor * 0.10))
@@ -766,10 +778,12 @@ func _draw_bush(pos: Vector2) -> void:
 	draw_circle(pos + Vector2(4, -4), 5, leaves[2])
 
 func _draw_lamp(pos: Vector2) -> void:
+	var lamp_glow := night_factor
+	if lamp_glow > 0.04:
+		draw_ellipse(pos + Vector2(8, 0), Vector2(25, 11), Color("#f3d98e", lamp_glow * 0.045))
 	draw_ellipse(pos + Vector2(0, 4), Vector2(7, 3), Color("#435443", 0.3))
 	draw_line(pos, pos + Vector2(0, -24), Color("#3d4944"), 3.0)
 	draw_line(pos + Vector2(0, -23), pos + Vector2(8, -28), Color("#3d4944"), 2.0)
-	var lamp_glow := night_factor
 	draw_circle(pos + Vector2(9, -29), 4.0, Color("#f3d98e").lerp(Color("#b5a77e"), 1.0 - lamp_glow))
 	if lamp_glow > 0.04:
 		draw_circle(pos + Vector2(9, -29), 9.0 + sin(construction_animation_time * 2.0) * 1.0, Color("#f3d98e", lamp_glow * 0.22))
