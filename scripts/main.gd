@@ -72,6 +72,9 @@ var status_label: Label
 var control_root: Control
 var hint_label: Label
 var transaction_popup: PopupPanel
+var business_portfolio_popup: PopupPanel
+var business_portfolio_summary_label: Label
+var business_portfolio_rows: VBoxContainer
 var transaction_rows: VBoxContainer
 var transaction_summary_label: Label
 var municipal_popup: PopupPanel
@@ -153,6 +156,7 @@ func _create_interface() -> void:
 	control_root = root
 	root.resized.connect(_on_interface_resized)
 	_create_transaction_history_popup()
+	_create_business_portfolio_popup()
 	_create_municipal_services_popup()
 	_create_progression_popup()
 	_create_district_event_popup()
@@ -248,6 +252,14 @@ func _create_interface() -> void:
 	progression_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
 	progression_button.pressed.connect(_on_progression_pressed)
 	management_buttons.add_child(progression_button)
+	var business_portfolio_button := Button.new()
+	business_portfolio_button.text = "БИЗНЕС"
+	business_portfolio_button.custom_minimum_size = Vector2(0, 40)
+	business_portfolio_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	business_portfolio_button.add_theme_font_size_override("font_size", 10)
+	business_portfolio_button.add_theme_stylebox_override("normal", _button_style(Color("#d5b98f")))
+	business_portfolio_button.pressed.connect(_on_business_portfolio_pressed)
+	management_buttons.add_child(business_portfolio_button)
 	road_tool_button = Button.new()
 	road_tool_button.text = "ДОРОГИ"
 	road_tool_button.custom_minimum_size = Vector2(0, 40)
@@ -525,6 +537,130 @@ func _create_transaction_history_popup() -> void:
 	transaction_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	transaction_rows.add_theme_constant_override("separation", 6)
 	scroll.add_child(transaction_rows)
+
+
+func _create_business_portfolio_popup() -> void:
+	business_portfolio_popup = PopupPanel.new()
+	business_portfolio_popup.title = "Коммерческие заведения района"
+	business_portfolio_popup.size = Vector2i(600, 500)
+	business_portfolio_popup.transient = true
+	business_portfolio_popup.exclusive = true
+	add_child(business_portfolio_popup)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	business_portfolio_popup.add_child(panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	var title := Label.new()
+	title.text = "КОММЕРЧЕСКИЙ ПОРТФЕЛЬ РАЙОНА"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "✕"
+	close_button.custom_minimum_size = Vector2(42, 34)
+	close_button.pressed.connect(business_portfolio_popup.hide)
+	header.add_child(close_button)
+
+	business_portfolio_summary_label = Label.new()
+	business_portfolio_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	business_portfolio_summary_label.add_theme_color_override("font_color", Color("#f4d98d"))
+	content.add_child(business_portfolio_summary_label)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(540, 340)
+	content.add_child(scroll)
+	business_portfolio_rows = VBoxContainer.new()
+	business_portfolio_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	business_portfolio_rows.add_theme_constant_override("separation", 7)
+	scroll.add_child(business_portfolio_rows)
+
+
+func _on_business_portfolio_pressed() -> void:
+	_refresh_business_portfolio()
+	business_portfolio_popup.popup_centered(Vector2i(600, 500))
+
+
+func _refresh_business_portfolio() -> void:
+	if business_portfolio_rows == null or business_service == null:
+		return
+	var summary := business_service.get_portfolio_summary()
+	var operating_result := int(summary.get("operating_result", 0))
+	business_portfolio_summary_label.text = "Заведений: %d • работают: %d • сданы в аренду: %d\nПокупатели: %s • выручка: ₽ %s\nНачислено расходов: ₽ %s • оплачено: ₽ %s • долг: ₽ %s\nОперационный результат собственных заведений: %s ₽\nПолучено аренды: ₽ %s" % [
+		int(summary.get("business_count", 0)),
+		int(summary.get("active_count", 0)),
+		int(summary.get("leased_count", 0)),
+		_format_money(int(summary.get("total_customers", 0))),
+		_format_money(int(summary.get("total_revenue", 0))),
+		_format_money(int(summary.get("total_operating_costs", 0))),
+		_format_money(int(summary.get("total_operating_costs_paid", 0))),
+		_format_money(int(summary.get("unpaid_operating_costs", 0))),
+		("+" if operating_result >= 0 else "−") + _format_money(absi(operating_result)),
+		_format_money(int(summary.get("total_rent_received", 0)))
+	]
+	for child in business_portfolio_rows.get_children():
+		business_portfolio_rows.remove_child(child)
+		child.queue_free()
+	var plot_ids: Array[int] = []
+	for key in business_service.businesses.keys():
+		plot_ids.append(int(key))
+	plot_ids.sort()
+	if plot_ids.is_empty():
+		var empty_label := Label.new()
+		empty_label.text = "Коммерческих заведений пока нет. Открой магазин на готовом свободном участке."
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+		business_portfolio_rows.add_child(empty_label)
+		return
+	for plot_id in plot_ids:
+		var business: Dictionary = business_service.get_business(plot_id)
+		var leased := bool(business.get("leased", false))
+		var active := bool(business.get("active", false))
+		var business_type := str(business.get("type", "corner_shop"))
+		var status := "АРЕНДА" if leased else ("РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕНО")
+		var details := "Покупатели: %s • выручка: ₽ %s\nРасходы: ₽ %s • оплачено: ₽ %s • долг: ₽ %s" % [
+			_format_money(int(business.get("total_customers", 0))),
+			_format_money(int(business.get("total_revenue", 0))),
+			_format_money(int(business.get("total_operating_costs", 0))),
+			_format_money(int(business.get("total_operating_costs_paid", 0))),
+			_format_money(int(business.get("unpaid_operating_costs", 0)))
+		]
+		if leased:
+			details = "Арендная ставка: ₽ %s/сутки • получено: ₽ %s" % [
+				_format_money(business_service.get_daily_rent(plot_id)),
+				_format_money(int(business.get("total_rent_received", 0)))
+			]
+		var row_panel := PanelContainer.new()
+		row_panel.add_theme_stylebox_override("panel", _panel_style(Color("#354b40"), 0.9))
+		business_portfolio_rows.add_child(row_panel)
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 3)
+		row_panel.add_child(row)
+		var heading := Label.new()
+		heading.text = "Участок %d • %s • %s • репутация %d/100" % [
+			plot_id,
+			business_service.get_business_type_title(business_type),
+			status,
+			business_service.get_business_reputation(plot_id)
+		]
+		heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+		row.add_child(heading)
+		var details_label := Label.new()
+		details_label.text = details
+		details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		details_label.add_theme_font_size_override("font_size", 12)
+		details_label.add_theme_color_override("font_color", Color("#c9d0b9"))
+		row.add_child(details_label)
 
 
 func _create_municipal_services_popup() -> void:
