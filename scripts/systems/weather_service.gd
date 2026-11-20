@@ -48,7 +48,7 @@ func process_day(day: int) -> bool:
 	if season_id != previous_season or day >= next_weather_day:
 		weather_id = _roll_weather(season_id)
 		next_weather_day = day + rng.randi_range(1, 3)
-	return season_id != previous_season or weather_id != previous_weather
+	return true
 
 func get_season_label() -> String:
 	return str(SEASON_LABELS.get(season_id, "Весна"))
