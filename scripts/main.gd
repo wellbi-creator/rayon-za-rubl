@@ -18,6 +18,7 @@ const BABA_QUEST_REWARD := 150000
 const ROAD_CELL_COST := 5000
 const ROAD_REMOVAL_REFUND := 2500
 const ROAD_ASPHALT_COST := 12000
+const ROAD_LAMP_COST := 8000
 
 var world: DistrictWorld
 var selected_plot_id: int = -1
@@ -80,6 +81,7 @@ var weather_label: Label
 var road_tool_button: Button
 var road_remove_button: Button
 var road_asphalt_button: Button
+var road_lamp_button: Button
 var road_tool_status_label: Label
 
 func _ready() -> void:
@@ -259,6 +261,14 @@ func _create_interface() -> void:
 	road_asphalt_button.add_theme_stylebox_override("normal", _button_style(Color("#8eb8d6")))
 	road_asphalt_button.pressed.connect(_on_road_asphalt_pressed)
 	road_buttons.add_child(road_asphalt_button)
+	road_lamp_button = Button.new()
+	road_lamp_button.text = "ФОНАРИ"
+	road_lamp_button.custom_minimum_size = Vector2(0, 40)
+	road_lamp_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	road_lamp_button.add_theme_font_size_override("font_size", 10)
+	road_lamp_button.add_theme_stylebox_override("normal", _button_style(Color("#e1c77f")))
+	road_lamp_button.pressed.connect(_on_road_lamp_pressed)
+	road_buttons.add_child(road_lamp_button)
 
 	road_tool_status_label = Label.new()
 	road_tool_status_label.text = "Дороги: 5 000 ₽ за клетку. Включи режим, чтобы строить."
@@ -974,6 +984,7 @@ func _on_road_tool_pressed() -> void:
 	road_tool_button.text = "ЗАКРЫТЬ" if enabled else "ДОРОГИ"
 	road_remove_button.text = "СНЕСТИ"
 	road_asphalt_button.text = "АСФАЛЬТ"
+	road_lamp_button.text = "ФОНАРИ"
 	road_tool_status_label.text = "Строительство: зелёная клетка — можно проложить дорогу. Цена — 5 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_remove_pressed() -> void:
@@ -982,6 +993,7 @@ func _on_road_remove_pressed() -> void:
 	road_remove_button.text = "ЗАКРЫТЬ" if enabled else "СНЕСТИ"
 	road_tool_button.text = "ДОРОГИ"
 	road_asphalt_button.text = "АСФАЛЬТ"
+	road_lamp_button.text = "ФОНАРИ"
 	road_tool_status_label.text = "Демонтаж: оранжевая клетка — можно снять сегмент. Возврат за построенную дорогу — 2 500 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_asphalt_pressed() -> void:
@@ -990,10 +1002,35 @@ func _on_road_asphalt_pressed() -> void:
 	road_asphalt_button.text = "ЗАКРЫТЬ" if enabled else "АСФАЛЬТ"
 	road_tool_button.text = "ДОРОГИ"
 	road_remove_button.text = "СНЕСТИ"
+	road_lamp_button.text = "ФОНАРИ"
 	road_tool_status_label.text = "Асфальтирование: голубая клетка — можно улучшить покрытие. Цена — 12 000 ₽." if enabled else "Режим работы с дорогами выключен."
+
+func _on_road_lamp_pressed() -> void:
+	var enabled := not world.road_build_mode or world.road_edit_action != "lamp"
+	world.set_road_build_mode(enabled, "lamp")
+	road_lamp_button.text = "ЗАКРЫТЬ" if enabled else "ФОНАРИ"
+	road_tool_button.text = "ДОРОГИ"
+	road_remove_button.text = "СНЕСТИ"
+	road_asphalt_button.text = "АСФАЛЬТ"
+	road_tool_status_label.text = "Установка фонарей: жёлтая клетка — можно поставить фонарь. Цена — 8 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_cell_requested(cell: Vector2i) -> void:
 	if not world.road_build_mode:
+		return
+	if world.road_edit_action == "lamp":
+		if not world.can_add_road_lamp(cell):
+			road_tool_status_label.text = "Фонарь можно установить только на свободную клетку дороги."
+			return
+		if not economy.try_spend(ROAD_LAMP_COST, "Установка уличного фонаря"):
+			road_tool_status_label.text = "Недостаточно средств. Нужно %s ₽." % _format_money(ROAD_LAMP_COST)
+			return
+		if not world.add_road_lamp(cell):
+			economy.add_money(ROAD_LAMP_COST, "Возврат за отменённую установку фонаря")
+			road_tool_status_label.text = "Не удалось установить фонарь. Деньги возвращены."
+			return
+		progression_service.add_progress(3, 0, "Установлен уличный фонарь")
+		road_tool_status_label.text = "Фонарь установлен! −%s ₽." % _format_money(ROAD_LAMP_COST)
+		_save_game()
 		return
 	if world.road_edit_action == "upgrade":
 		if not world.can_upgrade_road_surface(cell):
