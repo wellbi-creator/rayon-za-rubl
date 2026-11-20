@@ -40,6 +40,7 @@ var save_service: SaveService
 var save_timer: Timer
 var baba_notebook_opened: bool = false
 var baba_wiring_repaired: bool = false
+var is_loading_game: bool = false
 
 var balance_label: Label
 var plot_title: Label
@@ -461,7 +462,7 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		world.set_time_of_day(hour, minute)
 	if resident_service != null:
 		resident_service.update_time(hour, minute, day)
-	if upkeep_service != null and economy != null and resident_service != null:
+	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		if upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy):
 			_save_game()
 
@@ -981,6 +982,7 @@ func _load_game() -> void:
 	var data := save_service.load_game()
 	if data.is_empty():
 		return
+	is_loading_game = true
 	economy.set_balance(int(data.get("balance", 1000000)))
 	var transactions_data: Variant = data.get("economy_transactions", [])
 	if transactions_data is Array:
@@ -1007,6 +1009,7 @@ func _load_game() -> void:
 	else:
 		# Legacy saves start tracking from their current day; no retroactive charges.
 		upkeep_service.initialize_day(game_time.get_day())
+	is_loading_game = false
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
 	if construction_data is Dictionary and not construction_data.is_empty():
