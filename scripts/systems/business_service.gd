@@ -182,7 +182,11 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 		"last_daily_customers": BASE_DAILY_CUSTOMERS,
 		"last_daily_revenue": BASE_DAILY_CUSTOMERS * int(BUSINESS_TYPES[business_type].get("customer_spend", CUSTOMER_SPEND)),
 		"reputation": 50,
-		"last_reputation_change": 0
+		"last_reputation_change": 0,
+		"total_customers": 0,
+		"total_revenue": 0,
+		"total_operating_costs": 0,
+		"total_rent_received": 0
 	}
 	return true
 
@@ -245,8 +249,12 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
 			var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
 			var store_revenue := store_customers * int(type_data.get("customer_spend", CUSTOMER_SPEND))
+			var daily_business_expenses := get_daily_expenses(business_type) + get_business_upgrade_level(plot_id) * BUSINESS_UPGRADE_DAILY_COST
 			business["last_daily_customers"] = store_customers
 			business["last_daily_revenue"] = store_revenue
+			business["total_customers"] = maxi(0, int(business.get("total_customers", 0))) + store_customers * elapsed_days
+			business["total_revenue"] = maxi(0, int(business.get("total_revenue", 0))) + store_revenue * elapsed_days
+			business["total_operating_costs"] = maxi(0, int(business.get("total_operating_costs", 0))) + daily_business_expenses * elapsed_days
 			businesses[plot_id] = business
 			total_daily_revenue += store_revenue
 		economy.add_money(total_daily_revenue * elapsed_days, "Выручка магазинов района")
@@ -260,7 +268,10 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 		var business: Dictionary = businesses[key]
 		if bool(business.get("leased", false)):
 			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
-			daily_rent_income += int(BUSINESS_DAILY_RENT.get(business_type, BUSINESS_DAILY_RENT[SUPPORTED_BUSINESS]))
+			var business_rent := int(BUSINESS_DAILY_RENT.get(business_type, BUSINESS_DAILY_RENT[SUPPORTED_BUSINESS]))
+			daily_rent_income += business_rent
+			business["total_rent_received"] = maxi(0, int(business.get("total_rent_received", 0))) + business_rent * elapsed_days
+			businesses[key] = business
 	if daily_rent_income > 0:
 		var rent_payment := daily_rent_income * elapsed_days
 		economy.add_money(rent_payment, "Арендная плата за коммерческие помещения")
@@ -285,7 +296,11 @@ func get_save_data() -> Dictionary:
 			"last_daily_customers": maxi(0, int(business.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),
 			"last_daily_revenue": maxi(0, int(business.get("last_daily_revenue", DAILY_REVENUE))),
 			"reputation": clampi(int(business.get("reputation", 50)), 0, 100),
-			"last_reputation_change": clampi(int(business.get("last_reputation_change", 0)), -1, 1)
+			"last_reputation_change": clampi(int(business.get("last_reputation_change", 0)), -1, 1),
+			"total_customers": maxi(0, int(business.get("total_customers", 0))),
+			"total_revenue": maxi(0, int(business.get("total_revenue", 0))),
+			"total_operating_costs": maxi(0, int(business.get("total_operating_costs", 0))),
+			"total_rent_received": maxi(0, int(business.get("total_rent_received", 0)))
 		})
 	return {
 		"businesses": saved_businesses,
@@ -318,5 +333,9 @@ func load_save_data(data: Dictionary) -> void:
 			"last_daily_customers": maxi(0, int(entry.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),
 			"last_daily_revenue": maxi(0, int(entry.get("last_daily_revenue", DAILY_REVENUE))),
 			"reputation": clampi(int(entry.get("reputation", 50)), 0, 100),
-			"last_reputation_change": clampi(int(entry.get("last_reputation_change", 0)), -1, 1)
+			"last_reputation_change": clampi(int(entry.get("last_reputation_change", 0)), -1, 1),
+			"total_customers": maxi(0, int(entry.get("total_customers", 0))),
+			"total_revenue": maxi(0, int(entry.get("total_revenue", 0))),
+			"total_operating_costs": maxi(0, int(entry.get("total_operating_costs", 0))),
+			"total_rent_received": maxi(0, int(entry.get("total_rent_received", 0)))
 		}
