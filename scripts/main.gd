@@ -98,6 +98,11 @@ var road_remove_button: Button
 var road_asphalt_button: Button
 var road_lamp_button: Button
 var road_tool_status_label: Label
+var top_hud_panel: PanelContainer
+var district_panel: PanelContainer
+var resident_hud_label: Label
+var satisfaction_hud_label: Label
+var level_hud_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -164,7 +169,8 @@ func _create_interface() -> void:
 	_create_progression_popup()
 	_create_district_event_popup()
 
-	var top_panel := PanelContainer.new()
+	top_hud_panel = PanelContainer.new()
+	var top_panel := top_hud_panel
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	top_panel.position = Vector2(18, 16)
 	top_panel.custom_minimum_size = Vector2(370, 66)
@@ -189,6 +195,18 @@ func _create_interface() -> void:
 	balance_label.add_theme_font_size_override("font_size", 18)
 	balance_label.add_theme_color_override("font_color", Color("#f4d98d"))
 	top_row.add_child(balance_label)
+	resident_hud_label = Label.new()
+	resident_hud_label.add_theme_font_size_override("font_size", 14)
+	resident_hud_label.add_theme_color_override("font_color", Color("#c9e4f2"))
+	top_row.add_child(resident_hud_label)
+	satisfaction_hud_label = Label.new()
+	satisfaction_hud_label.add_theme_font_size_override("font_size", 14)
+	satisfaction_hud_label.add_theme_color_override("font_color", Color("#f2d98e"))
+	top_row.add_child(satisfaction_hud_label)
+	level_hud_label = Label.new()
+	level_hud_label.add_theme_font_size_override("font_size", 14)
+	level_hud_label.add_theme_color_override("font_color", Color("#f4e8c8"))
+	top_row.add_child(level_hud_label)
 
 	hint_label = Label.new()
 	hint_label.text = "ПК: правая кнопка — перемещение, колесо — масштаб  •  Телефон: перетаскивание и касание"
@@ -209,7 +227,8 @@ func _create_interface() -> void:
 	weather_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	weather_panel.add_child(weather_label)
 
-	var panel := PanelContainer.new()
+	district_panel = PanelContainer.new()
+	var panel := district_panel
 	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	panel.offset_left = -342
 	panel.offset_top = 104
@@ -220,7 +239,12 @@ func _create_interface() -> void:
 
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
-	panel.add_child(content)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_child(scroll)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content)
 
 	var heading := Label.new()
 	heading.text = "УПРАВЛЕНИЕ РАЙОНОМ"
@@ -500,6 +524,8 @@ func _create_interface() -> void:
 	footer.add_theme_font_size_override("font_size", 12)
 	footer.add_theme_color_override("font_color", Color("#a9b8a3"))
 	content.add_child(footer)
+	_on_interface_resized()
+	_refresh_top_hud()
 
 
 func _create_transaction_history_popup() -> void:
@@ -1311,10 +1337,23 @@ func _refresh_transaction_history() -> void:
 
 
 func _on_interface_resized() -> void:
-	if control_root == null or hint_label == null:
+	if control_root == null:
 		return
-	# Hide the long desktop hint on narrow landscape screens.
-	hint_label.visible = control_root.size.x >= 900.0
+	var viewport_size := control_root.size
+	var compact := viewport_size.x < 1050.0
+	if hint_label != null:
+		hint_label.visible = not compact
+	if top_hud_panel != null:
+		top_hud_panel.position = Vector2(10, 10)
+		top_hud_panel.size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
+		top_hud_panel.custom_minimum_size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
+	if district_panel != null:
+		var panel_width := clampf(viewport_size.x * (0.37 if compact else 0.30), 270.0, 390.0)
+		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		district_panel.offset_left = -panel_width - 10.0
+		district_panel.offset_top = 82.0 if compact else 104.0
+		district_panel.offset_right = -10.0
+		district_panel.offset_bottom = -10.0
 
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -1327,13 +1366,18 @@ func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	style.content_margin_right = 18
 	style.content_margin_top = 14
 	style.content_margin_bottom = 14
-	style.border_color = Color("#d6c18b", 0.35)
+	style.border_color = Color("#c9d7e8", 0.20)
 	style.set_border_width_all(1)
+	style.shadow_color = Color(0.02, 0.04, 0.08, 0.38)
+	style.shadow_size = 14
+	style.shadow_offset = Vector2(0, 5)
 	return style
 
 func _button_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
+	style.border_color = Color("#ffffff", 0.18)
+	style.set_border_width_all(1)
 	style.corner_radius_top_left = 10
 	style.corner_radius_top_right = 10
 	style.corner_radius_bottom_left = 10
@@ -1343,7 +1387,18 @@ func _button_style(color: Color) -> StyleBoxFlat:
 	return style
 
 func _update_balance() -> void:
-	balance_label.text = "₽ %s" % _format_money(economy.balance)
+	if balance_label != null:
+		balance_label.text = "₽ %s" % _format_money(economy.balance)
+	_refresh_top_hud()
+
+func _refresh_top_hud() -> void:
+	if resident_hud_label == null or resident_service == null:
+		return
+	resident_hud_label.text = "👥 %s" % _format_money(resident_service.get_total_resident_count())
+	if satisfaction_hud_label != null:
+		satisfaction_hud_label.text = "☺ %d%%" % roundi(_get_average_resident_satisfaction())
+	if level_hud_label != null and progression_service != null:
+		level_hud_label.text = "★ %d" % progression_service.get_level()
 
 func _get_average_resident_satisfaction() -> float:
 	if resident_service == null:
@@ -2083,6 +2138,7 @@ func _on_household_action_pressed(action_id: String) -> void:
 
 func _on_residents_changed(plot_id: int) -> void:
 	world.set_resident_groups(resident_service.get_resident_display_data())
+	_refresh_top_hud()
 	if selected_plot_id == plot_id:
 		_on_plot_selected(plot_id)
 
