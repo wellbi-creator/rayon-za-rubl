@@ -81,6 +81,12 @@ func _get_demo_traffic_route(seed: int) -> Array[Vector2]:
 		return empty_route
 	var start_index := posmod(seed, endpoints.size())
 	var end_index := posmod(start_index + maxi(1, endpoints.size() / 2), endpoints.size())
+	if endpoints.size() == 4:
+		# Keep the original horizontal and vertical showcase flows on the initial cross.
+		var starts := [1, 2, 0, 3]
+		var finishes := [2, 1, 3, 0]
+		start_index = starts[posmod(seed, 4)]
+		end_index = finishes[posmod(seed, 4)]
 	if start_index == end_index:
 		end_index = (start_index + 1) % endpoints.size()
 	return get_transport_route(endpoints[start_index], endpoints[end_index])
