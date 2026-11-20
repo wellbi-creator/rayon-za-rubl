@@ -774,7 +774,8 @@ func _refresh_municipal_services() -> void:
 		row.add_theme_constant_override("separation", 8)
 		row_panel.add_child(row)
 		var info := Label.new()
-		info.text = "%s\nШтат: %d  •  ₽ %s/день" % [label, count, _format_money(daily_salary)]
+		var efficiency := municipal_services.get_service_efficiency_percent(service_id)
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день" % [label, count, efficiency, _format_money(daily_salary)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))

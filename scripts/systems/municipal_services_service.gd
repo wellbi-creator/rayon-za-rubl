@@ -2,6 +2,7 @@ extends RefCounted
 class_name MunicipalServicesService
 
 const MAX_EMPLOYEES_PER_SERVICE := 10
+const EMPLOYEES_FOR_FULL_EFFICIENCY := 5
 const SERVICES := [
 	{"id": "road", "label": "Дорожные рабочие", "hire_cost": 4000, "daily_salary": 500},
 	{"id": "electricity", "label": "Электрики", "hire_cost": 5000, "daily_salary": 650},
@@ -24,6 +25,12 @@ func get_service_definitions() -> Array:
 
 func get_employee_count(service_id: String) -> int:
 	return int(employees.get(service_id, 0))
+
+func get_service_efficiency_percent(service_id: String) -> int:
+	return roundi(float(mini(get_employee_count(service_id), EMPLOYEES_FOR_FULL_EFFICIENCY)) / float(EMPLOYEES_FOR_FULL_EFFICIENCY) * 100.0)
+
+func get_service_discount_percent(service_id: String, maximum_discount: int) -> int:
+	return roundi(float(clampi(maximum_discount, 0, 80) * get_service_efficiency_percent(service_id)) / 100.0)
 
 func get_hire_cost(service_id: String) -> int:
 	var definition := _get_definition(service_id)
