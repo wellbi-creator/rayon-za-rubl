@@ -1133,15 +1133,21 @@ func set_baba_home_repaired(repaired: bool) -> void:
 	queue_redraw()
 
 func set_plot_building(plot_id: int, progress: float) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size():
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
 		return
-	plot_states[plot_id] = {"kind": "building", "progress": clampf(progress, 0.0, 1.0)}
+	var state: Dictionary = plot_states[plot_id].duplicate(true)
+	state["kind"] = "building"
+	state["progress"] = clampf(progress, 0.0, 1.0)
+	plot_states[plot_id] = state
 	queue_redraw()
 
 func finish_plot(plot_id: int) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size():
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
 		return
-	plot_states[plot_id] = {"kind": "built", "progress": 1.0}
+	var state: Dictionary = plot_states[plot_id].duplicate(true)
+	state["kind"] = "built"
+	state["progress"] = 1.0
+	plot_states[plot_id] = state
 	queue_redraw()
 
 func get_plot_kind(plot_id: int) -> String:
