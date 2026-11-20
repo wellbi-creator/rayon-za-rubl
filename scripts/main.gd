@@ -789,7 +789,8 @@ func _refresh_municipal_services() -> void:
 		var work_count := municipal_services.get_work_orders_completed(service_id)
 		var last_work := municipal_services.get_last_work_day(service_id)
 		var work_status := "Последняя работа: день %d" % last_work if last_work > 0 else "Работ пока не было"
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день\nВыполнено работ: %d  •  %s" % [label, count, efficiency, _format_money(daily_salary), work_count, work_status]
+		var work_spent := municipal_services.get_total_work_spent(service_id)
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, _format_money(daily_salary), work_count, work_status, _format_money(work_spent)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
