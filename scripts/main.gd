@@ -683,6 +683,7 @@ func _create_business_portfolio_popup() -> void:
 
 
 func _on_business_portfolio_pressed() -> void:
+	_hide_district_panel()
 	_refresh_business_portfolio()
 	_polish_context_panel(business_portfolio_popup)
 	_show_responsive_popup(business_portfolio_popup, Vector2i(600, 500))
@@ -795,6 +796,7 @@ func _create_finance_popup() -> void:
 	content.add_child(finance_summary_label)
 
 func _on_finance_pressed() -> void:
+	_hide_district_panel()
 	_refresh_finance_summary()
 	_polish_context_panel(finance_popup)
 	_show_responsive_popup(finance_popup, Vector2i(560, 390))
@@ -1051,6 +1053,7 @@ func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: b
 
 
 func _on_progression_pressed() -> void:
+	_hide_district_panel()
 	_refresh_progression_popup()
 	_polish_context_panel(progression_popup)
 	_show_responsive_popup(progression_popup, Vector2i(560, 470))
@@ -1114,6 +1117,7 @@ func _award_district_progress(experience_gain: int, reputation_gain: int, reason
 
 
 func _on_municipal_services_pressed() -> void:
+	_hide_district_panel()
 	_refresh_municipal_services()
 	_polish_context_panel(municipal_popup)
 	_show_responsive_popup(municipal_popup, Vector2i(560, 470))
@@ -1331,6 +1335,7 @@ func _on_municipal_fire_pressed(service_id: String) -> void:
 
 
 func _on_transaction_history_pressed() -> void:
+	_hide_district_panel()
 	_refresh_transaction_history()
 	_polish_context_panel(transaction_popup)
 	_show_responsive_popup(transaction_popup, Vector2i(560, 380))
@@ -1736,6 +1741,7 @@ func _show_empty_selection() -> void:
 	build_button.disabled = true
 
 func _on_road_tool_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "build"
 	world.set_road_build_mode(enabled, "build")
 	road_tool_button.text = "ЗАКРЫТЬ" if enabled else "ДОРОГИ"
@@ -1745,6 +1751,7 @@ func _on_road_tool_pressed() -> void:
 	road_tool_status_label.text = "Строительство: зелёная клетка — можно проложить дорогу. Цена — 5 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_remove_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "remove"
 	world.set_road_build_mode(enabled, "remove")
 	road_remove_button.text = "ЗАКРЫТЬ" if enabled else "СНЕСТИ"
@@ -1754,6 +1761,7 @@ func _on_road_remove_pressed() -> void:
 	road_tool_status_label.text = "Демонтаж: оранжевая клетка — можно снять сегмент. Возврат за построенную дорогу — 2 500 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_asphalt_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "upgrade"
 	world.set_road_build_mode(enabled, "upgrade")
 	road_asphalt_button.text = "ЗАКРЫТЬ" if enabled else "АСФАЛЬТ"
@@ -1763,6 +1771,7 @@ func _on_road_asphalt_pressed() -> void:
 	road_tool_status_label.text = "Асфальтирование: голубая клетка — можно улучшить покрытие. Цена — 12 000 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_lamp_pressed() -> void:
+	_hide_district_panel()
 	var enabled := not world.road_build_mode or world.road_edit_action != "lamp"
 	world.set_road_build_mode(enabled, "lamp")
 	road_lamp_button.text = "ЗАКРЫТЬ" if enabled else "ФОНАРИ"
