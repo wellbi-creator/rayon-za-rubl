@@ -68,7 +68,7 @@ func _ready() -> void:
 	for lamp_cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
 		road_lamp_cells[lamp_cell] = true
 	for i in PLOT_CELLS.size():
-		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0, "unlocked": i < STARTER_PLOT_COUNT})
+		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0, "unlocked": i < STARTER_PLOT_COUNT, "owned": i < STARTER_PLOT_COUNT})
 	camera = Camera2D.new()
 	camera.position = Grid.grid_to_world(Vector2i(4, 3), TILE)
 	camera_target_position = camera.position
@@ -426,6 +426,9 @@ func _draw_plot(plot_id: int) -> void:
 	_draw_diamond(center, TILE * Vector2(0.88, 0.76), plot_color, Color("#e5d9b9"), 2.0)
 	if selected:
 		_draw_diamond(center, TILE * Vector2(0.96, 0.84), Color("#f6d77a", 0.14), Color("#ffe49a"), 3.0)
+	if not bool(state.get("owned", plot_id < STARTER_PLOT_COUNT)):
+		draw_string(ThemeDB.fallback_font, center + Vector2(-31, 4), "ПРОДАЁТСЯ", HORIZONTAL_ALIGNMENT_LEFT, 64.0, 9, Color("#fff0b7"))
+		return
 
 	match str(state.get("kind", "empty")):
 		"home":
@@ -1135,10 +1138,11 @@ func load_save_data(data: Dictionary) -> void:
 				plot_states.append({
 					"kind": kind,
 					"progress": clampf(float(entry.get("progress", 0.0)), 0.0, 1.0),
-					"unlocked": bool(entry.get("unlocked", plot_id < STARTER_PLOT_COUNT))
+					"unlocked": bool(entry.get("unlocked", plot_id < STARTER_PLOT_COUNT)),
+					"owned": bool(entry.get("owned", bool(entry.get("unlocked", plot_id < STARTER_PLOT_COUNT))))
 				})
 			else:
-				plot_states.append({"kind": "empty", "progress": 0.0, "unlocked": plot_id < STARTER_PLOT_COUNT})
+				plot_states.append({"kind": "empty", "progress": 0.0, "unlocked": plot_id < STARTER_PLOT_COUNT, "owned": plot_id < STARTER_PLOT_COUNT})
 	baba_home_repaired = bool(data.get("baba_home_repaired", false))
 	queue_redraw()
 
@@ -1147,7 +1151,7 @@ func set_baba_home_repaired(repaired: bool) -> void:
 	queue_redraw()
 
 func set_plot_building(plot_id: int, progress: float) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_owned(plot_id):
 		return
 	var state: Dictionary = plot_states[plot_id].duplicate(true)
 	state["kind"] = "building"
@@ -1156,7 +1160,7 @@ func set_plot_building(plot_id: int, progress: float) -> void:
 	queue_redraw()
 
 func finish_plot(plot_id: int) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_owned(plot_id):
 		return
 	var state: Dictionary = plot_states[plot_id].duplicate(true)
 	state["kind"] = "built"
@@ -1169,6 +1173,8 @@ func get_plot_kind(plot_id: int) -> String:
 		return ""
 	if not is_plot_unlocked(plot_id):
 		return "locked"
+	if not is_plot_owned(plot_id):
+		return "unowned"
 	return str(plot_states[plot_id].get("kind", ""))
 
 func is_plot_unlocked(plot_id: int) -> bool:
@@ -1183,6 +1189,32 @@ func get_unlocked_plot_ids() -> Array[int]:
 			result.append(plot_id)
 	return result
 
+func is_plot_owned(plot_id: int) -> bool:
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
+		return false
+	return bool(plot_states[plot_id].get("owned", plot_id < STARTER_PLOT_COUNT))
+
+func get_owned_plot_ids() -> Array[int]:
+	var result: Array[int] = []
+	for plot_id in plot_states.size():
+		if is_plot_owned(plot_id):
+			result.append(plot_id)
+	return result
+
+func get_plot_purchase_cost(plot_id: int) -> int:
+	if plot_id < EAST_QUARTER_PLOT_START or plot_id >= EAST_QUARTER_PLOT_START + EAST_QUARTER_PLOT_COUNT:
+		return -1
+	return 80000
+
+func purchase_plot(plot_id: int) -> bool:
+	if not is_plot_unlocked(plot_id) or is_plot_owned(plot_id):
+		return false
+	var state: Dictionary = plot_states[plot_id].duplicate(true)
+	state["owned"] = true
+	plot_states[plot_id] = state
+	queue_redraw()
+	return true
+
 func get_quarter_purchase_cost() -> int:
 	return EAST_QUARTER_PURCHASE_COST
 
@@ -1192,6 +1224,7 @@ func unlock_east_quarter() -> bool:
 		if plot_id >= 0 and plot_id < plot_states.size() and not is_plot_unlocked(plot_id):
 			var state: Dictionary = plot_states[plot_id]
 			state["unlocked"] = true
+			state["owned"] = false
 			plot_states[plot_id] = state
 			changed = true
 	if changed:
