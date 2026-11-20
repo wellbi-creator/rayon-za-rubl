@@ -103,6 +103,9 @@ var district_panel: PanelContainer
 var resident_hud_label: Label
 var satisfaction_hud_label: Label
 var level_hud_label: Label
+var navigation_panel: PanelContainer
+var quickbar_panel: PanelContainer
+var district_scroll: ScrollContainer
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -221,6 +224,21 @@ func _create_interface() -> void:
 	weather_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	weather_panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.88))
 	root.add_child(weather_panel)
+
+	navigation_panel = PanelContainer.new()
+	navigation_panel.position = Vector2(16, 112)
+	navigation_panel.custom_minimum_size = Vector2(154, 0)
+	navigation_panel.add_theme_stylebox_override("panel", _panel_style(Color("#202b42"), 0.94))
+	root.add_child(navigation_panel)
+	var navigation := VBoxContainer.new()
+	navigation.add_theme_constant_override("separation", 7)
+	navigation_panel.add_child(navigation)
+	_add_navigation_button(navigation, "⌂   КАРТА", _on_navigation_map_pressed)
+	_add_navigation_button(navigation, "⌁   СТРОИТЕЛЬСТВО", _on_navigation_build_pressed)
+	_add_navigation_button(navigation, "⚒   УСЛУГИ", _on_municipal_services_pressed)
+	_add_navigation_button(navigation, "▥   СТАТИСТИКА", _on_finance_pressed)
+	_add_navigation_button(navigation, "★   ДОСТИЖЕНИЯ", _on_progression_pressed)
+	_add_navigation_button(navigation, "▤   ЖУРНАЛ", _on_transaction_history_pressed)
 	weather_label = Label.new()
 	weather_label.add_theme_font_size_override("font_size", 12)
 	weather_label.add_theme_color_override("font_color", Color("#d9e6c8"))
@@ -239,7 +257,8 @@ func _create_interface() -> void:
 
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
-	var scroll := ScrollContainer.new()
+	district_scroll = ScrollContainer.new()
+	var scroll := district_scroll
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(scroll)
@@ -356,6 +375,31 @@ func _create_interface() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.add_theme_color_override("font_color", Color("#b9c9ae"))
 	content.add_child(status_label)
+
+	quickbar_panel = PanelContainer.new()
+	quickbar_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	quickbar_panel.offset_left = 16
+	quickbar_panel.offset_right = -16
+	quickbar_panel.offset_top = -76
+	quickbar_panel.offset_bottom = -12
+	quickbar_panel.add_theme_stylebox_override("panel", _panel_style(Color("#202b42"), 0.94))
+	root.add_child(quickbar_panel)
+	var quickbar_scroll := ScrollContainer.new()
+	quickbar_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	quickbar_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	quickbar_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quickbar_panel.add_child(quickbar_scroll)
+	var quickbar := HBoxContainer.new()
+	quickbar.add_theme_constant_override("separation", 9)
+	quickbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quickbar_scroll.add_child(quickbar)
+	_add_quickbar_button(quickbar, "⌂  ПОСТРОИТЬ", _on_navigation_build_pressed)
+	_add_quickbar_button(quickbar, "ДОРОГА", _on_road_tool_pressed)
+	_add_quickbar_button(quickbar, "АСФАЛЬТ", _on_road_asphalt_pressed)
+	_add_quickbar_button(quickbar, "ФОНАРИ", _on_road_lamp_pressed)
+	_add_quickbar_button(quickbar, "СЛУЖБЫ", _on_municipal_services_pressed)
+	_add_quickbar_button(quickbar, "БИЗНЕС", _on_business_portfolio_pressed)
+	_add_quickbar_button(quickbar, "ФИНАНСЫ", _on_finance_pressed)
 
 	house_type_selector = OptionButton.new()
 	house_type_selector.add_item("Обычный дом — 10 минут")
@@ -1336,6 +1380,38 @@ func _refresh_transaction_history() -> void:
 		row.add_child(amount_label)
 
 
+func _add_navigation_button(container: VBoxContainer, caption: String, action: Callable) -> void:
+	var button := Button.new()
+	button.text = caption
+	button.custom_minimum_size = Vector2(142, 42)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_stylebox_override("normal", _button_style(Color("#8faed8")))
+	button.add_theme_stylebox_override("hover", _button_style(Color("#b6cbed")))
+	button.pressed.connect(action)
+	container.add_child(button)
+
+func _add_quickbar_button(container: HBoxContainer, caption: String, action: Callable) -> void:
+	var button := Button.new()
+	button.text = caption
+	button.custom_minimum_size = Vector2(112, 46)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.add_theme_font_size_override("font_size", 11)
+	button.add_theme_stylebox_override("normal", _button_style(Color("#a9c5e6")))
+	button.add_theme_stylebox_override("hover", _button_style(Color("#c5d9f0")))
+	button.pressed.connect(action)
+	container.add_child(button)
+
+func _on_navigation_map_pressed() -> void:
+	status_label.text = "Карта района. Выбери участок, чтобы открыть его действия."
+	if world.road_build_mode:
+		world.set_road_build_mode(false)
+
+func _on_navigation_build_pressed() -> void:
+	if district_scroll != null and build_button != null:
+		district_scroll.ensure_control_visible(build_button)
+	status_label.text = "Выбери свободный участок на карте, затем нажми «Построить обычный дом»."
 func _on_interface_resized() -> void:
 	if control_root == null:
 		return
@@ -1347,13 +1423,23 @@ func _on_interface_resized() -> void:
 		top_hud_panel.position = Vector2(10, 10)
 		top_hud_panel.size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
 		top_hud_panel.custom_minimum_size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
+	if navigation_panel != null:
+		navigation_panel.position = Vector2(12.0, 112.0)
+		navigation_panel.custom_minimum_size = Vector2(142.0 if compact else 164.0, 0.0)
+		navigation_panel.visible = viewport_size.x >= 760.0
+	if quickbar_panel != null:
+		quickbar_panel.offset_left = 12.0
+		quickbar_panel.offset_right = -12.0
+		quickbar_panel.offset_top = -68.0 if compact else -78.0
+		quickbar_panel.offset_bottom = -8.0
+		quickbar_panel.visible = viewport_size.y >= 420.0
 	if district_panel != null:
 		var panel_width := clampf(viewport_size.x * (0.37 if compact else 0.30), 270.0, 390.0)
 		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 		district_panel.offset_left = -panel_width - 10.0
 		district_panel.offset_top = 82.0 if compact else 104.0
 		district_panel.offset_right = -10.0
-		district_panel.offset_bottom = -10.0
+		district_panel.offset_bottom = -84.0
 
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
