@@ -26,6 +26,7 @@ var transport_entries: Array[Dictionary] = []
 var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
+var player_built_road_cells: Dictionary = {}
 var road_build_mode := false
 var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
@@ -905,6 +906,7 @@ func add_road_cell(cell: Vector2i) -> bool:
 		return false
 	var added := road_path_network.add_road_cell(cell)
 	if added:
+		player_built_road_cells[cell] = true
 		queue_redraw()
 	return added
 
@@ -912,28 +914,46 @@ func can_remove_road_cell(cell: Vector2i) -> bool:
 	return road_path_network != null and road_path_network.can_remove_road_cell(cell)
 
 func is_player_built_road_cell(cell: Vector2i) -> bool:
-	# The original cross-shaped road is part of the starting district, not a paid upgrade.
-	return cell.y != 3 and cell.x != 4
+	return player_built_road_cells.has(cell)
 
 func remove_road_cell(cell: Vector2i) -> bool:
 	if not can_remove_road_cell(cell):
 		return false
 	var removed := road_path_network.remove_road_cell(cell)
 	if removed:
+		player_built_road_cells.erase(cell)
 		queue_redraw()
 	return removed
 
 func get_save_data() -> Dictionary:
+	var saved_player_roads: Array[Dictionary] = []
+	for cell in road_path_network.get_road_cells():
+		if player_built_road_cells.has(cell):
+			saved_player_roads.append({"x": cell.x, "y": cell.y})
 	return {
 		"plot_states": plot_states.duplicate(true),
 		"baba_home_repaired": baba_home_repaired,
-		"road_network": road_path_network.get_save_data()
+		"road_network": road_path_network.get_save_data(),
+		"player_built_road_cells": saved_player_roads
 	}
 
 func load_save_data(data: Dictionary) -> void:
 	var road_data: Variant = data.get("road_network", {})
 	if road_data is Dictionary and not road_data.is_empty():
 		road_path_network.load_save_data(road_data)
+	player_built_road_cells.clear()
+	var saved_player_roads: Variant = data.get("player_built_road_cells", [])
+	if saved_player_roads is Array:
+		for entry in saved_player_roads:
+			if entry is Dictionary:
+				var cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
+				if road_path_network.is_road_cell(cell):
+					player_built_road_cells[cell] = true
+	else:
+		# M5.2 saves predate explicit ownership; infer non-starter segments safely.
+		for cell in road_path_network.get_road_cells():
+			if cell.y != 3 and cell.x != 4:
+				player_built_road_cells[cell] = true
 	var saved_plots: Variant = data.get("plot_states", [])
 	if saved_plots is Array and saved_plots.size() == PLOT_CELLS.size():
 		plot_states.clear()
