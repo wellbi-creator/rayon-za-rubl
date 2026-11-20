@@ -19,6 +19,11 @@ const BUSINESS_UPGRADE_COSTS := [35000, 75000]
 const BUSINESS_UPGRADE_DAILY_COST := 500
 const BUSINESS_BASE_ATTRACTION := 100
 const BUSINESS_UPGRADE_ATTRACTION := 25
+const BUSINESS_SCHEDULES := {
+	"standard": {"title": "Обычный • 08:00–20:00", "open_hour": 8, "close_hour": 20, "customer_weight": 100, "expense_percent": 100},
+	"extended": {"title": "Продлённый • 06:00–22:00", "open_hour": 6, "close_hour": 22, "customer_weight": 115, "expense_percent": 125},
+	"night": {"title": "Круглосуточно • 00:00–24:00", "open_hour": 0, "close_hour": 24, "customer_weight": 130, "expense_percent": 150}
+}
 const BUSINESS_DAILY_RENT := {
 	"corner_shop": 3500,
 	"bakery": 4500,
@@ -44,6 +49,30 @@ func get_business_type_title(business_type: String) -> String:
 
 func get_business_type_ids() -> Array[String]:
 	return ["corner_shop", "bakery", "cafe"]
+
+func get_business_schedule_ids() -> Array[String]:
+	return ["standard", "extended", "night"]
+
+func get_business_schedule_title(schedule_id: String) -> String:
+	var schedule: Dictionary = BUSINESS_SCHEDULES.get(schedule_id, BUSINESS_SCHEDULES["standard"])
+	return str(schedule.get("title", BUSINESS_SCHEDULES["standard"]["title"]))
+
+func get_business_schedule(plot_id: int) -> String:
+	var business := get_business(plot_id)
+	var schedule_id := str(business.get("schedule", "standard"))
+	return schedule_id if BUSINESS_SCHEDULES.has(schedule_id) else "standard"
+
+func set_business_schedule(plot_id: int, schedule_id: String) -> bool:
+	if not businesses.has(plot_id) or is_business_leased(plot_id) or not BUSINESS_SCHEDULES.has(schedule_id):
+		return false
+	var business: Dictionary = businesses[plot_id]
+	business["schedule"] = schedule_id
+	businesses[plot_id] = business
+	return true
+
+func get_business_schedule_hours(plot_id: int) -> Dictionary:
+	var schedule: Dictionary = BUSINESS_SCHEDULES.get(get_business_schedule(plot_id), BUSINESS_SCHEDULES["standard"])
+	return {"open_hour": int(schedule["open_hour"]), "close_hour": int(schedule["close_hour"])}
 
 func get_business_reputation(plot_id: int) -> int:
 	var business := get_business(plot_id)
@@ -98,7 +127,9 @@ func get_business_daily_expenses(plot_id: int) -> int:
 		return 0
 	var business_type := str(business.get("type", SUPPORTED_BUSINESS))
 	var upgrade_level := get_business_upgrade_level(plot_id)
-	return get_daily_expenses(business_type) + upgrade_level * BUSINESS_UPGRADE_DAILY_COST
+	var base_cost := get_daily_expenses(business_type) + upgrade_level * BUSINESS_UPGRADE_DAILY_COST
+	var schedule: Dictionary = BUSINESS_SCHEDULES.get(get_business_schedule(plot_id), BUSINESS_SCHEDULES["standard"])
+	return roundi(float(base_cost) * float(schedule.get("expense_percent", 100)) / 100.0)
 
 func purchase_business_upgrade(plot_id: int, economy: EconomyService) -> bool:
 	if economy == null or not businesses.has(plot_id):
@@ -115,7 +146,10 @@ func purchase_business_upgrade(plot_id: int, economy: EconomyService) -> bool:
 func _get_business_attraction_weight(business: Dictionary) -> int:
 	var upgrade_level := clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size())
 	var reputation := clampi(int(business.get("reputation", 50)), 0, 100)
-	return maxi(1, BUSINESS_BASE_ATTRACTION + upgrade_level * BUSINESS_UPGRADE_ATTRACTION + reputation - 50)
+	var schedule_id := str(business.get("schedule", "standard"))
+	var schedule: Dictionary = BUSINESS_SCHEDULES.get(schedule_id, BUSINESS_SCHEDULES["standard"])
+	var schedule_weight := int(schedule.get("customer_weight", 100))
+	return maxi(1, roundi(float(BUSINESS_BASE_ATTRACTION + upgrade_level * BUSINESS_UPGRADE_ATTRACTION + reputation - 50) * float(schedule_weight) / 100.0))
 
 func _update_business_reputation(business: Dictionary, average_satisfaction: float) -> Dictionary:
 	var current := clampi(int(business.get("reputation", 50)), 0, 100)
@@ -144,7 +178,13 @@ func get_business_visual_data() -> Dictionary:
 	var result: Dictionary = {}
 	for key in businesses.keys():
 		var business: Dictionary = businesses[key]
-		result[int(key)] = bool(business.get("active", false))
+		var schedule_id := str(business.get("schedule", "standard"))
+		var schedule: Dictionary = BUSINESS_SCHEDULES.get(schedule_id, BUSINESS_SCHEDULES["standard"])
+		result[int(key)] = {
+			"active": bool(business.get("active", false)),
+			"open_hour": int(schedule.get("open_hour", 8)),
+			"close_hour": int(schedule.get("close_hour", 20))
+		}
 	return result
 
 func get_daily_customer_count(resident_count: int, average_satisfaction: float, reputation: int, weather_id: String) -> int:
@@ -176,6 +216,7 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 		return false
 	businesses[plot_id] = {
 		"type": business_type,
+		"schedule": "standard",
 		"upgrade_level": 0,
 		"active": true,
 		"opened_day": last_processed_day,
@@ -249,7 +290,7 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
 			var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
 			var store_revenue := store_customers * int(type_data.get("customer_spend", CUSTOMER_SPEND))
-			var daily_business_expenses := get_daily_expenses(business_type) + get_business_upgrade_level(plot_id) * BUSINESS_UPGRADE_DAILY_COST
+			var daily_business_expenses := get_business_daily_expenses(plot_id)
 			business["last_daily_customers"] = store_customers
 			business["last_daily_revenue"] = store_revenue
 			business["total_customers"] = maxi(0, int(business.get("total_customers", 0))) + store_customers * elapsed_days
@@ -261,7 +302,7 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 		var daily_expenses := 0
 		for plot_id in active_plot_ids:
 			var business: Dictionary = businesses[plot_id]
-			daily_expenses += get_daily_expenses(str(business.get("type", SUPPORTED_BUSINESS))) + get_business_upgrade_level(plot_id) * BUSINESS_UPGRADE_DAILY_COST
+			daily_expenses += get_business_daily_expenses(plot_id)
 		unpaid_operating_costs += daily_expenses * elapsed_days
 	var daily_rent_income := 0
 	for key in businesses.keys():
@@ -289,6 +330,7 @@ func get_save_data() -> Dictionary:
 		saved_businesses.append({
 			"plot_id": int(key),
 			"type": str(business.get("type", SUPPORTED_BUSINESS)),
+			"schedule": get_business_schedule(int(key)),
 			"leased": bool(business.get("leased", false)),
 			"upgrade_level": clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(business.get("active", false)),
@@ -326,6 +368,7 @@ func load_save_data(data: Dictionary) -> void:
 			continue
 		businesses[plot_id] = {
 			"type": business_type,
+			"schedule": str(entry.get("schedule", "standard")) if BUSINESS_SCHEDULES.has(str(entry.get("schedule", "standard"))) else "standard",
 			"leased": bool(entry.get("leased", false)),
 			"upgrade_level": clampi(int(entry.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(entry.get("active", false)),
