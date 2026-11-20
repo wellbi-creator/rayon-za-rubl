@@ -1354,7 +1354,7 @@ func _on_plot_selected(plot_id: int) -> void:
 					resident_button.visible = false
 					resident_label.visible = false
 					var active := bool(business.get("active", false))
-					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
+					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 						_format_money(business_service.get_daily_revenue()),
 						_format_money(business_service.get_daily_expenses()),
