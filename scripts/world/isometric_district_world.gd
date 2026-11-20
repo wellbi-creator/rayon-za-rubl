@@ -26,7 +26,9 @@ var transport_entries: Array[Dictionary] = []
 var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
+var player_built_road_cells: Dictionary = {}
 var road_build_mode := false
+var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
 var baba_home_repaired := false
 var construction_animation_time := 0.0
@@ -317,17 +319,28 @@ func _draw_roads() -> void:
 		_draw_road_cell(cell)
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
-		var preview_valid := can_build_road_cell(road_preview_cell)
-		var preview_color := Color("#8bd39b", 0.38) if preview_valid else Color("#d97870", 0.34)
-		var preview_outline := Color("#c6f0c8") if preview_valid else Color("#ffc0b7")
+		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_build_road_cell(road_preview_cell)
+		var preview_color := Color("#d97870", 0.34)
+		var preview_outline := Color("#ffc0b7")
+		if preview_valid:
+			if road_edit_action == "remove":
+				preview_color = Color("#e6b56f", 0.38)
+				preview_outline = Color("#ffe0a8")
+			else:
+				preview_color = Color("#8bd39b", 0.38)
+				preview_outline = Color("#c6f0c8")
 		_draw_diamond(preview_center, TILE * Vector2(0.88, 0.76), preview_color, preview_outline, 3.0)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
-		var p: Vector2 = Grid.grid_to_world(Vector2i(x, 3), TILE)
-		draw_line(p + Vector2(-15, 0), p + Vector2(15, 0), Color("#eadcae"), 2.0)
+		var cell := Vector2i(x, 3)
+		if road_path_network.is_road_cell(cell):
+			var p: Vector2 = Grid.grid_to_world(cell, TILE)
+			draw_line(p + Vector2(-15, 0), p + Vector2(15, 0), Color("#eadcae"), 2.0)
 	for y in [1, 5]:
-		var p: Vector2 = Grid.grid_to_world(Vector2i(4, y), TILE)
-		draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
+		var cell := Vector2i(4, y)
+		if road_path_network.is_road_cell(cell):
+			var p: Vector2 = Grid.grid_to_world(cell, TILE)
+			draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
 
 func _draw_grass_detail(pos: Vector2) -> void:
 	var blade_color := _get_leaf_palette()[2]
@@ -862,8 +875,9 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 		return []
 	return road_path_network.get_route(start_road_cell, end_road_cell, TILE)
 
-func set_road_build_mode(enabled: bool) -> void:
+func set_road_build_mode(enabled: bool, action: String = "build") -> void:
 	road_build_mode = enabled
+	road_edit_action = "remove" if action == "remove" else "build"
 	road_preview_cell = Vector2i(-1, -1)
 	queue_redraw()
 
@@ -892,20 +906,54 @@ func add_road_cell(cell: Vector2i) -> bool:
 		return false
 	var added := road_path_network.add_road_cell(cell)
 	if added:
+		player_built_road_cells[cell] = true
 		queue_redraw()
 	return added
 
+func can_remove_road_cell(cell: Vector2i) -> bool:
+	return road_path_network != null and road_path_network.can_remove_road_cell(cell)
+
+func is_player_built_road_cell(cell: Vector2i) -> bool:
+	return player_built_road_cells.has(cell)
+
+func remove_road_cell(cell: Vector2i) -> bool:
+	if not can_remove_road_cell(cell):
+		return false
+	var removed := road_path_network.remove_road_cell(cell)
+	if removed:
+		player_built_road_cells.erase(cell)
+		queue_redraw()
+	return removed
+
 func get_save_data() -> Dictionary:
+	var saved_player_roads: Array[Dictionary] = []
+	for cell in road_path_network.get_road_cells():
+		if player_built_road_cells.has(cell):
+			saved_player_roads.append({"x": cell.x, "y": cell.y})
 	return {
 		"plot_states": plot_states.duplicate(true),
 		"baba_home_repaired": baba_home_repaired,
-		"road_network": road_path_network.get_save_data()
+		"road_network": road_path_network.get_save_data(),
+		"player_built_road_cells": saved_player_roads
 	}
 
 func load_save_data(data: Dictionary) -> void:
 	var road_data: Variant = data.get("road_network", {})
 	if road_data is Dictionary and not road_data.is_empty():
 		road_path_network.load_save_data(road_data)
+	player_built_road_cells.clear()
+	var saved_player_roads: Variant = data.get("player_built_road_cells", [])
+	if data.has("player_built_road_cells") and saved_player_roads is Array:
+		for entry in saved_player_roads:
+			if entry is Dictionary:
+				var cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
+				if road_path_network.is_road_cell(cell):
+					player_built_road_cells[cell] = true
+	else:
+		# M5.2 saves predate explicit ownership; infer non-starter segments safely.
+		for cell in road_path_network.get_road_cells():
+			if cell.y != 3 and cell.x != 4:
+				player_built_road_cells[cell] = true
 	var saved_plots: Variant = data.get("plot_states", [])
 	if saved_plots is Array and saved_plots.size() == PLOT_CELLS.size():
 		plot_states.clear()
