@@ -15,10 +15,17 @@ const SERVICES := [
 var employees: Dictionary = {}
 var last_payroll_day: int = 1
 var unpaid_wages: int = 0
+var work_orders_completed: Dictionary = {}
+var last_work_day: Dictionary = {}
+var total_work_spent: Dictionary = {}
 
 func _init() -> void:
 	for service in SERVICES:
-		employees[str(service["id"])] = 0
+		var service_id := str(service["id"])
+		employees[service_id] = 0
+		work_orders_completed[service_id] = 0
+		last_work_day[service_id] = 0
+		total_work_spent[service_id] = 0
 
 func get_service_definitions() -> Array:
 	return SERVICES.duplicate(true)
@@ -55,6 +62,29 @@ func get_total_daily_payroll() -> int:
 
 func get_unpaid_wages() -> int:
 	return unpaid_wages
+
+func get_work_orders_completed(service_id: String) -> int:
+	return int(work_orders_completed.get(service_id, 0))
+
+func get_last_work_day(service_id: String) -> int:
+	return int(last_work_day.get(service_id, 0))
+
+func get_total_work_spent(service_id: String) -> int:
+	return int(total_work_spent.get(service_id, 0))
+
+func get_total_work_orders_completed() -> int:
+	var total := 0
+	for service_id in work_orders_completed:
+		total += int(work_orders_completed[service_id])
+	return total
+
+func record_work_order(service_id: String, day: int, cost: int) -> bool:
+	if _get_definition(service_id).is_empty() or get_employee_count(service_id) <= 0:
+		return false
+	work_orders_completed[service_id] = get_work_orders_completed(service_id) + 1
+	last_work_day[service_id] = maxi(1, day)
+	total_work_spent[service_id] = get_total_work_spent(service_id) + maxi(0, cost)
+	return true
 
 func hire_employee(service_id: String, economy: EconomyService) -> bool:
 	var definition := _get_definition(service_id)
@@ -94,7 +124,10 @@ func get_save_data() -> Dictionary:
 	return {
 		"employees": employees.duplicate(true),
 		"last_payroll_day": last_payroll_day,
-		"unpaid_wages": unpaid_wages
+		"unpaid_wages": unpaid_wages,
+		"work_orders_completed": work_orders_completed.duplicate(true),
+		"last_work_day": last_work_day.duplicate(true),
+		"total_work_spent": total_work_spent.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -105,6 +138,14 @@ func load_save_data(data: Dictionary) -> void:
 		employees[service_id] = clampi(saved_count, 0, MAX_EMPLOYEES_PER_SERVICE)
 	last_payroll_day = maxi(1, int(data.get("last_payroll_day", 1)))
 	unpaid_wages = maxi(0, int(data.get("unpaid_wages", 0)))
+	var saved_work_orders: Variant = data.get("work_orders_completed", {})
+	var saved_last_work_day: Variant = data.get("last_work_day", {})
+	var saved_work_spent: Variant = data.get("total_work_spent", {})
+	for service in SERVICES:
+		var service_id := str(service["id"])
+		work_orders_completed[service_id] = maxi(0, int(saved_work_orders.get(service_id, 0))) if saved_work_orders is Dictionary else 0
+		last_work_day[service_id] = maxi(0, int(saved_last_work_day.get(service_id, 0))) if saved_last_work_day is Dictionary else 0
+		total_work_spent[service_id] = maxi(0, int(saved_work_spent.get(service_id, 0))) if saved_work_spent is Dictionary else 0
 
 func _get_definition(service_id: String) -> Dictionary:
 	for service in SERVICES:
