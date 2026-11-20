@@ -998,6 +998,8 @@ func can_build_road_cell(cell: Vector2i) -> bool:
 		return false
 	if PLOT_CELLS.has(cell):
 		return false
+	if cell.x >= 9 and not is_plot_unlocked(EAST_QUARTER_PLOT_START):
+		return false
 	if cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5), Vector2i(5, 5)]:
 		return false
 	return true
