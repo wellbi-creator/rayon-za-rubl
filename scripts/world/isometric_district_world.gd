@@ -28,6 +28,7 @@ var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
 var player_built_road_cells: Dictionary = {}
 var road_lamp_cells: Dictionary = {}
+var business_plots: Dictionary = {}
 var road_build_mode := false
 var road_edit_action := "build"
 var road_preview_cell := Vector2i(-1, -1)
@@ -416,8 +417,30 @@ func _draw_plot(plot_id: int) -> void:
 			_draw_construction(center, float(state.get("progress", 0.0)))
 		"built":
 			_draw_house(center, true)
+			if business_plots.has(plot_id):
+				_draw_shop_sign(center, bool(business_plots[plot_id]))
 		_:
 			_draw_garden(center)
+
+func _draw_shop_sign(ground: Vector2, active: bool) -> void:
+	var sign_color := Color("#e0bd70") if active else Color("#8b9389")
+	var sign_text_color := Color("#354638") if active else Color("#343b38")
+	var sign_origin := ground + Vector2(7, -52)
+	# A small timber-framed sign and striped awning distinguish a shop from a home.
+	draw_line(sign_origin + Vector2(4, 10), sign_origin + Vector2(4, 17), Color("#614a36"), 2.0)
+	draw_line(sign_origin + Vector2(25, 10), sign_origin + Vector2(25, 17), Color("#614a36"), 2.0)
+	draw_rect(Rect2(sign_origin - Vector2(2, 2), Vector2(33, 14)), Color("#493d31"), true)
+	draw_rect(Rect2(sign_origin, Vector2(29, 10)), sign_color, true)
+	draw_rect(Rect2(sign_origin + Vector2(1, 1), Vector2(27, 8)), sign_color.lightened(0.12), false, 1.0)
+	draw_string(ThemeDB.fallback_font, sign_origin + Vector2(2, 7.5), "МАГАЗИН", HORIZONTAL_ALIGNMENT_LEFT, 26.0, 6, sign_text_color)
+	var awning_origin := ground + Vector2(3, -23)
+	draw_colored_polygon(PackedVector2Array([
+		awning_origin, awning_origin + Vector2(17, 8),
+		awning_origin + Vector2(17, 13), awning_origin + Vector2(0, 5)
+	]), Color("#9b5d4d") if active else Color("#777d78"))
+	draw_line(awning_origin + Vector2(4, 2), awning_origin + Vector2(4, 8), Color("#f0d8ad", 0.85), 1.2)
+	draw_line(awning_origin + Vector2(11, 5), awning_origin + Vector2(11, 11), Color("#f0d8ad", 0.85), 1.2)
+
 
 func _draw_house(ground: Vector2, repaired: bool) -> void:
 	# Footprint shadow and two facade planes; the base point stays on the plot cell.
@@ -889,6 +912,10 @@ func set_weather(value: String) -> void:
 
 func set_resident_groups(groups: Array) -> void:
 	resident_groups = groups.duplicate(true)
+	queue_redraw()
+
+func set_business_plots(entries: Dictionary) -> void:
+	business_plots = entries.duplicate(true)
 	queue_redraw()
 
 func set_transport_entries(entries: Array) -> void:
