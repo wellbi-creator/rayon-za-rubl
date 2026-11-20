@@ -15,6 +15,10 @@ const RESIDENT_CUSTOMER_BONUS := 3
 const REPUTATION_CUSTOMER_BONUS := 0.2
 const SATISFACTION_CUSTOMER_BONUS := 0.1
 const SUPPORTED_BUSINESS := "corner_shop"
+const BUSINESS_UPGRADE_COSTS := [35000, 75000]
+const BUSINESS_UPGRADE_DAILY_COST := 500
+const BUSINESS_BASE_ATTRACTION := 100
+const BUSINESS_UPGRADE_ATTRACTION := 25
 
 var businesses: Dictionary = {}
 var last_processed_day: int = 1
@@ -34,6 +38,40 @@ func get_business_type_title(business_type: String) -> String:
 
 func get_business_type_ids() -> Array[String]:
 	return ["corner_shop", "bakery", "cafe"]
+
+func get_business_upgrade_level(plot_id: int) -> int:
+	var business := get_business(plot_id)
+	return clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size())
+
+func get_business_upgrade_cost(plot_id: int) -> int:
+	var level := get_business_upgrade_level(plot_id)
+	if level >= BUSINESS_UPGRADE_COSTS.size():
+		return 0
+	return int(BUSINESS_UPGRADE_COSTS[level])
+
+func get_business_daily_expenses(plot_id: int) -> int:
+	var business := get_business(plot_id)
+	if business.is_empty():
+		return 0
+	var business_type := str(business.get("type", SUPPORTED_BUSINESS))
+	var upgrade_level := get_business_upgrade_level(plot_id)
+	return get_daily_expenses(business_type) + upgrade_level * BUSINESS_UPGRADE_DAILY_COST
+
+func purchase_business_upgrade(plot_id: int, economy: EconomyService) -> bool:
+	if economy == null or not businesses.has(plot_id):
+		return false
+	var upgrade_level := get_business_upgrade_level(plot_id)
+	var upgrade_cost := get_business_upgrade_cost(plot_id)
+	if upgrade_cost <= 0 or not economy.try_spend(upgrade_cost, "Улучшение заведения"):
+		return false
+	var business: Dictionary = businesses[plot_id]
+	business["upgrade_level"] = upgrade_level + 1
+	businesses[plot_id] = business
+	return true
+
+func _get_business_attraction_weight(business: Dictionary) -> int:
+	var upgrade_level := clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size())
+	return BUSINESS_BASE_ATTRACTION + upgrade_level * BUSINESS_UPGRADE_ATTRACTION
 
 func get_daily_revenue() -> int:
 	return DAILY_REVENUE
@@ -86,6 +124,7 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 		return false
 	businesses[plot_id] = {
 		"type": business_type,
+		"upgrade_level": 0,
 		"active": true,
 		"opened_day": last_processed_day,
 		"last_daily_customers": BASE_DAILY_CUSTOMERS,
@@ -117,12 +156,26 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 	var active_count := active_plot_ids.size()
 	if active_count > 0:
 		var total_daily_customers := get_daily_customer_count(resident_count, average_satisfaction, reputation, weather_id)
-		var customers_per_store := int(total_daily_customers / active_count)
-		var extra_customers := total_daily_customers % active_count
+		var total_weight := 0
+		for plot_id in active_plot_ids:
+			total_weight += _get_business_attraction_weight(businesses[plot_id])
+		var allocated_customers := 0
+		var customer_allocations: Dictionary = {}
+		for plot_id in active_plot_ids:
+			var weight := _get_business_attraction_weight(businesses[plot_id])
+			var allocated := floori(float(total_daily_customers * weight) / float(maxi(1, total_weight)))
+			customer_allocations[plot_id] = allocated
+			allocated_customers += allocated
+		var remaining_customers := total_daily_customers - allocated_customers
+		for plot_id in active_plot_ids:
+			if remaining_customers <= 0:
+				break
+			customer_allocations[plot_id] = int(customer_allocations[plot_id]) + 1
+			remaining_customers -= 1
 		var total_daily_revenue := 0
 		for index in range(active_count):
 			var plot_id := active_plot_ids[index]
-			var store_customers := customers_per_store + (1 if index < extra_customers else 0)
+			var store_customers := int(customer_allocations.get(plot_id, 0))
 			var business: Dictionary = businesses[plot_id]
 			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
 			var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
@@ -135,7 +188,7 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 		var daily_expenses := 0
 		for plot_id in active_plot_ids:
 			var business: Dictionary = businesses[plot_id]
-			daily_expenses += get_daily_expenses(str(business.get("type", SUPPORTED_BUSINESS)))
+			daily_expenses += get_daily_expenses(str(business.get("type", SUPPORTED_BUSINESS))) + get_business_upgrade_level(plot_id) * BUSINESS_UPGRADE_DAILY_COST
 		unpaid_operating_costs += daily_expenses * elapsed_days
 	if unpaid_operating_costs > 0 and economy.balance > 0:
 		var payment := mini(unpaid_operating_costs, economy.balance)
@@ -150,6 +203,7 @@ func get_save_data() -> Dictionary:
 		saved_businesses.append({
 			"plot_id": int(key),
 			"type": str(business.get("type", SUPPORTED_BUSINESS)),
+			"upgrade_level": clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(business.get("active", false)),
 			"opened_day": maxi(1, int(business.get("opened_day", 1))),
 			"last_daily_customers": maxi(0, int(business.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),
@@ -177,6 +231,7 @@ func load_save_data(data: Dictionary) -> void:
 			continue
 		businesses[plot_id] = {
 			"type": business_type,
+			"upgrade_level": clampi(int(entry.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size()),
 			"active": bool(entry.get("active", false)),
 			"opened_day": maxi(1, int(entry.get("opened_day", 1))),
 			"last_daily_customers": maxi(0, int(entry.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),

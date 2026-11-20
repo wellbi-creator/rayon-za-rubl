@@ -39,6 +39,7 @@ var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
 var business_button: Button
+var business_upgrade_button: Button
 var business_type_selector: OptionButton
 var business_status_label: Label
 var household_actions_heading: Label
@@ -405,6 +406,15 @@ func _create_interface() -> void:
 	business_button.pressed.connect(_on_business_action_pressed)
 	business_button.visible = false
 	content.add_child(business_button)
+
+	business_upgrade_button = Button.new()
+	business_upgrade_button.text = "Улучшить заведение"
+	business_upgrade_button.custom_minimum_size = Vector2(0, 36)
+	business_upgrade_button.add_theme_font_size_override("font_size", 11)
+	business_upgrade_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cfca")))
+	business_upgrade_button.pressed.connect(_on_business_upgrade_pressed)
+	business_upgrade_button.visible = false
+	content.add_child(business_upgrade_button)
 
 	household_actions_heading = Label.new()
 	household_actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
@@ -1309,6 +1319,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	resident_button.visible = false
 	business_status_label.visible = false
 	business_button.visible = false
+	business_upgrade_button.visible = false
 	business_type_selector.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
@@ -1569,19 +1580,40 @@ func _on_plot_selected(plot_id: int) -> void:
 					var business_title := business_service.get_business_type_title(business_type)
 					var daily_customers := int(business.get("last_daily_customers", 80))
 					var daily_revenue := int(business.get("last_daily_revenue", business_service.get_daily_revenue()))
-					var daily_expenses := business_service.get_daily_expenses(business_type)
+					var upgrade_level := business_service.get_business_upgrade_level(plot_id)
+					var daily_expenses := business_service.get_business_daily_expenses(plot_id)
 					var daily_profit := daily_revenue - daily_expenses
-					business_status_label.text = "%s • %s\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
+					business_status_label.text = "%s • %s\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
 						business_title.to_upper(),
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
+						upgrade_level,
 						daily_customers,
 						_format_money(daily_revenue),
 						_format_money(daily_expenses),
 						"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
 						_format_money(business_service.unpaid_operating_costs)
 					]
-					business_button.text = "Приостановить магазин" if active else "Возобновить магазин"
+					business_button.text = "Приостановить заведение" if active else "Возобновить заведение"
 					business_button.disabled = false
+					business_upgrade_button.visible = true
+					var next_upgrade_cost := business_service.get_business_upgrade_cost(plot_id)
+					if next_upgrade_cost > 0:
+						business_upgrade_button.text = "Улучшить привлекательность — ₽ %s" % _format_money(next_upgrade_cost)
+						business_upgrade_button.disabled = economy.balance < next_upgrade_cost
+					else:
+						business_upgrade_button.text = "Максимальная привлекательность"
+						business_upgrade_button.disabled = true
+
+func _on_business_upgrade_pressed() -> void:
+	if selected_plot_id < 1:
+		return
+	if not business_service.purchase_business_upgrade(selected_plot_id, economy):
+		status_label.text = "Не удалось улучшить заведение. Проверь баланс и уровень улучшения."
+		return
+	status_label.text = "Заведение улучшено! Его привлекательность выросла, а ежедневные расходы увеличились на 500 ₽."
+	_save_game()
+	_on_plot_selected(selected_plot_id)
+
 
 func _on_business_type_selected(index: int) -> void:
 	if index < 0 or index >= business_type_selector.item_count:
