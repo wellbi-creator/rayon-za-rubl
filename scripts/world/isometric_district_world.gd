@@ -74,16 +74,24 @@ func _process(delta: float) -> void:
 	camera.zoom = Vector2(zoom_value, zoom_value)
 	queue_redraw()
 
+func _get_demo_traffic_route(seed: int) -> Array[Vector2]:
+	var endpoints := road_path_network.get_road_endpoints()
+	var empty_route: Array[Vector2] = []
+	if endpoints.size() < 2:
+		return empty_route
+	var start_index := posmod(seed, endpoints.size())
+	var end_index := posmod(start_index + maxi(1, endpoints.size() / 2), endpoints.size())
+	if start_index == end_index:
+		end_index = (start_index + 1) % endpoints.size()
+	return get_transport_route(endpoints[start_index], endpoints[end_index])
+
 func _initialize_demo_traffic() -> void:
-	# Showcase traffic uses the road graph only; it never changes game or save data.
-	var horizontal_route := get_transport_route(Vector2i(0, 3), Vector2i(8, 3))
-	var vertical_route := get_transport_route(Vector2i(4, 0), Vector2i(4, 6))
-	if horizontal_route.size() >= 2:
-		_add_demo_vehicle(horizontal_route, 1, 48.0, Color("#c46f55"), 7.0, 0.0, 0)
-		_add_demo_vehicle(horizontal_route, -1, 44.0, Color("#5b8497"), 7.0, 1.2, 1)
-	if vertical_route.size() >= 2:
-		_add_demo_vehicle(vertical_route, 1, 42.0, Color("#d0a85e"), 7.0, 0.6, 2)
-		_add_demo_vehicle(vertical_route, -1, 40.0, Color("#71917a"), 7.0, 1.8, 3)
+	# Vehicles travel between the current road network's terminal cells. Extending a
+	# branch moves its terminal, so traffic gradually adopts the new route on respawn.
+	_add_demo_vehicle(_get_demo_traffic_route(0), 1, 48.0, Color("#c46f55"), 7.0, 0.0, 0)
+	_add_demo_vehicle(_get_demo_traffic_route(1), -1, 44.0, Color("#5b8497"), 7.0, 1.2, 1)
+	_add_demo_vehicle(_get_demo_traffic_route(2), 1, 42.0, Color("#d0a85e"), 7.0, 0.6, 2)
+	_add_demo_vehicle(_get_demo_traffic_route(3), -1, 40.0, Color("#71917a"), 7.0, 1.8, 3)
 	_update_demo_traffic(0.0)
 
 func _add_demo_vehicle(route: Array[Vector2], direction: int, speed: float, body_color: Color, lane_offset: float, spawn_delay: float, seed: int) -> void:
@@ -143,6 +151,14 @@ func _update_demo_traffic(delta: float) -> void:
 			var respawn_timer := float(vehicle.get("respawn_timer", 0.0)) - delta
 			vehicle["respawn_timer"] = respawn_timer
 			if respawn_timer <= 0.0:
+				var refreshed_route := _get_demo_traffic_route(int(vehicle.get("spawn_seed", 0)))
+				if refreshed_route.size() < 2:
+					vehicle["respawn_timer"] = 1.0
+					continue
+				route = refreshed_route
+				route_length = _get_traffic_route_length(route)
+				vehicle["route"] = route
+				vehicle["route_length"] = route_length
 				vehicle["active"] = true
 				vehicle["distance"] = 0.0 if direction > 0 else route_length
 			else:
