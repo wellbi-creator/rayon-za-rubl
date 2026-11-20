@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/isometric_prototype_camera.gd" id="1_camera"]
 [ext_resource type="Script" path="res://scripts/world/construction_visuals_3d.gd" id="2_construction"]
@@ -17,6 +17,10 @@ roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="LotMat"]
 albedo_color = Color(0.69, 0.59, 0.42, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="RoadMarkingMat"]
+albedo_color = Color(0.92, 0.86, 0.68, 1)
 roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="FoundationMat"]
@@ -58,6 +62,12 @@ top_radius = 0.18
 bottom_radius = 0.25
 height = 1.8
 
+[sub_resource type="SphereMesh" id="TreeCanopyMesh"]
+radius = 1.0
+height = 2.0
+radial_segments = 12
+rings = 8
+
 [node name="District3DPrototype" type="Node3D"]
 script = ExtResource("2_construction")
 
@@ -83,6 +93,66 @@ position = Vector3(0, 0.11, -6.45)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("SidewalkMat")
 scale = Vector3(40, 0.12, 0.65)
+
+[node name="MainRoadCenterDash01" type="MeshInstance3D" parent="."]
+position = Vector3(-70, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash02" type="MeshInstance3D" parent="."]
+position = Vector3(-56, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash03" type="MeshInstance3D" parent="."]
+position = Vector3(-42, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash04" type="MeshInstance3D" parent="."]
+position = Vector3(-21, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash05" type="MeshInstance3D" parent="."]
+position = Vector3(-7, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash06" type="MeshInstance3D" parent="."]
+position = Vector3(7, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash07" type="MeshInstance3D" parent="."]
+position = Vector3(21, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash08" type="MeshInstance3D" parent="."]
+position = Vector3(42, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash09" type="MeshInstance3D" parent="."]
+position = Vector3(56, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
+
+[node name="MainRoadCenterDash10" type="MeshInstance3D" parent="."]
+position = Vector3(70, 0.112, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.0, 0.025, 0.13)
 
 
 [node name="CrossStreetWest" type="MeshInstance3D" parent="."]
@@ -202,9 +272,15 @@ surface_material_override/0 = SubResource("TrunkMat")
 
 [node name="TreeLeavesA" type="MeshInstance3D" parent="."]
 position = Vector3(-7, 2.25, 8)
-mesh = SubResource("BoxMesh")
+mesh = SubResource("TreeCanopyMesh")
 surface_material_override/0 = SubResource("LeavesMat")
-scale = Vector3(2.1, 2.1, 2.1)
+scale = Vector3(1.55, 1.8, 1.55)
+
+[node name="TreeCanopyAUpper" type="MeshInstance3D" parent="."]
+position = Vector3(-7, 3.0, 8)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("LeavesMat")
+scale = Vector3(1.1, 1.25, 1.1)
 
 [node name="TreeTrunkB" type="MeshInstance3D" parent="."]
 position = Vector3(7, 0.95, 8)
@@ -213,9 +289,15 @@ surface_material_override/0 = SubResource("TrunkMat")
 
 [node name="TreeLeavesB" type="MeshInstance3D" parent="."]
 position = Vector3(7, 2.25, 8)
-mesh = SubResource("BoxMesh")
+mesh = SubResource("TreeCanopyMesh")
 surface_material_override/0 = SubResource("LeavesMat")
-scale = Vector3(2.1, 2.1, 2.1)
+scale = Vector3(1.55, 1.8, 1.55)
+
+[node name="TreeCanopyBUpper" type="MeshInstance3D" parent="."]
+position = Vector3(7, 3.0, 8)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("LeavesMat")
+scale = Vector3(1.1, 1.25, 1.1)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 position = Vector3(0, 34, 42)
