@@ -183,7 +183,10 @@ func get_business_visual_data() -> Dictionary:
 		result[int(key)] = {
 			"active": bool(business.get("active", false)),
 			"open_hour": int(schedule.get("open_hour", 8)),
-			"close_hour": int(schedule.get("close_hour", 20))
+			"close_hour": int(schedule.get("close_hour", 20)),
+			"type": str(business.get("type", SUPPORTED_BUSINESS)),
+			"upgrade_level": clampi(int(business.get("upgrade_level", 0)), 0, 2),
+			"leased": bool(business.get("leased", false))
 		}
 	return result
 
