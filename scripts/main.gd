@@ -2063,21 +2063,7 @@ func _on_plot_selected(plot_id: int) -> void:
 				var source_label := "Автономия" if str(event.get("source", "")) == "autonomous" else "Игрок"
 				history_lines.append("День %d, %02d:%02d — %s (%s)" % [int(event.get("day", 1)), int(event.get("hour", 0)), int(event.get("minute", 0)), str(event.get("description", "Событие")), source_label])
 			var history_summary := "\n".join(history_lines) if not history_lines.is_empty() else "Пока событий не было."
-			status_label.text = "Жителей: %d • %s\nСреднее по семье — Энергия %d%%  Еда %d%%  Гигиена %d%%\nДосуг %d%%  Комфорт дома %d%%\nНастроение %d%%  Довольство %d%%\nПоследнее действие (%s): %s\n\nЖурнал семьи (последние события):\n%s\n\nПо каждому жителю:\n%s" % [
-				int(current_family["members_count"]),
-				str(current_family.get("activity_label", "Дома")),
-				int(needs.get("energy", 75.0)),
-				int(needs.get("hunger", 80.0)),
-				int(needs.get("hygiene", 80.0)),
-				int(needs.get("leisure", 75.0)),
-				int(needs.get("home_comfort", 75.0)),
-				int(current_family.get("mood", 75)),
-				int(current_family.get("satisfaction", 75)),
-				action_source_label,
-				last_action,
-				history_summary,
-				member_summary
-			]
+			status_label.text = "Семья проживает в доме. Подробности доступны во вкладках профиля выше. Управление действиями и автономией — ниже."
 			build_button.text = "Дом заселён"
 		else:
 			plot_description.text = "Коробка дома построена. Проверь инженерные системы, отделку и обустройство, прежде чем заселять семью."
