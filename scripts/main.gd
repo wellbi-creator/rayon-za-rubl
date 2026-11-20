@@ -763,11 +763,13 @@ func _on_municipal_services_pressed() -> void:
 func _refresh_municipal_services() -> void:
 	if municipal_rows == null or municipal_services == null:
 		return
-	municipal_summary_label.text = "Работников: %d  •  зарплата за игровые сутки: ₽ %s  •  долг: ₽ %s  •  выполнено работ: %d" % [
+	municipal_summary_label.text = "Работников: %d  •  зарплата/сутки: ₽ %s  •  долг: ₽ %s  •  работ: %d  •  качество: %d%%  •  автослужб: %d" % [
 		municipal_services.get_total_employee_count(),
 		_format_money(municipal_services.get_total_daily_payroll()),
 		_format_money(municipal_services.get_unpaid_wages()),
-		municipal_services.get_total_work_orders_completed()
+		municipal_services.get_total_work_orders_completed(),
+		municipal_services.get_average_service_quality(),
+		municipal_services.get_automatic_maintenance_count()
 	]
 	for child in municipal_rows.get_children():
 		municipal_rows.remove_child(child)
@@ -790,11 +792,21 @@ func _refresh_municipal_services() -> void:
 		var last_work := municipal_services.get_last_work_day(service_id)
 		var work_status := "Последняя работа: день %d" % last_work if last_work > 0 else "Работ пока не было"
 		var work_spent := municipal_services.get_total_work_spent(service_id)
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, _format_money(daily_salary), work_count, work_status, _format_money(work_spent)]
+		var quality := municipal_services.get_service_quality_percent(service_id)
+		var maintenance_cost := municipal_services.get_maintenance_cost(service_id)
+		var maintenance_status := "ВКЛ • ₽ %s/работу" % _format_money(maintenance_cost) if municipal_services.is_automatic_maintenance_enabled(service_id) else "ВЫКЛ"
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
 		row.add_child(info)
+		var maintenance_button := Button.new()
+		maintenance_button.text = "Авто ВКЛ" if municipal_services.is_automatic_maintenance_enabled(service_id) else "Авто ВЫКЛ"
+		maintenance_button.custom_minimum_size = Vector2(82, 42)
+		maintenance_button.add_theme_font_size_override("font_size", 10)
+		maintenance_button.disabled = count <= 0
+		maintenance_button.pressed.connect(_on_municipal_maintenance_toggled.bind(service_id))
+		row.add_child(maintenance_button)
 		var fire_button := Button.new()
 		fire_button.text = "−"
 		fire_button.custom_minimum_size = Vector2(42, 42)
@@ -808,6 +820,16 @@ func _refresh_municipal_services() -> void:
 		hire_button.add_theme_font_size_override("font_size", 11)
 		hire_button.pressed.connect(_on_municipal_hire_pressed.bind(service_id))
 		row.add_child(hire_button)
+
+
+func _on_municipal_maintenance_toggled(service_id: String) -> void:
+	var enabled := not municipal_services.is_automatic_maintenance_enabled(service_id)
+	if municipal_services.set_automatic_maintenance_enabled(service_id, enabled):
+		municipal_status_label.text = "Автоматическое обслуживание %s." % ("включено" if enabled else "отключено")
+		_save_game()
+	else:
+		municipal_status_label.text = "Для автообслуживания сначала найми хотя бы одного работника."
+	_refresh_municipal_services()
 
 
 func _on_municipal_hire_pressed(service_id: String) -> void:
@@ -973,10 +995,11 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
+		var maintenance_processed := municipal_services.process_daily_maintenance(day, economy) if municipal_services != null else false
 		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
 		if event_spawned:
 			_show_district_event()
-		if upkeep_processed or payroll_processed or event_spawned or weather_processed or business_processed:
+		if upkeep_processed or payroll_processed or maintenance_processed or event_spawned or weather_processed or business_processed:
 			_save_game()
 		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
 			_show_district_event()
