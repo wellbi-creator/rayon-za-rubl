@@ -91,9 +91,11 @@ func get_save_data() -> Dictionary:
 	}
 
 func load_save_data(data: Dictionary) -> void:
+	var saved_employees: Variant = data.get("employees", {})
 	for service in SERVICES:
 		var service_id := str(service["id"])
-		employees[service_id] = clampi(int(data.get("employees", {}).get(service_id, 0)), 0, MAX_EMPLOYEES_PER_SERVICE)
+		var saved_count := int(saved_employees.get(service_id, 0)) if saved_employees is Dictionary else 0
+		employees[service_id] = clampi(saved_count, 0, MAX_EMPLOYEES_PER_SERVICE)
 	last_payroll_day = maxi(1, int(data.get("last_payroll_day", 1)))
 	unpaid_wages = maxi(0, int(data.get("unpaid_wages", 0)))
 
