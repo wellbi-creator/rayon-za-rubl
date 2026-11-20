@@ -123,6 +123,7 @@ func _ready() -> void:
 	_create_save_timer()
 	_load_game()
 	world.set_resident_groups(resident_service.get_resident_display_data())
+	world.set_business_plots(business_service.get_business_visual_data())
 	_update_balance()
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
@@ -1378,6 +1379,7 @@ func _on_business_action_pressed() -> void:
 		if not business_service.set_business_active(selected_plot_id, next_active):
 			return
 		status_label.text = "Магазин %s." % ("возобновил работу" if next_active else "приостановлен")
+	world.set_business_plots(business_service.get_business_visual_data())
 	_save_game()
 	_on_plot_selected(selected_plot_id)
 
