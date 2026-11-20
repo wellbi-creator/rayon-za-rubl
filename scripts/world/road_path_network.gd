@@ -10,6 +10,7 @@ var map_height: int = 0
 var horizontal_road_y: int = 0
 var vertical_road_x: int = 0
 var _road_cells: Dictionary = {}
+var _road_surfaces: Dictionary = {}
 
 func configure(width: int, height: int, road_y: int, road_x: int) -> void:
 	map_width = maxi(0, width)
@@ -17,12 +18,17 @@ func configure(width: int, height: int, road_y: int, road_x: int) -> void:
 	horizontal_road_y = road_y
 	vertical_road_x = road_x
 	_road_cells.clear()
+	_road_surfaces.clear()
 	if horizontal_road_y >= 0 and horizontal_road_y < map_height:
 		for x in range(map_width):
-			_road_cells[Vector2i(x, horizontal_road_y)] = true
+			var horizontal_cell := Vector2i(x, horizontal_road_y)
+			_road_cells[horizontal_cell] = true
+			_road_surfaces[horizontal_cell] = "standard"
 	if vertical_road_x >= 0 and vertical_road_x < map_width:
 		for y in range(map_height):
-			_road_cells[Vector2i(vertical_road_x, y)] = true
+			var vertical_cell := Vector2i(vertical_road_x, y)
+			_road_cells[vertical_cell] = true
+			_road_surfaces[vertical_cell] = "standard"
 
 func is_road_cell(cell: Vector2i) -> bool:
 	return _road_cells.has(cell)
@@ -39,6 +45,7 @@ func add_road_cell(cell: Vector2i) -> bool:
 	if not can_add_road_cell(cell):
 		return false
 	_road_cells[cell] = true
+	_road_surfaces[cell] = "standard"
 	return true
 
 func can_remove_road_cell(cell: Vector2i) -> bool:
@@ -52,6 +59,21 @@ func remove_road_cell(cell: Vector2i) -> bool:
 	if not can_remove_road_cell(cell):
 		return false
 	_road_cells.erase(cell)
+	_road_surfaces.erase(cell)
+	return true
+
+func get_road_surface_type(cell: Vector2i) -> String:
+	if not is_road_cell(cell):
+		return ""
+	return str(_road_surfaces.get(cell, "standard"))
+
+func can_upgrade_road_surface(cell: Vector2i) -> bool:
+	return is_road_cell(cell) and get_road_surface_type(cell) == "standard"
+
+func set_road_surface_type(cell: Vector2i, surface_type: String) -> bool:
+	if surface_type not in ["standard", "asphalt"] or not is_road_cell(cell):
+		return false
+	_road_surfaces[cell] = surface_type
 	return true
 
 func _get_road_neighbor_count(cell: Vector2i) -> int:
@@ -103,7 +125,11 @@ func get_road_endpoints() -> Array[Vector2i]:
 func get_save_data() -> Dictionary:
 	var saved_cells: Array[Dictionary] = []
 	for cell in get_road_cells():
-		saved_cells.append({"x": cell.x, "y": cell.y})
+		saved_cells.append({
+			"x": cell.x,
+			"y": cell.y,
+			"surface": get_road_surface_type(cell)
+		})
 	return {
 		"map_width": map_width,
 		"map_height": map_height,
@@ -117,16 +143,22 @@ func load_save_data(data: Dictionary) -> bool:
 	if saved_width != map_width or saved_height != map_height or not saved_cells is Array:
 		return false
 	var candidate_cells: Dictionary = {}
+	var candidate_surfaces: Dictionary = {}
 	for entry in saved_cells:
 		if not entry is Dictionary:
 			return false
 		var cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
 		if not is_cell_in_bounds(cell) or candidate_cells.has(cell):
 			return false
+		var surface := str(entry.get("surface", "standard"))
+		if surface not in ["standard", "asphalt"]:
+			return false
 		candidate_cells[cell] = true
+		candidate_surfaces[cell] = surface
 	if not _are_all_road_cells_connected(candidate_cells):
 		return false
 	_road_cells = candidate_cells
+	_road_surfaces = candidate_surfaces
 	return true
 
 func get_route(start_cell: Vector2i, end_cell: Vector2i, tile_size: Vector2 = Vector2(128.0, 64.0)) -> Array[Vector2]:

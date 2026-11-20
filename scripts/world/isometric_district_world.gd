@@ -319,13 +319,22 @@ func _draw_roads() -> void:
 		_draw_road_cell(cell)
 	if road_build_mode and road_preview_cell.x >= 0:
 		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
-		var preview_valid := can_remove_road_cell(road_preview_cell) if road_edit_action == "remove" else can_build_road_cell(road_preview_cell)
+		var preview_valid := false
+		if road_edit_action == "remove":
+			preview_valid = can_remove_road_cell(road_preview_cell)
+		elif road_edit_action == "upgrade":
+			preview_valid = can_upgrade_road_surface(road_preview_cell)
+		else:
+			preview_valid = can_build_road_cell(road_preview_cell)
 		var preview_color := Color("#d97870", 0.34)
 		var preview_outline := Color("#ffc0b7")
 		if preview_valid:
 			if road_edit_action == "remove":
 				preview_color = Color("#e6b56f", 0.38)
 				preview_outline = Color("#ffe0a8")
+			elif road_edit_action == "upgrade":
+				preview_color = Color("#78acd4", 0.4)
+				preview_outline = Color("#b8e0ff")
 			else:
 				preview_color = Color("#8bd39b", 0.38)
 				preview_outline = Color("#c6f0c8")
@@ -351,16 +360,26 @@ func _draw_grass_detail(pos: Vector2) -> void:
 
 func _draw_road_cell(cell: Vector2i) -> void:
 	var center: Vector2 = Grid.grid_to_world(cell, TILE)
-	var road_base := Color("#c5bda7")
+	var is_asphalt := road_path_network.get_road_surface_type(cell) == "asphalt"
+	var road_base := Color("#929b98") if is_asphalt else Color("#c5bda7")
 	if weather_id in ["rain", "storm"]:
 		road_base = road_base.darkened(0.10 if weather_id == "rain" else 0.16)
 	elif weather_id == "snow":
 		road_base = road_base.lerp(Color("#e0e5e1"), 0.28)
+	var inner_road_color := Color("#303b40") if is_asphalt else Color("#59615f")
+	var inner_edge_color := Color("#aeb9b4") if is_asphalt else Color("#737c75")
 	_draw_diamond(center, TILE, road_base.lerp(Color("#626b68"), night_factor * 0.5), Color("#ded4bd"), 1.0)
-	_draw_diamond(center, TILE * Vector2(0.86, 0.82), Color("#59615f").lerp(Color("#303c43"), night_factor * 0.45), Color("#737c75"), 1.0)
+	_draw_diamond(center, TILE * Vector2(0.86, 0.82), inner_road_color.lerp(Color("#303c43"), night_factor * 0.45), inner_edge_color, 1.0)
 	var curb_color := Color("#d8cdb4").lerp(Color("#82908c"), night_factor * 0.6)
 	draw_line(center + Vector2(-52, -2), center + Vector2(0, 25), curb_color, 1.4)
 	draw_line(center + Vector2(0, 25), center + Vector2(52, -2), curb_color, 1.4)
+	if is_asphalt:
+		var horizontal := road_path_network.is_road_cell(cell + Vector2i(-1, 0)) or road_path_network.is_road_cell(cell + Vector2i(1, 0))
+		var vertical := road_path_network.is_road_cell(cell + Vector2i(0, -1)) or road_path_network.is_road_cell(cell + Vector2i(0, 1))
+		if horizontal:
+			draw_line(center + Vector2(-12, 0), center + Vector2(12, 0), Color("#e8dfbd", 0.82), 1.4)
+		if vertical:
+			draw_line(center + Vector2(0, -6), center + Vector2(0, 6), Color("#e8dfbd", 0.82), 1.4)
 
 func _draw_environment() -> void:
 	for cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
@@ -877,7 +896,7 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 
 func set_road_build_mode(enabled: bool, action: String = "build") -> void:
 	road_build_mode = enabled
-	road_edit_action = "remove" if action == "remove" else "build"
+	road_edit_action = action if action in ["build", "remove", "upgrade"] else "build"
 	road_preview_cell = Vector2i(-1, -1)
 	queue_redraw()
 
@@ -912,6 +931,17 @@ func add_road_cell(cell: Vector2i) -> bool:
 
 func can_remove_road_cell(cell: Vector2i) -> bool:
 	return road_path_network != null and road_path_network.can_remove_road_cell(cell)
+
+func can_upgrade_road_surface(cell: Vector2i) -> bool:
+	return road_path_network != null and road_path_network.can_upgrade_road_surface(cell)
+
+func upgrade_road_surface(cell: Vector2i) -> bool:
+	if not can_upgrade_road_surface(cell):
+		return false
+	var upgraded := road_path_network.set_road_surface_type(cell, "asphalt")
+	if upgraded:
+		queue_redraw()
+	return upgraded
 
 func is_player_built_road_cell(cell: Vector2i) -> bool:
 	return player_built_road_cells.has(cell)
