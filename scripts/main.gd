@@ -983,7 +983,12 @@ func _refresh_municipal_services() -> void:
 		var maintenance_status := "ВКЛ • ₽ %s/работу" % _format_money(maintenance_cost) if municipal_services.is_automatic_maintenance_enabled(service_id) else "ВЫКЛ"
 		var assigned_zones := municipal_services.get_service_zone_plot_ids(service_id)
 		var equipment_level := municipal_services.get_equipment_level(service_id)
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nТехника: уровень %d (+%d%%)  •  Зоны: %d/%d\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, equipment_level, equipment_level * MunicipalServicesService.EQUIPMENT_EFFICIENCY_PER_LEVEL, assigned_zones.size(), count, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
+		var wages_accrued := municipal_services.get_total_wages_accrued(service_id)
+		var wages_paid := municipal_services.get_total_wages_paid(service_id)
+		var wages_unpaid := municipal_services.get_unpaid_wages_for_service(service_id)
+		var equipment_spent := municipal_services.get_total_equipment_spent(service_id)
+		var maintenance_spent := municipal_services.get_total_maintenance_spent(service_id)
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nТехника: уровень %d (+%d%%)  •  Зоны: %d/%d\nЗарплата: ₽ %s/день\nЗарплата всего: начислено ₽ %s  •  выплачено ₽ %s  •  долг ₽ %s\nОборудование: ₽ %s  •  обслуживание: ₽ %s\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, equipment_level, equipment_level * MunicipalServicesService.EQUIPMENT_EFFICIENCY_PER_LEVEL, assigned_zones.size(), count, _format_money(daily_salary), _format_money(wages_accrued), _format_money(wages_paid), _format_money(wages_unpaid), _format_money(equipment_spent), _format_money(maintenance_spent), maintenance_status, work_count, work_status, _format_money(work_spent)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
