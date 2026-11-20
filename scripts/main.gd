@@ -852,20 +852,22 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		game_time_label.text = "День %d  •  %02d:%02d" % [day, hour, minute]
 	if world != null:
 		world.set_time_of_day(hour, minute)
-	if resident_service != null:
+	var weather_processed := false
+	if not is_loading_game and weather_service != null:
+		weather_processed = weather_service.process_day(day)
+	_apply_weather_state()
+	if not is_loading_game and resident_service != null:
 		resident_service.update_time(hour, minute, day)
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
 		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
-		var weather_changed := weather_service.process_day(day) if weather_service != null else false
 		if event_spawned:
 			_show_district_event()
-		if upkeep_processed or payroll_processed or event_spawned or weather_changed:
+		if upkeep_processed or payroll_processed or event_spawned or weather_processed:
 			_save_game()
 		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
 			_show_district_event()
-	_apply_weather_state()
 
 func _apply_weather_state() -> void:
 	if weather_service == null:
@@ -875,6 +877,8 @@ func _apply_weather_state() -> void:
 	if world != null:
 		world.set_season(weather_service.season_id)
 		world.set_weather(weather_service.weather_id)
+	if resident_service != null:
+		resident_service.set_environment(weather_service.season_id, weather_service.weather_id)
 
 
 func _on_balance_changed(_new_balance: int) -> void:
