@@ -7,6 +7,7 @@ const ConstructionServiceScript = preload("res://scripts/systems/construction_se
 const MoveInServiceScript = preload("res://scripts/systems/move_in_service.gd")
 const ResidentServiceScript = preload("res://scripts/systems/resident_service.gd")
 const GameTimeScript = preload("res://scripts/systems/game_time.gd")
+const DistrictUpkeepServiceScript = preload("res://scripts/systems/district_upkeep_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -17,6 +18,7 @@ var construction_service: ConstructionService
 var move_in_service: MoveInService
 var resident_service: ResidentService
 var game_time: GameTime
+var upkeep_service: DistrictUpkeepService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
@@ -38,6 +40,7 @@ var save_service: SaveService
 var save_timer: Timer
 var baba_notebook_opened: bool = false
 var baba_wiring_repaired: bool = false
+var is_loading_game: bool = false
 
 var balance_label: Label
 var plot_title: Label
@@ -53,6 +56,7 @@ var transaction_summary_label: Label
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
 	add_child(economy)
+	upkeep_service = DistrictUpkeepServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
@@ -458,6 +462,9 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		world.set_time_of_day(hour, minute)
 	if resident_service != null:
 		resident_service.update_time(hour, minute, day)
+	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
+		if upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy):
+			_save_game()
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
@@ -960,6 +967,7 @@ func _save_game() -> void:
 	var data := {
 		"balance": economy.balance,
 		"economy_transactions": economy.get_transaction_history(),
+		"district_upkeep": upkeep_service.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -974,6 +982,7 @@ func _load_game() -> void:
 	var data := save_service.load_game()
 	if data.is_empty():
 		return
+	is_loading_game = true
 	economy.set_balance(int(data.get("balance", 1000000)))
 	var transactions_data: Variant = data.get("economy_transactions", [])
 	if transactions_data is Array:
@@ -994,6 +1003,13 @@ func _load_game() -> void:
 	var game_time_data: Variant = data.get("game_time", {})
 	if game_time_data is Dictionary:
 		game_time.load_save_data(game_time_data, offline_seconds)
+	var upkeep_data: Variant = data.get("district_upkeep", {})
+	if upkeep_data is Dictionary and not upkeep_data.is_empty():
+		upkeep_service.load_save_data(upkeep_data)
+	else:
+		# Legacy saves start tracking from their current day; no retroactive charges.
+		upkeep_service.initialize_day(game_time.get_day())
+	is_loading_game = false
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
 	if construction_data is Dictionary and not construction_data.is_empty():
