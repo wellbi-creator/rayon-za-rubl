@@ -30,10 +30,13 @@ func is_road_cell(cell: Vector2i) -> bool:
 func is_cell_in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < map_width and cell.y < map_height
 
-func add_road_cell(cell: Vector2i) -> bool:
+func can_add_road_cell(cell: Vector2i) -> bool:
 	if not is_cell_in_bounds(cell) or is_road_cell(cell):
 		return false
-	if not _road_cells.is_empty() and _get_road_neighbor_count(cell) == 0:
+	return _road_cells.is_empty() or _get_road_neighbor_count(cell) > 0
+
+func add_road_cell(cell: Vector2i) -> bool:
+	if not can_add_road_cell(cell):
 		return false
 	_road_cells[cell] = true
 	return true
@@ -102,19 +105,17 @@ func load_save_data(data: Dictionary) -> bool:
 	var saved_cells: Variant = data.get("cells", [])
 	if saved_width != map_width or saved_height != map_height or not saved_cells is Array:
 		return false
-	var previous_cells := _road_cells.duplicate()
-	_road_cells.clear()
+	var candidate_cells: Dictionary = {}
 	for entry in saved_cells:
 		if not entry is Dictionary:
-			_road_cells = previous_cells
 			return false
 		var cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
-		if not add_road_cell(cell):
-			_road_cells = previous_cells
+		if not is_cell_in_bounds(cell) or candidate_cells.has(cell):
 			return false
-	if not _are_all_road_cells_connected(_road_cells):
-		_road_cells = previous_cells
+		candidate_cells[cell] = true
+	if not _are_all_road_cells_connected(candidate_cells):
 		return false
+	_road_cells = candidate_cells
 	return true
 
 func get_route(start_cell: Vector2i, end_cell: Vector2i, tile_size: Vector2 = Vector2(128.0, 64.0)) -> Array[Vector2]:

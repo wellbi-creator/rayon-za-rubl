@@ -2,6 +2,7 @@ extends Node2D
 class_name DistrictWorld
 
 signal plot_selected(plot_id: int)
+signal road_cell_requested(cell: Vector2i)
 
 const Grid = preload("res://scripts/world/isometric_grid.gd")
 const RoadPathNetwork = preload("res://scripts/world/road_path_network.gd")
@@ -25,6 +26,8 @@ var transport_entries: Array[Dictionary] = []
 var _demo_transport_entries: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var road_path_network: RoadPathNetwork
+var road_build_mode := false
+var road_preview_cell := Vector2i(-1, -1)
 var baba_home_repaired := false
 var construction_animation_time := 0.0
 var pedestrian_time := 0.0
@@ -290,6 +293,12 @@ func _draw_roads() -> void:
 	# Rendering and pathfinding share one source of truth for road cells.
 	for cell in road_path_network.get_road_cells():
 		_draw_road_cell(cell)
+	if road_build_mode and road_preview_cell.x >= 0:
+		var preview_center: Vector2 = Grid.grid_to_world(road_preview_cell, TILE)
+		var preview_valid := can_build_road_cell(road_preview_cell)
+		var preview_color := Color("#8bd39b", 0.38) if preview_valid else Color("#d97870", 0.34)
+		var preview_outline := Color("#c6f0c8") if preview_valid else Color("#ffc0b7")
+		_draw_diamond(preview_center, TILE * Vector2(0.88, 0.76), preview_color, preview_outline, 3.0)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
 		var p: Vector2 = Grid.grid_to_world(Vector2i(x, 3), TILE)
@@ -707,8 +716,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom_at_screen_position(1.0 / 1.12, event.position)
 		elif event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_select_world_position(get_global_mouse_position())
-	elif event is InputEventMouseMotion and drag_active:
-		camera_target_position -= event.relative / camera.zoom.x
+	elif event is InputEventMouseMotion:
+		if road_build_mode:
+			_update_road_preview(get_global_mouse_position())
+		if drag_active:
+			camera_target_position -= event.relative / camera.zoom.x
 	elif event is InputEventScreenTouch:
 		if event.pressed:
 			touch_active = true
@@ -723,6 +735,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			touch_moved = true
 		if touch_moved:
 			camera_target_position -= event.relative / camera.zoom.x
+			if road_build_mode:
+				_update_road_preview(get_viewport().get_canvas_transform().affine_inverse() * event.position)
 	elif event is InputEventMagnifyGesture:
 		_zoom_at_screen_position(event.factor, get_viewport_rect().size * 0.5)
 	elif event is InputEventPanGesture:
@@ -778,6 +792,9 @@ func _select_world_position(world_position: Vector2) -> void:
 		return
 	if not Grid.is_inside_cell(world_position - center, TILE):
 		return
+	if road_build_mode:
+		road_cell_requested.emit(cell)
+		return
 	for plot_id in PLOT_CELLS.size():
 		if PLOT_CELLS[plot_id] == cell:
 			selected_plot = plot_id
@@ -823,10 +840,50 @@ func get_transport_route(start_road_cell: Vector2i, end_road_cell: Vector2i) -> 
 		return []
 	return road_path_network.get_route(start_road_cell, end_road_cell, TILE)
 
+func set_road_build_mode(enabled: bool) -> void:
+	road_build_mode = enabled
+	road_preview_cell = Vector2i(-1, -1)
+	queue_redraw()
+
+func _update_road_preview(world_position: Vector2) -> void:
+	if not road_build_mode:
+		return
+	var cell: Vector2i = Grid.world_to_grid(world_position, TILE)
+	var center: Vector2 = Grid.grid_to_world(cell, TILE)
+	if cell.x < 0 or cell.x >= MAP_WIDTH or cell.y < 0 or cell.y >= MAP_HEIGHT or not Grid.is_inside_cell(world_position - center, TILE):
+		road_preview_cell = Vector2i(-1, -1)
+	else:
+		road_preview_cell = cell
+	queue_redraw()
+
+func can_build_road_cell(cell: Vector2i) -> bool:
+	if road_path_network == null or not road_path_network.can_add_road_cell(cell):
+		return false
+	if PLOT_CELLS.has(cell):
+		return false
+	if cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5), Vector2i(5, 5)]:
+		return false
+	return true
+
+func add_road_cell(cell: Vector2i) -> bool:
+	if not can_build_road_cell(cell):
+		return false
+	var added := road_path_network.add_road_cell(cell)
+	if added:
+		queue_redraw()
+	return added
+
 func get_save_data() -> Dictionary:
-	return {"plot_states": plot_states.duplicate(true), "baba_home_repaired": baba_home_repaired}
+	return {
+		"plot_states": plot_states.duplicate(true),
+		"baba_home_repaired": baba_home_repaired,
+		"road_network": road_path_network.get_save_data()
+	}
 
 func load_save_data(data: Dictionary) -> void:
+	var road_data: Variant = data.get("road_network", {})
+	if road_data is Dictionary and not road_data.is_empty():
+		road_path_network.load_save_data(road_data)
 	var saved_plots: Variant = data.get("plot_states", [])
 	if saved_plots is Array and saved_plots.size() == PLOT_CELLS.size():
 		plot_states.clear()

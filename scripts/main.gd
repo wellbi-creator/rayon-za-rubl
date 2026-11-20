@@ -15,6 +15,7 @@ const WeatherServiceScript = preload("res://scripts/systems/weather_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
+const ROAD_CELL_COST := 5000
 
 var world: DistrictWorld
 var selected_plot_id: int = -1
@@ -74,6 +75,8 @@ var district_event_description_label: Label
 var district_event_choices: VBoxContainer
 var district_event_status_label: Label
 var weather_label: Label
+var road_tool_button: Button
+var road_tool_status_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -104,6 +107,7 @@ func _ready() -> void:
 	world = DistrictWorldScript.new()
 	add_child(world)
 	world.plot_selected.connect(_on_plot_selected)
+	world.road_cell_requested.connect(_on_road_cell_requested)
 	_create_interface()
 	_create_save_timer()
 	_load_game()
@@ -224,6 +228,21 @@ func _create_interface() -> void:
 	progression_button.add_theme_stylebox_override("normal", _button_style(Color("#d5c4a1")))
 	progression_button.pressed.connect(_on_progression_pressed)
 	management_buttons.add_child(progression_button)
+	road_tool_button = Button.new()
+	road_tool_button.text = "ДОРОГИ"
+	road_tool_button.custom_minimum_size = Vector2(0, 40)
+	road_tool_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	road_tool_button.add_theme_font_size_override("font_size", 10)
+	road_tool_button.add_theme_stylebox_override("normal", _button_style(Color("#b8c7c0")))
+	road_tool_button.pressed.connect(_on_road_tool_pressed)
+	management_buttons.add_child(road_tool_button)
+
+	road_tool_status_label = Label.new()
+	road_tool_status_label.text = "Дороги: 5 000 ₽ за клетку. Включи режим, чтобы строить."
+	road_tool_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	road_tool_status_label.add_theme_font_size_override("font_size", 11)
+	road_tool_status_label.add_theme_color_override("font_color", Color("#d9e6c8"))
+	content.add_child(road_tool_status_label)
 
 	plot_title = Label.new()
 	plot_title.text = "Выбери участок"
@@ -925,6 +944,29 @@ func _show_empty_selection() -> void:
 	plot_description.text = "Нажми на участок на карте, чтобы посмотреть доступные действия."
 	status_label.text = "Район ждёт своего восстановления."
 	build_button.disabled = true
+
+func _on_road_tool_pressed() -> void:
+	var enabled := not world.road_build_mode
+	world.set_road_build_mode(enabled)
+	road_tool_button.text = "ЗАКРЫТЬ" if enabled else "ДОРОГИ"
+	road_tool_status_label.text = "Режим строительства: нажимай на подсвеченные клетки. Цена — 5 000 ₽ за клетку." if enabled else "Режим строительства дорог выключен."
+
+func _on_road_cell_requested(cell: Vector2i) -> void:
+	if not world.road_build_mode:
+		return
+	if not world.can_build_road_cell(cell):
+		road_tool_status_label.text = "Здесь нельзя построить дорогу: выбери свободную клетку рядом с существующей сетью."
+		return
+	if not economy.try_spend(ROAD_CELL_COST, "Прокладка дороги"):
+		road_tool_status_label.text = "Недостаточно средств. Нужно %s ₽." % _format_money(ROAD_CELL_COST)
+		return
+	if not world.add_road_cell(cell):
+		economy.add_money(ROAD_CELL_COST, "Возврат за отменённую прокладку дороги")
+		road_tool_status_label.text = "Не удалось добавить дорогу. Деньги возвращены."
+		return
+	progression_service.add_progress(5, 0, "Построен участок дорожной сети")
+	road_tool_status_label.text = "Дорога построена! −%s ₽. Можно продолжать." % _format_money(ROAD_CELL_COST)
+	_save_game()
 
 func _on_plot_selected(plot_id: int) -> void:
 	selected_plot_id = plot_id
