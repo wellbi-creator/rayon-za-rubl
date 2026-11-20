@@ -648,6 +648,8 @@ func _show_district_event() -> void:
 	var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, 5)
 	var target_plot_name := world.get_plot_name(target_plot_id) if world != null else "Участок района"
 	district_event_description_label.text += "\n\nЗона происшествия: %s" % target_plot_name
+	var event_service_id := str(event.get("service_id", ""))
+	var can_dispatch_staff := municipal_services != null and municipal_services.is_plot_assigned_to_service(event_service_id, target_plot_id)
 	district_event_status_label.text = "День %d" % int(event.get("created_day", game_time.get_day()))
 	for child in district_event_choices.get_children():
 		district_event_choices.remove_child(child)
@@ -658,10 +660,6 @@ func _show_district_event() -> void:
 		var choice_id := str(choice.get("id", ""))
 		var cost := district_event_service.get_choice_cost(choice_id, municipal_services)
 		var button := Button.new()
-		var service_id := str(event.get("service_id", ""))
-		var service_staff_count := municipal_services.get_employee_count(service_id) if municipal_services != null else 0
-		var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, 5)
-		var can_dispatch_staff := municipal_services != null and municipal_services.is_plot_assigned_to_service(service_id, target_plot_id)
 		var service_action := int(choice.get("cost", 0)) > 0
 		var action_label := str(choice.get("label", "Выбрать"))
 		if service_action:
@@ -872,6 +870,7 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	save_button.text = "Сохранить зоны"
 	save_button.pressed.connect(_save_municipal_service_zones.bind(service_id, zone_checkboxes, popup))
 	layout.add_child(save_button)
+	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
 	popup.popup_centered(Vector2i(380, 430))
 
