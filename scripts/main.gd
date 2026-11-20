@@ -16,6 +16,7 @@ const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
 const ROAD_CELL_COST := 5000
+const ROAD_REMOVAL_REFUND := 2500
 
 var world: DistrictWorld
 var selected_plot_id: int = -1
@@ -76,6 +77,7 @@ var district_event_choices: VBoxContainer
 var district_event_status_label: Label
 var weather_label: Label
 var road_tool_button: Button
+var road_remove_button: Button
 var road_tool_status_label: Label
 
 func _ready() -> void:
@@ -236,6 +238,14 @@ func _create_interface() -> void:
 	road_tool_button.add_theme_stylebox_override("normal", _button_style(Color("#b8c7c0")))
 	road_tool_button.pressed.connect(_on_road_tool_pressed)
 	management_buttons.add_child(road_tool_button)
+	road_remove_button = Button.new()
+	road_remove_button.text = "СНЕСТИ"
+	road_remove_button.custom_minimum_size = Vector2(0, 40)
+	road_remove_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	road_remove_button.add_theme_font_size_override("font_size", 10)
+	road_remove_button.add_theme_stylebox_override("normal", _button_style(Color("#d6a17f")))
+	road_remove_button.pressed.connect(_on_road_remove_pressed)
+	management_buttons.add_child(road_remove_button)
 
 	road_tool_status_label = Label.new()
 	road_tool_status_label.text = "Дороги: 5 000 ₽ за клетку. Включи режим, чтобы строить."
@@ -946,13 +956,32 @@ func _show_empty_selection() -> void:
 	build_button.disabled = true
 
 func _on_road_tool_pressed() -> void:
-	var enabled := not world.road_build_mode
-	world.set_road_build_mode(enabled)
+	var enabled := not world.road_build_mode or world.road_edit_action != "build"
+	world.set_road_build_mode(enabled, "build")
 	road_tool_button.text = "ЗАКРЫТЬ" if enabled else "ДОРОГИ"
-	road_tool_status_label.text = "Режим строительства: нажимай на подсвеченные клетки. Цена — 5 000 ₽ за клетку." if enabled else "Режим строительства дорог выключен."
+	road_remove_button.text = "СНЕСТИ"
+	road_tool_status_label.text = "Строительство: зелёная клетка — можно проложить дорогу. Цена — 5 000 ₽." if enabled else "Режим работы с дорогами выключен."
+
+func _on_road_remove_pressed() -> void:
+	var enabled := not world.road_build_mode or world.road_edit_action != "remove"
+	world.set_road_build_mode(enabled, "remove")
+	road_remove_button.text = "ЗАКРЫТЬ" if enabled else "СНЕСТИ"
+	road_tool_button.text = "ДОРОГИ"
+	road_tool_status_label.text = "Демонтаж: оранжевая клетка — можно снять сегмент. Возврат — 2 500 ₽." if enabled else "Режим работы с дорогами выключен."
 
 func _on_road_cell_requested(cell: Vector2i) -> void:
 	if not world.road_build_mode:
+		return
+	if world.road_edit_action == "remove":
+		if not world.can_remove_road_cell(cell):
+			road_tool_status_label.text = "Нельзя снять этот сегмент: он отсутствует или его удаление разорвёт дорожную сеть."
+			return
+		if not world.remove_road_cell(cell):
+			road_tool_status_label.text = "Не удалось демонтировать дорогу. Изменений нет."
+			return
+		economy.add_money(ROAD_REMOVAL_REFUND, "Возврат за демонтаж дороги")
+		road_tool_status_label.text = "Сегмент снят. Возвращено %s ₽." % _format_money(ROAD_REMOVAL_REFUND)
+		_save_game()
 		return
 	if not world.can_build_road_cell(cell):
 		road_tool_status_label.text = "Здесь нельзя построить дорогу: выбери свободную клетку рядом с существующей сетью."
