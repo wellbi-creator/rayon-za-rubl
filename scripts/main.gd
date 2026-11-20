@@ -907,17 +907,22 @@ func _on_municipal_equipment_pressed(service_id: String) -> void:
 	var level := municipal_services.get_equipment_level(service_id)
 	var bonus := level * MunicipalServicesService.EQUIPMENT_EFFICIENCY_PER_LEVEL
 	var heading := Label.new()
-	heading.text = "Оборудование: %s" % service_id
+	var service_label := service_id
+	for definition in municipal_services.get_service_definitions():
+		if str(definition["id"]) == service_id:
+			service_label = str(definition["label"])
+			break
+	heading.text = "Оборудование: %s" % service_label
 	heading.add_theme_color_override("font_color", Color("#f4d98d"))
 	layout.add_child(heading)
 	var details := Label.new()
-	details.text = "Уровень: %d/3\\nБонус к эффективности: +%d%%\\nДоплата к плановому обслуживанию: ₽ %d за сутки" % [level, bonus, level * MunicipalServicesService.EQUIPMENT_MAINTENANCE_PER_LEVEL]
+	details.text = "Уровень: %d/3\nБонус к эффективности: +%d%%\nДоплата к плановому обслуживанию: ₽ %d за сутки" % [level, bonus, level * MunicipalServicesService.EQUIPMENT_MAINTENANCE_PER_LEVEL]
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layout.add_child(details)
 	var cost := municipal_services.get_equipment_upgrade_cost(service_id)
 	var upgrade_button := Button.new()
 	upgrade_button.text = "Улучшить • ₽ %s" % _format_money(cost) if cost >= 0 else "Максимальный уровень"
-	upgrade_button.disabled = cost < 0 or economy.balance < cost
+	upgrade_button.disabled = cost < 0 or economy.balance < cost or municipal_services.get_employee_count(service_id) <= 0
 	if cost >= 0:
 		upgrade_button.pressed.connect(_on_municipal_equipment_upgrade_pressed.bind(service_id, popup))
 	layout.add_child(upgrade_button)
