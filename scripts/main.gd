@@ -11,7 +11,7 @@ const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
 
-var world: DistrictWorld
+var world
 var selected_plot_id: int = -1
 var construction_service: ConstructionService
 var move_in_service: MoveInService
@@ -72,7 +72,8 @@ func _ready() -> void:
 	_create_interface()
 	_create_save_timer()
 	_load_game()
-	world.set_resident_groups(resident_service.get_resident_display_data())
+	if is_instance_valid(world):
+		world.set_resident_groups(resident_service.get_resident_display_data())
 	_update_balance()
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
@@ -84,23 +85,24 @@ func _process(_delta: float) -> void:
 		return
 	var frame_info := "MAIN PROCESS ACTIVE  frame=%d  ticks=%d" % [Engine.get_process_frames(), Time.get_ticks_msec()]
 	if is_instance_valid(world):
-		render_diagnostic_label.text = frame_info + "\n" + world.get_render_diagnostic_text()
+		render_diagnostic_label.text = frame_info + "\n" + str(world.get_render_diagnostic_text())
 	else:
 		render_diagnostic_label.text = frame_info + "\nWORLD RECOVERY FAILED"
 
 func _ensure_world_node() -> void:
-	# The main scene owns DistrictWorld as a real child node. Prefer that
-	# scene-instantiated node; this avoids relying on runtime script creation
-	# during the first frame of the exported Web build.
+	# Resolve the scene-owned node by its attached script resource instead of
+	# relying on the global class_name registry in exported Web builds.
 	if is_instance_valid(world) and world.is_inside_tree():
 		_connect_world_signals()
 		return
 
-	var existing := get_node_or_null("DistrictWorld")
-	if existing is DistrictWorld:
-		world = existing as DistrictWorld
+	var existing: Node = get_node_or_null("DistrictWorld")
+	if existing != null and existing.get_script() == DistrictWorldScript:
+		world = existing
 	else:
-		var created_world := DistrictWorldScript.new() as DistrictWorld
+		if existing != null:
+			existing.queue_free()
+		var created_world: Node = DistrictWorldScript.new()
 		if created_world == null:
 			push_error("DistrictWorld script could not be instantiated.")
 			return
