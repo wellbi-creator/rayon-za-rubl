@@ -78,6 +78,17 @@ jobs:
           echo "=== Exported Web payload sizes ==="
           ls -lh build/web/index.html build/web/index.js build/web/index.wasm build/web/index.pck
 
+      - name: Export standalone 3D prototype Web preview
+        run: |
+          mkdir -p build/web/prototype
+          godot --headless --verbose --path . --export-release "3D Prototype Web" build/web/prototype/index.html 2>&1 | tee /tmp/godot-prototype-web-export.log
+          test -s build/web/prototype/index.html
+          test -s build/web/prototype/index.js
+          test -s build/web/prototype/index.wasm
+          test -s build/web/prototype/index.pck
+          echo "=== Exported 3D prototype payload sizes ==="
+          ls -lh build/web/prototype/index.html build/web/prototype/index.js build/web/prototype/index.wasm build/web/prototype/index.pck
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
