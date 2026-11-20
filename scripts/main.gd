@@ -68,9 +68,7 @@ func _ready() -> void:
 	add_child(construction_service)
 	construction_service.project_updated.connect(_on_construction_updated)
 	construction_service.project_completed.connect(_on_construction_completed)
-	world = DistrictWorldScript.new()
-	add_child(world)
-	world.plot_selected.connect(_on_plot_selected)
+	_ensure_world_node()
 	_create_interface()
 	_create_save_timer()
 	_load_game()
@@ -80,13 +78,34 @@ func _ready() -> void:
 	_show_empty_selection()
 
 func _process(_delta: float) -> void:
+	# Keep the world reference attached and recover the district if its node was freed.
+	_ensure_world_node()
 	if render_diagnostic_label == null:
 		return
 	var frame_info := "MAIN PROCESS ACTIVE  frame=%d  ticks=%d" % [Engine.get_process_frames(), Time.get_ticks_msec()]
-	if world != null:
+	if is_instance_valid(world):
 		render_diagnostic_label.text = frame_info + "\n" + world.get_render_diagnostic_text()
 	else:
-		render_diagnostic_label.text = frame_info + "\nWORLD NODE IS NULL"
+		render_diagnostic_label.text = frame_info + "\nWORLD RECOVERY FAILED"
+
+func _ensure_world_node() -> void:
+	if is_instance_valid(world) and world.is_inside_tree():
+		return
+
+	# First recover an already attached world instead of creating a duplicate.
+	var existing := get_node_or_null("DistrictWorld")
+	if existing is DistrictWorld and existing.is_inside_tree():
+		world = existing
+	else:
+		world = DistrictWorldScript.new()
+		world.name = "DistrictWorld"
+		add_child(world)
+		world.plot_selected.connect(_on_plot_selected)
+
+	if resident_service != null:
+		world.set_resident_groups(resident_service.get_resident_display_data())
+	if game_time != null:
+		world.set_time_of_day(game_time.get_hour(), game_time.get_minute())
 
 func _create_save_timer() -> void:
 	save_timer = Timer.new()
