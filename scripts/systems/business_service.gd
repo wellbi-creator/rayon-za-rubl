@@ -359,9 +359,9 @@ func get_portfolio_summary() -> Dictionary:
 		var business: Dictionary = businesses[key]
 		if bool(business.get("active", false)):
 			summary["active_count"] = int(summary["active_count"]) + 1
+		summary["total_rent_received"] = int(summary["total_rent_received"]) + maxi(0, int(business.get("total_rent_received", 0)))
 		if bool(business.get("leased", false)):
 			summary["leased_count"] = int(summary["leased_count"]) + 1
-			summary["total_rent_received"] = int(summary["total_rent_received"]) + maxi(0, int(business.get("total_rent_received", 0)))
 			continue
 		summary["total_customers"] = int(summary["total_customers"]) + maxi(0, int(business.get("total_customers", 0)))
 		summary["total_revenue"] = int(summary["total_revenue"]) + maxi(0, int(business.get("total_revenue", 0)))
