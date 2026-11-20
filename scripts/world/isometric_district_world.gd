@@ -62,10 +62,9 @@ var weather_animation_time := 0.0
 func _ready() -> void:
 	road_path_network = RoadPathNetwork.new()
 	road_path_network.configure(MAP_WIDTH, MAP_HEIGHT, 3, 4)
-	# The east quarter is connected to the starter arterial by its own north-south street.
-	for y in range(MAP_HEIGHT):
-		if y != 3:
-			road_path_network.add_road_cell(Vector2i(10, y))
+	# Extend from the central road outward so every new cell touches the existing graph.
+	for y in [2, 1, 0, 4, 5, 6]:
+		road_path_network.add_road_cell(Vector2i(10, y))
 	for lamp_cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
 		road_lamp_cells[lamp_cell] = true
 	for i in PLOT_CELLS.size():
