@@ -297,7 +297,9 @@ func _draw_roads() -> void:
 		draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
 
 func _draw_grass_detail(pos: Vector2) -> void:
-	var blade_color := Color("#b3c58a", 0.42).lerp(Color("#70877b", 0.35), night_factor)
+	var blade_color := _get_leaf_palette()[2]
+	blade_color.a = 0.42
+	blade_color = blade_color.lerp(Color("#70877b", 0.35), night_factor)
 	draw_line(pos, pos + Vector2(-2, -5), blade_color, 1.0)
 	draw_line(pos + Vector2(1, 0), pos + Vector2(3, -4), blade_color, 1.0)
 
@@ -482,8 +484,11 @@ func _draw_tree(pos: Vector2) -> void:
 	draw_circle(pos + Vector2(8, -20), 10, leaves[2])
 	draw_circle(pos + Vector2(-3, -25), 7, leaves[3])
 	var leaf_sway := sin(construction_animation_time * 1.35 + pos.x * 0.025) * 2.0
-	draw_circle(pos + Vector2(-5 + leaf_sway, -15), 3, Color("#a4c47a", 0.55))
-	draw_circle(pos + Vector2(8 - leaf_sway * 0.7, -19), 2.5, Color("#a4c47a", 0.45))
+	var leaf_highlight := leaves[3]
+	leaf_highlight.a = 0.55
+	draw_circle(pos + Vector2(-5 + leaf_sway, -15), 3, leaf_highlight)
+	leaf_highlight.a = 0.45
+	draw_circle(pos + Vector2(8 - leaf_sway * 0.7, -19), 2.5, leaf_highlight)
 
 func _draw_chimney_smoke(origin: Vector2) -> void:
 	# Soft, slow puffs rise from the chimney; opacity stays low to preserve the cozy pixel-art look.
