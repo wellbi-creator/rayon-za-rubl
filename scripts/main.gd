@@ -1518,7 +1518,7 @@ func _on_interface_resized() -> void:
 		quickbar_panel.offset_bottom = -6.0
 		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
-		var panel_width := clampf(viewport_size.x * (0.40 if phone_landscape else (0.37 if compact else 0.30)), 240.0, 390.0)
+		var panel_width := clampf(viewport_size.x * (0.50 if phone_landscape else (0.46 if compact else 0.34)), 280.0, 480.0)
 		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 		district_panel.offset_left = -panel_width - 8.0
 		district_panel.offset_top = 72.0 if phone_landscape else (82.0 if compact else 104.0)
