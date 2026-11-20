@@ -1379,7 +1379,8 @@ func _on_construction_updated(plot_id: int, progress: float, stage: String) -> v
 	world.set_plot_building(plot_id, progress)
 	if selected_plot_id == plot_id:
 		var project := construction_service.get_project(plot_id)
-		var remaining := maxi(0, int(ceil(float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))))
+		var remaining_work := maxf(0.0, float(project.get("duration", 0.0)) - float(project.get("elapsed", 0.0)))
+		var remaining := maxi(0, int(ceil(remaining_work / maxf(construction_service.weather_speed_multiplier, 0.01))))
 		var weather_note := ""
 		var weather_percent := construction_service.get_weather_speed_percent()
 		if weather_percent < 100:
