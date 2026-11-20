@@ -122,8 +122,8 @@ func _ready() -> void:
 	_create_interface()
 	_create_save_timer()
 	_load_game()
-	municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
-	district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
+	municipal_services.set_available_plot_ids(world.get_owned_plot_ids())
+	district_event_service.set_available_plot_ids(world.get_owned_plot_ids())
 	world.set_resident_groups(resident_service.get_resident_display_data())
 	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
 	_update_balance()
@@ -875,7 +875,7 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	zone_scroll.custom_minimum_size = Vector2(320, 300)
 	var zone_list := VBoxContainer.new()
 	zone_scroll.add_child(zone_list)
-	for plot_id in world.get_unlocked_plot_ids():
+	for plot_id in world.get_owned_plot_ids():
 		var checkbox := CheckBox.new()
 		checkbox.text = "%s • инфраструктура %d%%" % [world.get_plot_name(plot_id), municipal_services.get_plot_infrastructure_condition(plot_id)]
 		checkbox.button_pressed = assigned.has(plot_id)
@@ -1112,8 +1112,8 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		resident_service.update_time(hour, minute, day)
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		if world != null:
-			municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
-			district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
+			municipal_services.set_available_plot_ids(world.get_owned_plot_ids())
+			district_event_service.set_available_plot_ids(world.get_owned_plot_ids())
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
 		var maintenance_processed := municipal_services.process_daily_maintenance(day, economy) if municipal_services != null else false
@@ -1301,10 +1301,16 @@ func _on_plot_selected(plot_id: int) -> void:
 	autonomy_toggle_button.visible = false
 	plot_title.text = plot_name
 	if kind == "locked":
-		plot_description.text = "Этот участок находится в восточном квартале. Купи квартал, чтобы открыть сразу четыре новых участка для строительства и бизнеса."
+		plot_description.text = "Этот участок находится в восточном квартале. Открытие квартала даст доступ к четырём новым площадкам, которые затем можно покупать по отдельности."
 		status_label.text = "Стоимость открытия восточного квартала: ₽ %s" % _format_money(world.get_quarter_purchase_cost())
-		build_button.text = "Купить восточный квартал"
+		build_button.text = "Открыть восточный квартал"
 		build_button.disabled = economy.balance < world.get_quarter_purchase_cost()
+	elif kind == "unowned":
+		var land_cost := world.get_plot_purchase_cost(plot_id)
+		plot_description.text = "Участок доступен для покупки. После приобретения здесь можно будет построить дом и заселить семью либо подготовить площадку под магазин."
+		status_label.text = "Покупка земли: ₽ %s" % _format_money(land_cost)
+		build_button.text = "Купить участок"
+		build_button.disabled = land_cost < 0 or economy.balance < land_cost
 	elif kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
 			plot_description.text = "Баба Зина благодарит тебя: в доме снова работает электричество. В её блокноте появятся новые просьбы."
@@ -1768,6 +1774,21 @@ func _on_context_action_pressed() -> void:
 	_on_build_pressed()
 
 func _on_build_pressed() -> void:
+	if selected_plot_id >= 0 and world.is_plot_unlocked(selected_plot_id) and not world.is_plot_owned(selected_plot_id):
+		var land_cost := world.get_plot_purchase_cost(selected_plot_id)
+		if land_cost < 0 or not economy.try_spend(land_cost, "Покупка земли: %s" % world.get_plot_name(selected_plot_id)):
+			status_label.text = "Недостаточно средств для покупки участка."
+			return
+		if not world.purchase_plot(selected_plot_id):
+			economy.add_money(land_cost, "Возврат: участок уже приобретён")
+			status_label.text = "Не удалось оформить покупку участка."
+			return
+		municipal_services.set_available_plot_ids(world.get_owned_plot_ids())
+		district_event_service.set_available_plot_ids(world.get_owned_plot_ids())
+		status_label.text = "Участок приобретён! Теперь здесь можно строить."
+		_on_plot_selected(selected_plot_id)
+		_save_game()
+		return
 	if selected_plot_id >= 0 and not world.is_plot_unlocked(selected_plot_id):
 		var quarter_cost := world.get_quarter_purchase_cost()
 		if not economy.try_spend(quarter_cost, "Покупка восточного квартала"):
@@ -1777,9 +1798,9 @@ func _on_build_pressed() -> void:
 			economy.add_money(quarter_cost, "Возврат: квартал уже открыт")
 			status_label.text = "Квартал уже открыт."
 			return
-		municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
-		district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
-		status_label.text = "Восточный квартал открыт! Доступны четыре новых участка."
+		municipal_services.set_available_plot_ids(world.get_owned_plot_ids())
+		district_event_service.set_available_plot_ids(world.get_owned_plot_ids())
+		status_label.text = "Восточный квартал открыт! Четыре участка теперь можно покупать по отдельности."
 		_on_plot_selected(selected_plot_id)
 		_save_game()
 		return
