@@ -394,7 +394,9 @@ func initialize_day(day: int) -> void:
 	last_payroll_day = maxi(1, day)
 	unpaid_wages = 0
 	for service in SERVICES:
-		last_maintenance_day[str(service["id"])] = last_payroll_day
+		var service_id := str(service["id"])
+		unpaid_wages_by_service[service_id] = 0
+		last_maintenance_day[service_id] = last_payroll_day
 	last_infrastructure_day = last_payroll_day
 
 func get_save_data() -> Dictionary:
