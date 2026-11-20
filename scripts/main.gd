@@ -1498,7 +1498,7 @@ func _on_interface_resized() -> void:
 	if quickbar_panel != null:
 		quickbar_panel.offset_left = 8.0
 		quickbar_panel.offset_right = -8.0
-		quickbar_panel.offset_top = -58.0 if phone_landscape else (-68.0 if compact else -78.0)
+		quickbar_panel.offset_top = -68.0 if phone_landscape else (-68.0 if compact else -78.0)
 		quickbar_panel.offset_bottom = -6.0
 		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
