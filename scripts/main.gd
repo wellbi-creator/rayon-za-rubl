@@ -655,26 +655,36 @@ func _show_district_event() -> void:
 		var choice_id := str(choice.get("id", ""))
 		var cost := district_event_service.get_choice_cost(choice_id, municipal_services)
 		var button := Button.new()
+		var service_id := str(event.get("service_id", ""))
+		var service_staff_count := municipal_services.get_employee_count(service_id) if municipal_services != null else 0
+		var service_action := int(choice.get("cost", 0)) > 0
+		var action_label := str(choice.get("label", "Выбрать"))
+		if service_action:
+			action_label = ("👷 Направить свою службу: " if service_staff_count > 0 else "Вызвать подрядчика: ") + action_label
 		button.text = "%s%s" % [
-			str(choice.get("label", "Выбрать")),
+			action_label,
 			"  •  ₽ %s" % _format_money(cost) if cost > 0 else "  •  бесплатно"
 		]
 		button.custom_minimum_size = Vector2(0, 42)
 		button.add_theme_font_size_override("font_size", 12)
 		button.disabled = cost < 0 or cost > economy.balance
 		button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
-		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id))
+		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id, service_action and service_staff_count > 0))
 		district_event_choices.add_child(button)
 	district_event_popup.popup_centered(Vector2i(560, 360))
 
 
-func _on_district_event_choice_pressed(choice_id: String) -> void:
+func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: bool = false) -> void:
+	var active_event := district_event_service.get_active_event()
+	var service_id := str(active_event.get("service_id", ""))
 	var result := district_event_service.resolve_choice(choice_id, game_time.get_day(), economy, municipal_services)
 	if not bool(result.get("success", false)):
 		var failure_message := str(result.get("message", "Не удалось применить решение."))
 		_show_district_event()
 		district_event_status_label.text = failure_message
 		return
+	if dispatched_by_staff and municipal_services.record_work_order(service_id, game_time.get_day(), int(result.get("cost", 0))):
+		result["message"] = "Штатная служба выполнила работу. " + str(result.get("message", ""))
 	progression_service.add_progress(int(result.get("experience", 0)), int(result.get("reputation", 0)), str(result.get("reason", "Решение события района")))
 	if progression_service.unlock_achievement("first_district_event"):
 		progression_service.add_progress(15, 1, "Решено первое событие района")
@@ -753,10 +763,11 @@ func _on_municipal_services_pressed() -> void:
 func _refresh_municipal_services() -> void:
 	if municipal_rows == null or municipal_services == null:
 		return
-	municipal_summary_label.text = "Работников: %d  •  зарплата за игровые сутки: ₽ %s  •  долг: ₽ %s" % [
+	municipal_summary_label.text = "Работников: %d  •  зарплата за игровые сутки: ₽ %s  •  долг: ₽ %s  •  выполнено работ: %d" % [
 		municipal_services.get_total_employee_count(),
 		_format_money(municipal_services.get_total_daily_payroll()),
-		_format_money(municipal_services.get_unpaid_wages())
+		_format_money(municipal_services.get_unpaid_wages()),
+		municipal_services.get_total_work_orders_completed()
 	]
 	for child in municipal_rows.get_children():
 		municipal_rows.remove_child(child)
