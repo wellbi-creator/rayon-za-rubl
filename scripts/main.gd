@@ -89,23 +89,38 @@ func _process(_delta: float) -> void:
 		render_diagnostic_label.text = frame_info + "\nWORLD RECOVERY FAILED"
 
 func _ensure_world_node() -> void:
+	# The main scene owns DistrictWorld as a real child node. Prefer that
+	# scene-instantiated node; this avoids relying on runtime script creation
+	# during the first frame of the exported Web build.
 	if is_instance_valid(world) and world.is_inside_tree():
+		_connect_world_signals()
 		return
 
-	# First recover an already attached world instead of creating a duplicate.
 	var existing := get_node_or_null("DistrictWorld")
-	if existing is DistrictWorld and existing.is_inside_tree():
-		world = existing
+	if existing is DistrictWorld:
+		world = existing as DistrictWorld
 	else:
-		world = DistrictWorldScript.new()
-		world.name = "DistrictWorld"
-		add_child(world)
-		world.plot_selected.connect(_on_plot_selected)
+		var created_world := DistrictWorldScript.new() as DistrictWorld
+		if created_world == null:
+			push_error("DistrictWorld script could not be instantiated.")
+			return
+		created_world.name = "DistrictWorld"
+		add_child(created_world)
+		world = created_world
 
+	if not is_instance_valid(world) or not world.is_inside_tree():
+		push_error("DistrictWorld node was not attached to the Main scene tree.")
+		return
+
+	_connect_world_signals()
 	if resident_service != null:
 		world.set_resident_groups(resident_service.get_resident_display_data())
 	if game_time != null:
 		world.set_time_of_day(game_time.get_hour(), game_time.get_minute())
+
+func _connect_world_signals() -> void:
+	if is_instance_valid(world) and not world.plot_selected.is_connected(_on_plot_selected):
+		world.plot_selected.connect(_on_plot_selected)
 
 func _create_save_timer() -> void:
 	save_timer = Timer.new()
