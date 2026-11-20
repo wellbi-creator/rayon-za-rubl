@@ -2234,6 +2234,7 @@ func _on_business_upgrade_pressed() -> void:
 		status_label.text = "Не удалось улучшить заведение. Проверь баланс и уровень улучшения."
 		return
 	status_label.text = "Заведение улучшено! Его привлекательность выросла, а ежедневные расходы увеличились на 500 ₽."
+	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
 	_save_game()
 	_on_plot_selected(selected_plot_id)
 
