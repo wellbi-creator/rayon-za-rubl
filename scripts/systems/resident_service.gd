@@ -70,6 +70,37 @@ var current_day: int = 1
 var current_season_id: String = "spring"
 var current_weather_id: String = "clear"
 var last_simulated_total_minute: int = -1
+var last_municipal_impact_day: int = 1
+
+
+func apply_municipal_service_impact(service_quality_by_plot: Dictionary, infrastructure_by_plot: Dictionary, day: int) -> bool:
+	if day <= last_municipal_impact_day:
+		return false
+	last_municipal_impact_day = day
+	for plot_id_value in occupied_homes:
+		var plot_id := int(plot_id_value)
+		var key := str(plot_id)
+		if not service_quality_by_plot.has(key):
+			continue
+		var service_quality := clampi(int(service_quality_by_plot[key]), 0, 100)
+		var infrastructure := clampi(int(infrastructure_by_plot.get(key, 100)), 0, 100)
+		var overall_condition := roundi(float(service_quality + infrastructure) / 2.0)
+		var family_id := str(occupied_homes[plot_id_value])
+		if not moved_families.has(family_id):
+			continue
+		var state: Dictionary = moved_families[family_id]
+		var satisfaction_delta := 1 if overall_condition >= 85 else (-1 if overall_condition <= 35 else 0)
+		if satisfaction_delta == 0:
+			continue
+		for member_value in state.get("members", []):
+			if not member_value is Dictionary:
+				continue
+			var member: Dictionary = member_value
+			member["satisfaction"] = clampi(int(member.get("satisfaction", 75)) + satisfaction_delta, 0, 100)
+			member["mood"] = clampi(int(member.get("mood", 75)) + satisfaction_delta, 0, 100)
+		_refresh_family_aggregates(state)
+		residents_changed.emit(plot_id)
+	return true
 
 
 func _record_family_event(state: Dictionary, description: String, source: String, total_minute: int) -> void:
@@ -1263,7 +1294,8 @@ func get_save_data() -> Dictionary:
 	return {
 		"occupied_homes": occupied_homes.duplicate(true),
 		"moved_families": moved_families.duplicate(true),
-		"last_simulated_total_minute": last_simulated_total_minute
+		"last_simulated_total_minute": last_simulated_total_minute,
+		"last_municipal_impact_day": last_municipal_impact_day
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -1309,3 +1341,4 @@ func load_save_data(data: Dictionary) -> void:
 				_refresh_family_aggregates(restored)
 				moved_families[str(family_id)] = restored
 	last_simulated_total_minute = int(data.get("last_simulated_total_minute", -1))
+	last_municipal_impact_day = maxi(1, int(data.get("last_municipal_impact_day", current_day)))

@@ -766,12 +766,13 @@ func _on_municipal_services_pressed() -> void:
 func _refresh_municipal_services() -> void:
 	if municipal_rows == null or municipal_services == null:
 		return
-	municipal_summary_label.text = "Работников: %d  •  зарплата/сутки: ₽ %s  •  долг: ₽ %s  •  работ: %d  •  качество: %d%%  •  автослужб: %d" % [
+	municipal_summary_label.text = "Работников: %d  •  зарплата/сутки: ₽ %s  •  долг: ₽ %s  •  работ: %d  •  качество: %d%%  •  инфраструктура: %d%%  •  автослужб: %d" % [
 		municipal_services.get_total_employee_count(),
 		_format_money(municipal_services.get_total_daily_payroll()),
 		_format_money(municipal_services.get_unpaid_wages()),
 		municipal_services.get_total_work_orders_completed(),
 		municipal_services.get_average_service_quality(),
+		municipal_services.get_average_infrastructure_condition(),
 		municipal_services.get_automatic_maintenance_count()
 	]
 	for child in municipal_rows.get_children():
@@ -799,7 +800,8 @@ func _refresh_municipal_services() -> void:
 		var maintenance_cost := municipal_services.get_maintenance_cost(service_id)
 		var maintenance_status := "ВКЛ • ₽ %s/работу" % _format_money(maintenance_cost) if municipal_services.is_automatic_maintenance_enabled(service_id) else "ВЫКЛ"
 		var assigned_zones := municipal_services.get_service_zone_plot_ids(service_id)
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nЗоны: %d/%d участков\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, assigned_zones.size(), count, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
+		var equipment_level := municipal_services.get_equipment_level(service_id)
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nТехника: уровень %d (+%d%%)  •  Зоны: %d/%d\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, equipment_level, equipment_level * MunicipalServicesService.EQUIPMENT_EFFICIENCY_PER_LEVEL, assigned_zones.size(), count, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
@@ -818,6 +820,12 @@ func _refresh_municipal_services() -> void:
 		zones_button.disabled = count <= 0
 		zones_button.pressed.connect(_on_municipal_zones_pressed.bind(service_id))
 		row.add_child(zones_button)
+		var equipment_button := Button.new()
+		equipment_button.text = "Техника"
+		equipment_button.custom_minimum_size = Vector2(72, 42)
+		equipment_button.add_theme_font_size_override("font_size", 10)
+		equipment_button.pressed.connect(_on_municipal_equipment_pressed.bind(service_id))
+		row.add_child(equipment_button)
 		var fire_button := Button.new()
 		fire_button.text = "−"
 		fire_button.custom_minimum_size = Vector2(42, 42)
@@ -862,7 +870,7 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	var assigned := municipal_services.get_service_zone_plot_ids(service_id)
 	for plot_id in range(6):
 		var checkbox := CheckBox.new()
-		checkbox.text = world.get_plot_name(plot_id)
+		checkbox.text = "%s • инфраструктура %d%%" % [world.get_plot_name(plot_id), municipal_services.get_plot_infrastructure_condition(plot_id)]
 		checkbox.button_pressed = assigned.has(plot_id)
 		layout.add_child(checkbox)
 		zone_checkboxes.append(checkbox)
@@ -886,6 +894,50 @@ func _save_municipal_service_zones(service_id: String, checkboxes: Array[CheckBo
 	municipal_status_label.text = "Зоны службы обновлены: %d участков." % selected_plots.size()
 	popup.hide()
 	_save_game()
+	_refresh_municipal_services()
+
+
+func _on_municipal_equipment_pressed(service_id: String) -> void:
+	var popup := PopupPanel.new()
+	popup.name = "MunicipalEquipmentPopup"
+	var layout := VBoxContainer.new()
+	layout.custom_minimum_size = Vector2(300, 0)
+	layout.add_theme_constant_override("separation", 10)
+	popup.add_child(layout)
+	var level := municipal_services.get_equipment_level(service_id)
+	var bonus := level * MunicipalServicesService.EQUIPMENT_EFFICIENCY_PER_LEVEL
+	var heading := Label.new()
+	var service_label := service_id
+	for definition in municipal_services.get_service_definitions():
+		if str(definition["id"]) == service_id:
+			service_label = str(definition["label"])
+			break
+	heading.text = "Оборудование: %s" % service_label
+	heading.add_theme_color_override("font_color", Color("#f4d98d"))
+	layout.add_child(heading)
+	var details := Label.new()
+	details.text = "Уровень: %d/3\nБонус к эффективности: +%d%%\nДоплата к плановому обслуживанию: ₽ %d за сутки" % [level, bonus, level * MunicipalServicesService.EQUIPMENT_MAINTENANCE_PER_LEVEL]
+	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	layout.add_child(details)
+	var cost := municipal_services.get_equipment_upgrade_cost(service_id)
+	var upgrade_button := Button.new()
+	upgrade_button.text = "Улучшить • ₽ %s" % _format_money(cost) if cost >= 0 else "Максимальный уровень"
+	upgrade_button.disabled = cost < 0 or economy.balance < cost or municipal_services.get_employee_count(service_id) <= 0
+	if cost >= 0:
+		upgrade_button.pressed.connect(_on_municipal_equipment_upgrade_pressed.bind(service_id, popup))
+	layout.add_child(upgrade_button)
+	popup.popup_hide.connect(popup.queue_free)
+	add_child(popup)
+	popup.popup_centered(Vector2i(360, 220))
+
+
+func _on_municipal_equipment_upgrade_pressed(service_id: String, popup: PopupPanel) -> void:
+	if municipal_services.upgrade_equipment(service_id, economy):
+		municipal_status_label.text = "Оборудование улучшено. Эффективность службы повышена."
+		popup.hide()
+		_save_game()
+	else:
+		municipal_status_label.text = "Не удалось улучшить оборудование: проверь баланс и уровень."
 	_refresh_municipal_services()
 
 
@@ -1053,10 +1105,12 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
 		var maintenance_processed := municipal_services.process_daily_maintenance(day, economy) if municipal_services != null else false
+		var infrastructure_processed := municipal_services.process_daily_infrastructure(day) if municipal_services != null else false
+		var resident_impact_processed := resident_service.apply_municipal_service_impact(municipal_services.get_plot_service_quality_by_plot(), municipal_services.get_plot_infrastructure_condition_data(), day) if municipal_services != null else false
 		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
 		if event_spawned:
 			_show_district_event()
-		if upkeep_processed or payroll_processed or maintenance_processed or event_spawned or weather_processed or business_processed:
+		if upkeep_processed or payroll_processed or maintenance_processed or infrastructure_processed or resident_impact_processed or event_spawned or weather_processed or business_processed:
 			_save_game()
 		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
 			_show_district_event()
