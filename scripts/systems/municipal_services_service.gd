@@ -3,6 +3,8 @@ class_name MunicipalServicesService
 
 const MAX_EMPLOYEES_PER_SERVICE := 10
 const EMPLOYEES_FOR_FULL_EFFICIENCY := 5
+const MAINTENANCE_BASE_COST := 150
+const MAINTENANCE_COST_PER_EMPLOYEE := 100
 const SERVICES := [
 	{"id": "road", "label": "Дорожные рабочие", "hire_cost": 4000, "daily_salary": 500},
 	{"id": "electricity", "label": "Электрики", "hire_cost": 5000, "daily_salary": 650},
@@ -18,6 +20,9 @@ var unpaid_wages: int = 0
 var work_orders_completed: Dictionary = {}
 var last_work_day: Dictionary = {}
 var total_work_spent: Dictionary = {}
+var service_quality: Dictionary = {}
+var automatic_maintenance_enabled: Dictionary = {}
+var last_maintenance_day: Dictionary = {}
 
 func _init() -> void:
 	for service in SERVICES:
@@ -26,6 +31,9 @@ func _init() -> void:
 		work_orders_completed[service_id] = 0
 		last_work_day[service_id] = 0
 		total_work_spent[service_id] = 0
+		service_quality[service_id] = 100
+		automatic_maintenance_enabled[service_id] = false
+		last_maintenance_day[service_id] = 1
 
 func get_service_definitions() -> Array:
 	return SERVICES.duplicate(true)
@@ -36,8 +44,66 @@ func get_employee_count(service_id: String) -> int:
 func get_service_efficiency_percent(service_id: String) -> int:
 	return roundi(float(mini(get_employee_count(service_id), EMPLOYEES_FOR_FULL_EFFICIENCY)) / float(EMPLOYEES_FOR_FULL_EFFICIENCY) * 100.0)
 
+func get_service_quality_percent(service_id: String) -> int:
+	return clampi(int(service_quality.get(service_id, 100)), 0, 100)
+
 func get_service_discount_percent(service_id: String, maximum_discount: int) -> int:
-	return roundi(float(clampi(maximum_discount, 0, 80) * get_service_efficiency_percent(service_id)) / 100.0)
+	var effective_percent := get_service_efficiency_percent(service_id) * get_service_quality_percent(service_id)
+	return roundi(float(clampi(maximum_discount, 0, 80) * effective_percent) / 10000.0)
+
+func is_automatic_maintenance_enabled(service_id: String) -> bool:
+	return bool(automatic_maintenance_enabled.get(service_id, false))
+
+func set_automatic_maintenance_enabled(service_id: String, enabled: bool) -> bool:
+	if _get_definition(service_id).is_empty():
+		return false
+	if enabled and get_employee_count(service_id) <= 0:
+		return false
+	automatic_maintenance_enabled[service_id] = enabled
+	return true
+
+func get_maintenance_cost(service_id: String) -> int:
+	if get_employee_count(service_id) <= 0:
+		return 0
+	return MAINTENANCE_BASE_COST + get_employee_count(service_id) * MAINTENANCE_COST_PER_EMPLOYEE
+
+func get_average_service_quality() -> int:
+	var total := 0
+	for service in SERVICES:
+		total += get_service_quality_percent(str(service["id"]))
+	return roundi(float(total) / float(SERVICES.size()))
+
+func get_automatic_maintenance_count() -> int:
+	var total := 0
+	for service in SERVICES:
+		if is_automatic_maintenance_enabled(str(service["id"])):
+			total += 1
+	return total
+
+func process_daily_maintenance(day: int, economy: EconomyService) -> bool:
+	var processed := false
+	for service in SERVICES:
+		var service_id := str(service["id"])
+		if day <= int(last_maintenance_day.get(service_id, 1)):
+			continue
+		last_maintenance_day[service_id] = day
+		var employee_count := get_employee_count(service_id)
+		if employee_count <= 0:
+			continue
+		processed = true
+		if not is_automatic_maintenance_enabled(service_id):
+			service_quality[service_id] = maxi(0, get_service_quality_percent(service_id) - 2)
+			continue
+		if get_service_quality_percent(service_id) >= 100:
+			continue
+		var cost := get_maintenance_cost(service_id)
+		if economy == null or not economy.try_spend(cost, "Плановое обслуживание: %s" % str(service["label"])):
+			service_quality[service_id] = maxi(0, get_service_quality_percent(service_id) - 3)
+			continue
+		var quality_gain := 3 + roundi(float(get_service_efficiency_percent(service_id)) / 20.0)
+		service_quality[service_id] = mini(100, get_service_quality_percent(service_id) + quality_gain)
+		record_work_order(service_id, day, cost)
+	return processed
 
 func get_hire_cost(service_id: String) -> int:
 	var definition := _get_definition(service_id)
@@ -127,7 +193,10 @@ func get_save_data() -> Dictionary:
 		"unpaid_wages": unpaid_wages,
 		"work_orders_completed": work_orders_completed.duplicate(true),
 		"last_work_day": last_work_day.duplicate(true),
-		"total_work_spent": total_work_spent.duplicate(true)
+		"total_work_spent": total_work_spent.duplicate(true),
+		"service_quality": service_quality.duplicate(true),
+		"automatic_maintenance_enabled": automatic_maintenance_enabled.duplicate(true),
+		"last_maintenance_day": last_maintenance_day.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -141,11 +210,17 @@ func load_save_data(data: Dictionary) -> void:
 	var saved_work_orders: Variant = data.get("work_orders_completed", {})
 	var saved_last_work_day: Variant = data.get("last_work_day", {})
 	var saved_work_spent: Variant = data.get("total_work_spent", {})
+	var saved_quality: Variant = data.get("service_quality", {})
+	var saved_maintenance: Variant = data.get("automatic_maintenance_enabled", {})
+	var saved_maintenance_day: Variant = data.get("last_maintenance_day", {})
 	for service in SERVICES:
 		var service_id := str(service["id"])
 		work_orders_completed[service_id] = maxi(0, int(saved_work_orders.get(service_id, 0))) if saved_work_orders is Dictionary else 0
 		last_work_day[service_id] = maxi(0, int(saved_last_work_day.get(service_id, 0))) if saved_last_work_day is Dictionary else 0
 		total_work_spent[service_id] = maxi(0, int(saved_work_spent.get(service_id, 0))) if saved_work_spent is Dictionary else 0
+		service_quality[service_id] = clampi(int(saved_quality.get(service_id, 100)), 0, 100) if saved_quality is Dictionary else 100
+		automatic_maintenance_enabled[service_id] = bool(saved_maintenance.get(service_id, false)) if saved_maintenance is Dictionary else false
+		last_maintenance_day[service_id] = maxi(last_payroll_day, int(saved_maintenance_day.get(service_id, last_payroll_day))) if saved_maintenance_day is Dictionary else last_payroll_day
 
 func _get_definition(service_id: String) -> Dictionary:
 	for service in SERVICES:
