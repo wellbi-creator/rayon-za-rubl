@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=27 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/isometric_prototype_camera.gd" id="1_camera"]
 [ext_resource type="Script" path="res://scripts/world/construction_visuals_3d.gd" id="2_construction"]
@@ -103,6 +103,10 @@ radius = 0.16
 height = 0.32
 radial_segments = 12
 rings = 6
+
+[sub_resource type="StandardMaterial3D" id="ShrubMat"]
+albedo_color = Color(0.24, 0.48, 0.25, 1)
+roughness = 1.0
 
 [sub_resource type="CylinderMesh" id="StreetPoleMesh"]
 top_radius = 0.1
@@ -716,6 +720,103 @@ position = Vector3(7, 3.0, 8)
 mesh = SubResource("TreeCanopyMesh")
 surface_material_override/0 = SubResource("LeavesMat")
 scale = Vector3(1.1, 1.25, 1.1)
+
+
+[node name="PlanterWestSouth" type="MeshInstance3D" parent="."]
+position = Vector3(-30, 0.16, 12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(4.8, 0.22, 2.2)
+
+[node name="PlanterEastSouth" type="MeshInstance3D" parent="."]
+position = Vector3(30, 0.16, 12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(4.8, 0.22, 2.2)
+
+[node name="PlanterWestNorth" type="MeshInstance3D" parent="."]
+position = Vector3(-30, 0.16, 34)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(4.8, 0.22, 2.2)
+
+[node name="PlanterEastNorth" type="MeshInstance3D" parent="."]
+position = Vector3(30, 0.16, 34)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("LotMat")
+scale = Vector3(4.8, 0.22, 2.2)
+
+[node name="ShrubWestSouthA" type="MeshInstance3D" parent="."]
+position = Vector3(-31.4, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubWestSouthB" type="MeshInstance3D" parent="."]
+position = Vector3(-30, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubWestSouthC" type="MeshInstance3D" parent="."]
+position = Vector3(-28.6, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastSouthA" type="MeshInstance3D" parent="."]
+position = Vector3(28.6, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastSouthB" type="MeshInstance3D" parent="."]
+position = Vector3(30, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastSouthC" type="MeshInstance3D" parent="."]
+position = Vector3(31.4, 0.72, 12)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubWestNorthA" type="MeshInstance3D" parent="."]
+position = Vector3(-31.4, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubWestNorthB" type="MeshInstance3D" parent="."]
+position = Vector3(-30, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubWestNorthC" type="MeshInstance3D" parent="."]
+position = Vector3(-28.6, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastNorthA" type="MeshInstance3D" parent="."]
+position = Vector3(28.6, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastNorthB" type="MeshInstance3D" parent="."]
+position = Vector3(30, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
+
+[node name="ShrubEastNorthC" type="MeshInstance3D" parent="."]
+position = Vector3(31.4, 0.72, 34)
+mesh = SubResource("TreeCanopyMesh")
+surface_material_override/0 = SubResource("ShrubMat")
+scale = Vector3(0.62, 0.72, 0.62)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 position = Vector3(0, 34, 42)
