@@ -5,6 +5,11 @@ const OPENING_COST := 100000
 const DAILY_REVENUE := 16000
 const DAILY_OPERATING_COST := 6000
 const CUSTOMER_SPEND := 200
+const BUSINESS_TYPES := {
+	"corner_shop": {"title": "Магазин у дома", "opening_cost": 100000, "customer_spend": 200, "daily_expenses": 6000},
+	"bakery": {"title": "Пекарня", "opening_cost": 140000, "customer_spend": 260, "daily_expenses": 8500},
+	"cafe": {"title": "Кафе", "opening_cost": 180000, "customer_spend": 320, "daily_expenses": 11000}
+}
 const BASE_DAILY_CUSTOMERS := 80
 const RESIDENT_CUSTOMER_BONUS := 3
 const REPUTATION_CUSTOMER_BONUS := 0.2
@@ -19,14 +24,23 @@ func initialize_day(day: int) -> void:
 	last_processed_day = maxi(1, day)
 	unpaid_operating_costs = 0
 
-func get_opening_cost() -> int:
-	return OPENING_COST
+func get_opening_cost(business_type: String = SUPPORTED_BUSINESS) -> int:
+	var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
+	return int(type_data.get("opening_cost", OPENING_COST))
+
+func get_business_type_title(business_type: String) -> String:
+	var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
+	return str(type_data.get("title", "Магазин у дома"))
+
+func get_business_type_ids() -> Array[String]:
+	return ["corner_shop", "bakery", "cafe"]
 
 func get_daily_revenue() -> int:
 	return DAILY_REVENUE
 
-func get_daily_expenses() -> int:
-	return DAILY_OPERATING_COST
+func get_daily_expenses(business_type: String = SUPPORTED_BUSINESS) -> int:
+	var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
+	return int(type_data.get("daily_expenses", DAILY_OPERATING_COST))
 
 func get_daily_profit() -> int:
 	return DAILY_REVENUE - DAILY_OPERATING_COST
@@ -64,17 +78,18 @@ func get_daily_customer_count(resident_count: int, average_satisfaction: float, 
 			weather_multiplier = 0.9
 	return maxi(10, roundi(float(base_customers) * weather_multiplier))
 
-func open_business(plot_id: int, economy: EconomyService) -> bool:
-	if plot_id < 1 or plot_id >= 10 or economy == null or businesses.has(plot_id):
+func open_business(plot_id: int, economy: EconomyService, business_type: String = SUPPORTED_BUSINESS) -> bool:
+	if plot_id < 1 or plot_id >= 10 or economy == null or businesses.has(plot_id) or not BUSINESS_TYPES.has(business_type):
 		return false
-	if not economy.try_spend(OPENING_COST, "Открытие магазина у дома"):
+	var opening_cost := get_opening_cost(business_type)
+	if not economy.try_spend(opening_cost, "Открытие: " + get_business_type_title(business_type)):
 		return false
 	businesses[plot_id] = {
-		"type": SUPPORTED_BUSINESS,
+		"type": business_type,
 		"active": true,
 		"opened_day": last_processed_day,
 		"last_daily_customers": BASE_DAILY_CUSTOMERS,
-		"last_daily_revenue": DAILY_REVENUE
+		"last_daily_revenue": BASE_DAILY_CUSTOMERS * int(BUSINESS_TYPES[business_type].get("customer_spend", CUSTOMER_SPEND))
 	}
 	return true
 
@@ -108,14 +123,20 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 		for index in range(active_count):
 			var plot_id := active_plot_ids[index]
 			var store_customers := customers_per_store + (1 if index < extra_customers else 0)
-			var store_revenue := store_customers * CUSTOMER_SPEND
 			var business: Dictionary = businesses[plot_id]
+			var business_type := str(business.get("type", SUPPORTED_BUSINESS))
+			var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
+			var store_revenue := store_customers * int(type_data.get("customer_spend", CUSTOMER_SPEND))
 			business["last_daily_customers"] = store_customers
 			business["last_daily_revenue"] = store_revenue
 			businesses[plot_id] = business
 			total_daily_revenue += store_revenue
 		economy.add_money(total_daily_revenue * elapsed_days, "Выручка магазинов района")
-		unpaid_operating_costs += active_count * DAILY_OPERATING_COST * elapsed_days
+		var daily_expenses := 0
+		for plot_id in active_plot_ids:
+			var business: Dictionary = businesses[plot_id]
+			daily_expenses += get_daily_expenses(str(business.get("type", SUPPORTED_BUSINESS)))
+		unpaid_operating_costs += daily_expenses * elapsed_days
 	if unpaid_operating_costs > 0 and economy.balance > 0:
 		var payment := mini(unpaid_operating_costs, economy.balance)
 		if payment > 0 and economy.try_spend(payment, "Операционные расходы магазинов"):
@@ -152,7 +173,7 @@ func load_save_data(data: Dictionary) -> void:
 			continue
 		var plot_id := int(entry.get("plot_id", -1))
 		var business_type := str(entry.get("type", SUPPORTED_BUSINESS))
-		if plot_id < 1 or plot_id >= 10 or business_type != SUPPORTED_BUSINESS:
+		if plot_id < 1 or plot_id >= 10 or not BUSINESS_TYPES.has(business_type):
 			continue
 		businesses[plot_id] = {
 			"type": business_type,
