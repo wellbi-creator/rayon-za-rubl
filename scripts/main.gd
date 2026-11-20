@@ -12,6 +12,7 @@ const MunicipalServicesServiceScript = preload("res://scripts/systems/municipal_
 const DistrictProgressionServiceScript = preload("res://scripts/systems/district_progression_service.gd")
 const DistrictEventServiceScript = preload("res://scripts/systems/district_event_service.gd")
 const WeatherServiceScript = preload("res://scripts/systems/weather_service.gd")
+const BusinessServiceScript = preload("res://scripts/systems/business_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -31,9 +32,12 @@ var municipal_services: MunicipalServicesService
 var progression_service: DistrictProgressionService
 var district_event_service: DistrictEventService
 var weather_service: WeatherService
+var business_service: BusinessService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
+var business_button: Button
+var business_status_label: Label
 var household_actions_heading: Label
 var household_actions_grid: GridContainer
 var household_action_buttons: Dictionary = {}
@@ -92,6 +96,7 @@ func _ready() -> void:
 	progression_service = DistrictProgressionServiceScript.new()
 	district_event_service = DistrictEventServiceScript.new()
 	weather_service = WeatherServiceScript.new()
+	business_service = BusinessServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
@@ -369,6 +374,22 @@ func _create_interface() -> void:
 	resident_button.pressed.connect(_on_resident_button_pressed)
 	resident_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 	content.add_child(resident_button)
+
+	business_status_label = Label.new()
+	business_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	business_status_label.add_theme_font_size_override("font_size", 11)
+	business_status_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+	business_status_label.visible = false
+	content.add_child(business_status_label)
+
+	business_button = Button.new()
+	business_button.text = "Открыть магазин"
+	business_button.custom_minimum_size = Vector2(0, 38)
+	business_button.add_theme_font_size_override("font_size", 11)
+	business_button.add_theme_stylebox_override("normal", _button_style(Color("#e6c77d")))
+	business_button.pressed.connect(_on_business_action_pressed)
+	business_button.visible = false
+	content.add_child(business_button)
 
 	household_actions_heading = Label.new()
 	household_actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
@@ -907,6 +928,9 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	var weather_processed := false
 	if not is_loading_game and weather_service != null:
 		weather_processed = weather_service.process_day(day)
+	var business_processed := false
+	if not is_loading_game and business_service != null and economy != null:
+		business_processed = business_service.process_day(day, economy)
 	_apply_weather_state()
 	if not is_loading_game and resident_service != null:
 		resident_service.update_time(hour, minute, day)
@@ -916,7 +940,7 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
 		if event_spawned:
 			_show_district_event()
-		if upkeep_processed or payroll_processed or event_spawned or weather_processed:
+		if upkeep_processed or payroll_processed or event_spawned or weather_processed or business_processed:
 			_save_game()
 		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
 			_show_district_event()
@@ -1087,6 +1111,8 @@ func _on_plot_selected(plot_id: int) -> void:
 	readiness_button.visible = false
 	resident_label.visible = false
 	resident_button.visible = false
+	business_status_label.visible = false
+	business_button.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
 	member_autonomy_container.visible = false
@@ -1313,6 +1339,46 @@ func _on_plot_selected(plot_id: int) -> void:
 					resident_label.text = "Все доступные семьи уже получили жильё."
 					resident_button.visible = false
 			resident_label.visible = current_family.is_empty()
+			if current_family.is_empty():
+				var business := business_service.get_business(plot_id)
+				business_status_label.visible = true
+				business_button.visible = true
+				if business.is_empty():
+					business_status_label.text = "Помещение свободно. Можно открыть магазин у дома и получать ежедневную выручку."
+					business_button.text = "Открыть магазин — ₽ %s" % _format_money(business_service.get_opening_cost())
+					business_button.disabled = economy.balance < business_service.get_opening_cost()
+				else:
+					var active := bool(business.get("active", false))
+					business_status_label.text = "МАГАЗИН У ДОМА • %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
+						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
+						_format_money(business_service.get_daily_revenue()),
+						_format_money(business_service.get_daily_expenses()),
+						_format_money(business_service.get_daily_profit()),
+						_format_money(business_service.unpaid_operating_costs)
+					]
+					business_button.text = "Приостановить магазин" if active else "Возобновить магазин"
+					business_button.disabled = false
+
+func _on_business_action_pressed() -> void:
+	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
+		return
+	if not move_in_service.is_ready(selected_plot_id) or resident_service.is_plot_occupied(selected_plot_id):
+		return
+	var business := business_service.get_business(selected_plot_id)
+	if business.is_empty():
+		if not business_service.open_business(selected_plot_id, economy):
+			status_label.text = "Не удалось открыть магазин. Проверь готовность помещения и баланс района."
+			return
+		progression_service.add_progress(60, 4, "Открыт первый магазин у дома")
+		status_label.text = "Магазин открыт! Со следующих игровых суток начнут начисляться выручка и операционные расходы."
+	else:
+		var next_active := not bool(business.get("active", false))
+		if not business_service.set_business_active(selected_plot_id, next_active):
+			return
+		status_label.text = "Магазин %s." % ("возобновил работу" if next_active else "приостановлен")
+	_save_game()
+	_on_plot_selected(selected_plot_id)
+
 
 func _on_resident_button_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
@@ -1561,6 +1627,7 @@ func _save_game() -> void:
 		"district_progression": progression_service.get_save_data(),
 		"district_events": district_event_service.get_save_data(),
 		"weather": weather_service.get_save_data(),
+		"businesses": business_service.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -1620,6 +1687,12 @@ func _load_game() -> void:
 		weather_service.load_save_data(weather_data)
 	else:
 		weather_service.initialize_day(game_time.get_day())
+	var businesses_data: Variant = data.get("businesses", {})
+	if businesses_data is Dictionary and not businesses_data.is_empty():
+		business_service.load_save_data(businesses_data)
+	else:
+		# Older saves start the business calendar on the current day without back-charging.
+		business_service.initialize_day(game_time.get_day())
 	# Backfill one-time achievements for milestones completed in older saves.
 	if baba_wiring_repaired:
 		progression_service.unlock_achievement("baba_helper")
