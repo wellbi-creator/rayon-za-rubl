@@ -525,7 +525,6 @@ func _draw_commercial_building(ground: Vector2, business_type: String, open_now:
 		"cafe":
 			accent = Color("#a86b83")
 			sign_text = "КАФЕ"
-		var _unused := 0
 	var wall_left := Color("#ead2a7") if business_type != "cafe" else Color("#dfc2b3")
 	var wall_right := Color("#c49b76") if business_type != "cafe" else Color("#b88f91")
 	var glass := Color("#f5d98d") if open_now else Color("#829da0")
