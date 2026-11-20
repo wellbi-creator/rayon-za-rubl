@@ -175,7 +175,7 @@ func _create_interface() -> void:
 	transaction_button.pressed.connect(_on_transaction_history_pressed)
 	management_buttons.add_child(transaction_button)
 	var municipal_button := Button.new()
-	municipal_button.text = "КОММУНАЛЬНЫЕ СЛУЖБЫ"
+	municipal_button.text = "СЛУЖБЫ"
 	municipal_button.custom_minimum_size = Vector2(0, 40)
 	municipal_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	municipal_button.add_theme_font_size_override("font_size", 11)
@@ -607,7 +607,10 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
-	_save_game()
+	if municipal_rows != null:
+		_refresh_municipal_services()
+	if not is_loading_game:
+		_save_game()
 
 func _format_money(value: int) -> String:
 	var raw := str(value)
