@@ -167,12 +167,15 @@ func _create_interface() -> void:
 	root.add_child(hint_label)
 	var weather_panel := PanelContainer.new()
 	weather_panel.position = Vector2(18, 116)
+	weather_panel.size = Vector2(220, 34)
 	weather_panel.custom_minimum_size = Vector2(220, 34)
+	weather_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	weather_panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.88))
 	root.add_child(weather_panel)
 	weather_label = Label.new()
 	weather_label.add_theme_font_size_override("font_size", 12)
 	weather_label.add_theme_color_override("font_color", Color("#d9e6c8"))
+	weather_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	weather_panel.add_child(weather_label)
 
 	var panel := PanelContainer.new()
