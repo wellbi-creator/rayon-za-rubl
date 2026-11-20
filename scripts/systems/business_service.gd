@@ -32,7 +32,7 @@ func get_business(plot_id: int) -> Dictionary:
 	return businesses[plot_id].duplicate(true)
 
 func open_business(plot_id: int, economy: EconomyService) -> bool:
-	if plot_id < 1 or economy == null or businesses.has(plot_id):
+	if plot_id < 1 or plot_id >= 6 or economy == null or businesses.has(plot_id):
 		return false
 	if not economy.try_spend(OPENING_COST, "Открытие магазина у дома"):
 		return false
