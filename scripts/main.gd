@@ -1,5 +1,26 @@
 extends Node2D
 
+func _input(event: InputEvent) -> void:
+	if district_panel == null or not is_instance_valid(district_panel) or not district_panel.visible:
+		return
+
+	var press_position := Vector2.ZERO
+	var is_pointer_press := false
+	if event is InputEventScreenTouch and event.pressed:
+		press_position = event.position
+		is_pointer_press = true
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		press_position = event.position
+		is_pointer_press = true
+
+	if not is_pointer_press:
+		return
+	# Taps and clicks inside the panel keep it open; anything outside dismisses it.
+	if not district_panel.get_global_rect().has_point(press_position):
+		_hide_district_panel()
+
+
+
 const DistrictWorldScript = preload("res://scripts/world/isometric_district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
