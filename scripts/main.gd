@@ -106,6 +106,9 @@ var level_hud_label: Label
 var navigation_panel: PanelContainer
 var quickbar_panel: PanelContainer
 var district_scroll: ScrollContainer
+var household_card: PanelContainer
+var household_card_content: VBoxContainer
+var household_card_tab: String = "family"
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -369,6 +372,17 @@ func _create_interface() -> void:
 	plot_description.custom_minimum_size = Vector2(270, 86)
 	plot_description.add_theme_color_override("font_color", Color("#e0e5d6"))
 	content.add_child(plot_description)
+
+	household_card = PanelContainer.new()
+	household_card.visible = false
+	household_card.add_theme_stylebox_override("panel", _panel_style(Color("#1c2940"), 0.98))
+	content.add_child(household_card)
+	var household_card_outer := VBoxContainer.new()
+	household_card_outer.add_theme_constant_override("separation", 8)
+	household_card.add_child(household_card_outer)
+	household_card_content = VBoxContainer.new()
+	household_card_content.add_theme_constant_override("separation", 7)
+	household_card_outer.add_child(household_card_content)
 
 	status_label = Label.new()
 	status_label.text = "Район ждёт своего восстановления."
@@ -1692,6 +1706,166 @@ func _on_road_cell_requested(cell: Vector2i) -> void:
 	road_tool_status_label.text = "Дорога построена! −%s ₽. Можно продолжать." % _format_money(ROAD_CELL_COST)
 	_save_game()
 
+func _refresh_household_card(family: Dictionary) -> void:
+	if household_card == null or household_card_content == null:
+		return
+	household_card.visible = true
+	for child in household_card_content.get_children():
+		child.queue_free()
+	var header := HBoxContainer.new()
+	household_card_content.add_child(header)
+	var family_title := Label.new()
+	family_title.text = "СЕМЬЯ • %s" % str(family.get("title", "Жители дома"))
+	family_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	family_title.add_theme_font_size_override("font_size", 15)
+	family_title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(family_title)
+	var mood := int(family.get("mood", 75))
+	var satisfaction := int(family.get("satisfaction", 75))
+	var mood_label := Label.new()
+	mood_label.text = "☺ %d%%" % mood
+	mood_label.add_theme_color_override("font_color", Color("#f2d98e"))
+	header.add_child(mood_label)
+	var satisfaction_label := Label.new()
+	satisfaction_label.text = "♥ %d%%" % satisfaction
+	satisfaction_label.add_theme_color_override("font_color", Color("#f2a7b5"))
+	header.add_child(satisfaction_label)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 5)
+	household_card_content.add_child(tabs)
+	for tab in [{"id":"family","label":"Семья"},{"id":"needs","label":"Потребности"},{"id":"goals","label":"Цели"},{"id":"events","label":"События"}]:
+		var tab_button := Button.new()
+		tab_button.text = str(tab["label"])
+		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab_button.custom_minimum_size = Vector2(0, 34)
+		tab_button.add_theme_font_size_override("font_size", 11)
+		var tab_color := Color("#477fc7") if household_card_tab == str(tab["id"]) else Color("#34445f")
+		tab_button.add_theme_stylebox_override("normal", _button_style(tab_color))
+		tab_button.pressed.connect(_on_household_tab_pressed.bind(str(tab["id"])))
+		tabs.add_child(tab_button)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 6)
+	household_card_content.add_child(body)
+	var members: Array = family.get("members", [])
+	match household_card_tab:
+		"needs":
+			var needs: Dictionary = family.get("needs", {})
+			_add_household_need_row(body, "Энергия", float(needs.get("energy", 75.0)), Color("#66b8ed"))
+			_add_household_need_row(body, "Сытость", float(needs.get("hunger", 80.0)), Color("#82c96b"))
+			_add_household_need_row(body, "Гигиена", float(needs.get("hygiene", 80.0)), Color("#64c9bd"))
+			_add_household_need_row(body, "Досуг", float(needs.get("leisure", 75.0)), Color("#b17de0"))
+			_add_household_need_row(body, "Комфорт дома", float(needs.get("home_comfort", 75.0)), Color("#d9b76d"))
+		"goals":
+			for member_value in members:
+				if not member_value is Dictionary:
+					continue
+				var member: Dictionary = member_value
+				var goal: Dictionary = member.get("personal_goal", {})
+				var target := maxi(1, int(goal.get("target", 1)))
+				var progress := clampi(int(goal.get("progress", 0)), 0, target)
+				var goal_label := Label.new()
+				goal_label.text = "%s • %s" % [str(member.get("name", "Житель")), str(goal.get("title", "Личная цель"))]
+				goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				goal_label.add_theme_font_size_override("font_size", 11)
+				body.add_child(goal_label)
+				_add_household_need_row(body, "Выполнение", 100.0 * float(progress) / float(target), Color("#d9b76d"), "%d/%d" % [progress, target] if not bool(goal.get("completed", false)) else "Выполнено")
+		"events":
+			var active_event: Dictionary = family.get("active_event", {})
+			if active_event.is_empty():
+				_add_household_info(body, "Сейчас у семьи нет активных событий.")
+			else:
+				_add_household_info(body, str(active_event.get("title", "Семейное событие")))
+				_add_household_info(body, str(active_event.get("description", "Семье нужна поддержка.")))
+			var history: Array = family.get("activity_history", [])
+			for event_value in history.slice(maxi(0, history.size() - 3), history.size()):
+				if event_value is Dictionary:
+					_add_household_info(body, "День %d • %02d:%02d — %s" % [int(event_value.get("day", 1)), int(event_value.get("hour", 0)), int(event_value.get("minute", 0)), str(event_value.get("description", "Событие"))])
+		_:
+			for member_value in members:
+				if not member_value is Dictionary:
+					continue
+				var member: Dictionary = member_value
+				var member_row := HBoxContainer.new()
+				member_row.add_theme_constant_override("separation", 8)
+				body.add_child(member_row)
+				var avatar := Label.new()
+				var member_name := str(member.get("name", "Житель"))
+				avatar.text = member_name.left(1).to_upper()
+				avatar.custom_minimum_size = Vector2(38, 38)
+				avatar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				avatar.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				avatar.add_theme_font_size_override("font_size", 17)
+				avatar.add_theme_color_override("font_color", Color("#f4e8c8"))
+				avatar.add_theme_stylebox_override("normal", _button_style(Color("#526b8d")))
+				member_row.add_child(avatar)
+				var member_info := VBoxContainer.new()
+				member_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				member_row.add_child(member_info)
+				var name_label := Label.new()
+				name_label.text = "%s • %s" % [member_name, str(member.get("role", "Житель"))]
+				name_label.add_theme_font_size_override("font_size", 12)
+				name_label.add_theme_color_override("font_color", Color("#f4e8c8"))
+				member_info.add_child(name_label)
+				var activity_label := Label.new()
+				activity_label.text = str(member.get("activity_label", "Дома"))
+				activity_label.add_theme_font_size_override("font_size", 10)
+				activity_label.add_theme_color_override("font_color", Color("#b9c9df"))
+				member_info.add_child(activity_label)
+				var member_needs: Dictionary = member.get("needs", {})
+				var quick_needs := Label.new()
+				quick_needs.text = "Энергия %d%%  •  Еда %d%%  •  Настроение %d%%" % [int(member_needs.get("energy", 75)), int(member_needs.get("hunger", 80)), int(member.get("mood", 75))]
+				quick_needs.add_theme_font_size_override("font_size", 10)
+				quick_needs.add_theme_color_override("font_color", Color("#d3dfed"))
+				member_info.add_child(quick_needs)
+
+func _add_household_need_row(container: VBoxContainer, caption: String, value: float, tint: Color, suffix: String = "") -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	container.add_child(row)
+	var title := Label.new()
+	title.text = caption
+	title.custom_minimum_size = Vector2(94, 0)
+	title.add_theme_font_size_override("font_size", 10)
+	title.add_theme_color_override("font_color", Color("#e0e8f2"))
+	row.add_child(title)
+	var bar := ProgressBar.new()
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.value = clampf(value, 0.0, 100.0)
+	bar.show_percentage = false
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.custom_minimum_size = Vector2(70, 12)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = tint
+	fill.corner_radius_top_left = 6
+	fill.corner_radius_top_right = 6
+	fill.corner_radius_bottom_left = 6
+	fill.corner_radius_bottom_right = 6
+	bar.add_theme_stylebox_override("fill", fill)
+	bar.add_theme_stylebox_override("background", _panel_style(Color("#354258"), 1.0))
+	row.add_child(bar)
+	var amount := Label.new()
+	amount.text = suffix if not suffix.is_empty() else "%d%%" % roundi(value)
+	amount.custom_minimum_size = Vector2(42, 0)
+	amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	amount.add_theme_font_size_override("font_size", 10)
+	amount.add_theme_color_override("font_color", Color("#f4e8c8"))
+	row.add_child(amount)
+
+func _add_household_info(container: VBoxContainer, message: String) -> void:
+	var label := Label.new()
+	label.text = message
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color("#d9e4f0"))
+	container.add_child(label)
+
+func _on_household_tab_pressed(tab_id: String) -> void:
+	household_card_tab = tab_id
+	if selected_plot_id >= 0:
+		var family := resident_service.get_family_at_plot(selected_plot_id)
+		if not family.is_empty():
+			_refresh_household_card(family)
 func _on_plot_selected(plot_id: int) -> void:
 	selected_plot_id = plot_id
 	var plot_name := world.get_plot_name(plot_id)
@@ -1713,6 +1887,8 @@ func _on_plot_selected(plot_id: int) -> void:
 	household_actions_heading.visible = false
 	member_autonomy_container.visible = false
 	autonomy_toggle_button.visible = false
+	if household_card != null:
+		household_card.visible = false
 	plot_title.text = plot_name
 	if kind == "locked":
 		var level_ready := progression_service.get_level() >= EAST_QUARTER_REQUIRED_LEVEL
@@ -1760,6 +1936,7 @@ func _on_plot_selected(plot_id: int) -> void:
 		var ready := move_in_service.is_ready(plot_id)
 		var current_family := resident_service.get_family_at_plot(plot_id)
 		if not current_family.is_empty():
+			_refresh_household_card(current_family)
 			household_actions_grid.visible = true
 			household_actions_heading.visible = true
 			autonomy_toggle_button.visible = true
