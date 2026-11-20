@@ -89,6 +89,13 @@ func get_road_cells() -> Array[Vector2i]:
 	)
 	return cells
 
+func get_road_endpoints() -> Array[Vector2i]:
+	var endpoints: Array[Vector2i] = []
+	for cell in get_road_cells():
+		if _get_road_neighbor_count(cell) == 1:
+			endpoints.append(cell)
+	return endpoints
+
 func get_save_data() -> Dictionary:
 	var saved_cells: Array[Dictionary] = []
 	for cell in get_road_cells():
