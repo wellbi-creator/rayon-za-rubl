@@ -5,6 +5,7 @@ const MAX_EMPLOYEES_PER_SERVICE := 10
 const EMPLOYEES_FOR_FULL_EFFICIENCY := 5
 const MAINTENANCE_BASE_COST := 150
 const MAINTENANCE_COST_PER_EMPLOYEE := 100
+const DISTRICT_PLOT_COUNT := 6
 const SERVICES := [
 	{"id": "road", "label": "Дорожные рабочие", "hire_cost": 4000, "daily_salary": 500},
 	{"id": "electricity", "label": "Электрики", "hire_cost": 5000, "daily_salary": 650},
@@ -23,6 +24,7 @@ var total_work_spent: Dictionary = {}
 var service_quality: Dictionary = {}
 var automatic_maintenance_enabled: Dictionary = {}
 var last_maintenance_day: Dictionary = {}
+var service_zone_plot_ids: Dictionary = {}
 
 func _init() -> void:
 	for service in SERVICES:
@@ -34,6 +36,7 @@ func _init() -> void:
 		service_quality[service_id] = 100
 		automatic_maintenance_enabled[service_id] = false
 		last_maintenance_day[service_id] = 1
+		service_zone_plot_ids[service_id] = []
 
 func get_service_definitions() -> Array:
 	return SERVICES.duplicate(true)
@@ -50,6 +53,38 @@ func get_service_quality_percent(service_id: String) -> int:
 func get_service_discount_percent(service_id: String, maximum_discount: int) -> int:
 	var effective_percent := get_service_efficiency_percent(service_id) * get_service_quality_percent(service_id)
 	return roundi(float(clampi(maximum_discount, 0, 80) * effective_percent) / 10000.0)
+
+func get_service_zone_plot_ids(service_id: String) -> Array[int]:
+	var result: Array[int] = []
+	var saved_ids: Variant = service_zone_plot_ids.get(service_id, [])
+	if saved_ids is Array:
+		for value in saved_ids:
+			var plot_id := int(value)
+			if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and not result.has(plot_id):
+				result.append(plot_id)
+	return result
+
+func is_plot_assigned_to_service(service_id: String, plot_id: int) -> bool:
+	return get_employee_count(service_id) > 0 and get_service_zone_plot_ids(service_id).has(plot_id)
+
+func set_service_zone_plot_ids(service_id: String, plot_ids: Array) -> bool:
+	if _get_definition(service_id).is_empty() or plot_ids.size() > get_employee_count(service_id):
+		return false
+	var validated: Array[int] = []
+	for value in plot_ids:
+		var plot_id := int(value)
+		if plot_id < 0 or plot_id >= DISTRICT_PLOT_COUNT or validated.has(plot_id):
+			return false
+		validated.append(plot_id)
+	service_zone_plot_ids[service_id] = validated
+	return true
+
+func _get_first_unassigned_plot(service_id: String) -> int:
+	var assigned := get_service_zone_plot_ids(service_id)
+	for plot_id in range(DISTRICT_PLOT_COUNT):
+		if not assigned.has(plot_id):
+			return plot_id
+	return -1
 
 func is_automatic_maintenance_enabled(service_id: String) -> bool:
 	return bool(automatic_maintenance_enabled.get(service_id, false))
@@ -164,12 +199,21 @@ func hire_employee(service_id: String, economy: EconomyService) -> bool:
 	if not economy.try_spend(cost, "Найм: %s" % str(definition["label"])):
 		return false
 	employees[service_id] = get_employee_count(service_id) + 1
+	var next_plot_id := _get_first_unassigned_plot(service_id)
+	if next_plot_id >= 0:
+		var assigned := get_service_zone_plot_ids(service_id)
+		assigned.append(next_plot_id)
+		service_zone_plot_ids[service_id] = assigned
 	return true
 
 func fire_employee(service_id: String) -> bool:
 	if not employees.has(service_id) or get_employee_count(service_id) <= 0:
 		return false
 	employees[service_id] = get_employee_count(service_id) - 1
+	var assigned := get_service_zone_plot_ids(service_id)
+	while assigned.size() > get_employee_count(service_id):
+		assigned.pop_back()
+	service_zone_plot_ids[service_id] = assigned
 	return true
 
 func process_day(day: int, economy: EconomyService) -> bool:
@@ -200,7 +244,8 @@ func get_save_data() -> Dictionary:
 		"total_work_spent": total_work_spent.duplicate(true),
 		"service_quality": service_quality.duplicate(true),
 		"automatic_maintenance_enabled": automatic_maintenance_enabled.duplicate(true),
-		"last_maintenance_day": last_maintenance_day.duplicate(true)
+		"last_maintenance_day": last_maintenance_day.duplicate(true),
+		"service_zone_plot_ids": service_zone_plot_ids.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -217,6 +262,7 @@ func load_save_data(data: Dictionary) -> void:
 	var saved_quality: Variant = data.get("service_quality", {})
 	var saved_maintenance: Variant = data.get("automatic_maintenance_enabled", {})
 	var saved_maintenance_day: Variant = data.get("last_maintenance_day", {})
+	var saved_zones: Variant = data.get("service_zone_plot_ids", {})
 	for service in SERVICES:
 		var service_id := str(service["id"])
 		work_orders_completed[service_id] = maxi(0, int(saved_work_orders.get(service_id, 0))) if saved_work_orders is Dictionary else 0
@@ -225,6 +271,19 @@ func load_save_data(data: Dictionary) -> void:
 		service_quality[service_id] = clampi(int(saved_quality.get(service_id, 100)), 0, 100) if saved_quality is Dictionary else 100
 		automatic_maintenance_enabled[service_id] = bool(saved_maintenance.get(service_id, false)) if saved_maintenance is Dictionary else false
 		last_maintenance_day[service_id] = maxi(last_payroll_day, int(saved_maintenance_day.get(service_id, last_payroll_day))) if saved_maintenance_day is Dictionary else last_payroll_day
+		var restored_zones: Array[int] = []
+		if saved_zones is Dictionary and saved_zones.has(service_id) and saved_zones[service_id] is Array:
+			for value in saved_zones[service_id]:
+				var plot_id := int(value)
+				if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and not restored_zones.has(plot_id):
+					restored_zones.append(plot_id)
+		elif get_employee_count(service_id) > 0:
+			# Older saves receive a safe starter allocation, one plot per available employee.
+			for plot_id in range(mini(get_employee_count(service_id), DISTRICT_PLOT_COUNT)):
+				restored_zones.append(plot_id)
+		while restored_zones.size() > get_employee_count(service_id):
+			restored_zones.pop_back()
+		service_zone_plot_ids[service_id] = restored_zones
 
 func _get_definition(service_id: String) -> Dictionary:
 	for service in SERVICES:
