@@ -331,11 +331,15 @@ func _draw_roads() -> void:
 		_draw_diamond(preview_center, TILE * Vector2(0.88, 0.76), preview_color, preview_outline, 3.0)
 	# Small lane markers remain aligned with the road's isometric direction.
 	for x in [1, 3, 5, 7]:
-		var p: Vector2 = Grid.grid_to_world(Vector2i(x, 3), TILE)
-		draw_line(p + Vector2(-15, 0), p + Vector2(15, 0), Color("#eadcae"), 2.0)
+		var cell := Vector2i(x, 3)
+		if road_path_network.is_road_cell(cell):
+			var p: Vector2 = Grid.grid_to_world(cell, TILE)
+			draw_line(p + Vector2(-15, 0), p + Vector2(15, 0), Color("#eadcae"), 2.0)
 	for y in [1, 5]:
-		var p: Vector2 = Grid.grid_to_world(Vector2i(4, y), TILE)
-		draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
+		var cell := Vector2i(4, y)
+		if road_path_network.is_road_cell(cell):
+			var p: Vector2 = Grid.grid_to_world(cell, TILE)
+			draw_line(p + Vector2(0, -8), p + Vector2(0, 8), Color("#eadcae"), 2.0)
 
 func _draw_grass_detail(pos: Vector2) -> void:
 	var blade_color := _get_leaf_palette()[2]
