@@ -2,6 +2,7 @@ extends RefCounted
 class_name DistrictEventService
 
 const MAX_EVENT_HISTORY := 20
+const DISTRICT_PLOT_COUNT := 6
 const EVENTS := [
 	{
 		"id": "streetlight_failure",
@@ -77,6 +78,7 @@ func process_day(day: int) -> bool:
 		return false
 	var definition: Dictionary = EVENTS[rng.randi_range(0, EVENTS.size() - 1)].duplicate(true)
 	definition["created_day"] = day
+	definition["target_plot_id"] = rng.randi_range(0, DISTRICT_PLOT_COUNT - 1)
 	active_event = definition
 	return true
 
@@ -94,7 +96,8 @@ func get_choice_cost(choice_id: String, municipal_services: MunicipalServicesSer
 	var service_id := str(active_event.get("service_id", ""))
 	var maximum_discount := clampi(int(active_event.get("discount_percent", 0)), 0, 80)
 	var discount := 0
-	if municipal_services != null:
+	var target_plot_id := clampi(int(active_event.get("target_plot_id", 0)), 0, DISTRICT_PLOT_COUNT - 1)
+	if municipal_services != null and municipal_services.is_plot_assigned_to_service(service_id, target_plot_id):
 		discount = municipal_services.get_service_discount_percent(service_id, maximum_discount)
 	return roundi(float(base_cost * (100 - discount)) / 100.0)
 
@@ -159,6 +162,7 @@ func load_save_data(data: Dictionary) -> void:
 		if not definition.is_empty():
 			active_event = definition.duplicate(true)
 			active_event["created_day"] = maxi(1, int(saved_active.get("created_day", last_processed_day)))
+			active_event["target_plot_id"] = clampi(int(saved_active.get("target_plot_id", 0)), 0, DISTRICT_PLOT_COUNT - 1)
 	event_history.clear()
 	var saved_history: Variant = data.get("event_history", [])
 	if saved_history is Array:
