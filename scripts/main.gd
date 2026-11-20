@@ -1614,6 +1614,8 @@ func _on_plot_selected(plot_id: int) -> void:
 					var lifetime_customers := int(business.get("total_customers", 0))
 					var lifetime_revenue := int(business.get("total_revenue", 0))
 					var lifetime_expenses := int(business.get("total_operating_costs", 0))
+					var lifetime_paid_expenses := int(business.get("total_operating_costs_paid", 0))
+					var business_unpaid_expenses := int(business.get("unpaid_operating_costs", 0))
 					var lifetime_result := lifetime_revenue - lifetime_expenses
 					var lifetime_rent := int(business.get("total_rent_received", 0))
 					var schedule_id := business_service.get_business_schedule(plot_id)
@@ -1635,7 +1637,7 @@ func _on_plot_selected(plot_id: int) -> void:
 							upgrade_level
 						]
 					else:
-						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: %s\nПосетители: %d/день • всего: %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nЗа всё время: выручка ₽ %s • расходы ₽ %s • итог %s ₽\nДолг по расходам: ₽ %s" % [
+						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: %s\nПосетители: %d/день • всего: %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nЗа всё время: выручка ₽ %s • начислено ₽ %s • оплачено ₽ %s • итог %s ₽\nДолг заведения: ₽ %s" % [
 							business_title.to_upper(),
 							"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 							business_reputation,
@@ -1649,8 +1651,9 @@ func _on_plot_selected(plot_id: int) -> void:
 							"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
 							_format_money(lifetime_revenue),
 							_format_money(lifetime_expenses),
+							_format_money(lifetime_paid_expenses),
 							"%s%s" % ["+" if lifetime_result >= 0 else "−", _format_money(absi(lifetime_result))],
-							_format_money(business_service.unpaid_operating_costs)
+							_format_money(business_unpaid_expenses)
 						]
 					business_button.visible = not leased
 					business_button.text = "Приостановить заведение" if active else "Возобновить заведение"
