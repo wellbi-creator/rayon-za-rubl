@@ -1402,7 +1402,14 @@ func _add_navigation_button(container: VBoxContainer, caption: String, action: C
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.add_theme_font_size_override("font_size", 12)
 	button.add_theme_stylebox_override("normal", _button_style(Color("#8faed8")))
-	button.add_theme_stylebox_override("hover", _button_style(Color("#b6cbed")))
+	button.add_theme_stylebox_override("hover", _button_state_style(Color("#b6cbed"), false))
+	button.add_theme_stylebox_override("pressed", _button_state_style(Color("#8faed8"), true))
+	button.add_theme_stylebox_override("focus", _button_state_style(Color("#d5e4f4"), false))
+	button.add_theme_stylebox_override("disabled", _button_style(Color("#697789")))
+	button.add_theme_color_override("font_color", Color("#1d2b3c"))
+	button.add_theme_color_override("font_hover_color", Color("#17283a"))
+	button.add_theme_color_override("font_pressed_color", Color("#17283a"))
+	button.add_theme_color_override("font_disabled_color", Color("#c2c9cf"))
 	button.pressed.connect(action)
 	container.add_child(button)
 
@@ -1413,7 +1420,14 @@ func _add_quickbar_button(container: HBoxContainer, caption: String, action: Cal
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 11)
 	button.add_theme_stylebox_override("normal", _button_style(Color("#a9c5e6")))
-	button.add_theme_stylebox_override("hover", _button_style(Color("#c5d9f0")))
+	button.add_theme_stylebox_override("hover", _button_state_style(Color("#c5d9f0"), false))
+	button.add_theme_stylebox_override("pressed", _button_state_style(Color("#a9c5e6"), true))
+	button.add_theme_stylebox_override("focus", _button_state_style(Color("#dce9f7"), false))
+	button.add_theme_stylebox_override("disabled", _button_style(Color("#697789")))
+	button.add_theme_color_override("font_color", Color("#1d2b3c"))
+	button.add_theme_color_override("font_hover_color", Color("#17283a"))
+	button.add_theme_color_override("font_pressed_color", Color("#17283a"))
+	button.add_theme_color_override("font_disabled_color", Color("#c2c9cf"))
 	button.pressed.connect(action)
 	container.add_child(button)
 
@@ -1458,32 +1472,40 @@ func _on_interface_resized() -> void:
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(color.r, color.g, color.b, alpha)
-	style.corner_radius_top_left = 16
-	style.corner_radius_top_right = 16
-	style.corner_radius_bottom_left = 16
-	style.corner_radius_bottom_right = 16
+	style.corner_radius_top_left = 18
+	style.corner_radius_top_right = 18
+	style.corner_radius_bottom_left = 18
+	style.corner_radius_bottom_right = 18
 	style.content_margin_left = 18
 	style.content_margin_right = 18
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	style.border_color = Color("#c9d7e8", 0.20)
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	style.border_color = Color("#d9e5d4", 0.28)
 	style.set_border_width_all(1)
-	style.shadow_color = Color(0.02, 0.04, 0.08, 0.38)
-	style.shadow_size = 14
-	style.shadow_offset = Vector2(0, 5)
+	style.shadow_color = Color(0.01, 0.025, 0.045, 0.46)
+	style.shadow_size = 18
+	style.shadow_offset = Vector2(0, 6)
 	return style
 
 func _button_style(color: Color) -> StyleBoxFlat:
+	return _button_state_style(color, false)
+
+func _button_state_style(color: Color, pressed: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = Color("#ffffff", 0.18)
+	style.bg_color = color.darkened(0.12) if pressed else color
+	style.border_color = Color("#fff3d6", 0.34 if pressed else 0.24)
 	style.set_border_width_all(1)
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
-	style.content_margin_left = 12
-	style.content_margin_right = 12
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	style.shadow_color = Color(0.01, 0.02, 0.035, 0.28)
+	style.shadow_size = 4 if not pressed else 1
+	style.shadow_offset = Vector2(0, 2) if not pressed else Vector2.ZERO
 	return style
 
 func _update_balance() -> void:
