@@ -645,6 +645,9 @@ func _show_district_event() -> void:
 		return
 	district_event_title_label.text = str(event.get("title", "Событие района"))
 	district_event_description_label.text = str(event.get("description", "Району требуется внимание."))
+	var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, 5)
+	var target_plot_name := world.get_plot_name(target_plot_id) if world != null else "Участок района"
+	district_event_description_label.text += "\n\nЗона происшествия: %s" % target_plot_name
 	district_event_status_label.text = "День %d" % int(event.get("created_day", game_time.get_day()))
 	for child in district_event_choices.get_children():
 		district_event_choices.remove_child(child)
@@ -657,10 +660,12 @@ func _show_district_event() -> void:
 		var button := Button.new()
 		var service_id := str(event.get("service_id", ""))
 		var service_staff_count := municipal_services.get_employee_count(service_id) if municipal_services != null else 0
+		var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, 5)
+		var can_dispatch_staff := municipal_services != null and municipal_services.is_plot_assigned_to_service(service_id, target_plot_id)
 		var service_action := int(choice.get("cost", 0)) > 0
 		var action_label := str(choice.get("label", "Выбрать"))
 		if service_action:
-			action_label = ("👷 Направить свою службу: " if service_staff_count > 0 else "Вызвать подрядчика: ") + action_label
+			action_label = ("👷 Направить свою службу: " if can_dispatch_staff else "Вызвать подрядчика: ") + action_label
 		button.text = "%s%s" % [
 			action_label,
 			"  •  ₽ %s" % _format_money(cost) if cost > 0 else "  •  бесплатно"
@@ -669,7 +674,7 @@ func _show_district_event() -> void:
 		button.add_theme_font_size_override("font_size", 12)
 		button.disabled = cost < 0 or cost > economy.balance
 		button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
-		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id, service_action and service_staff_count > 0))
+		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id, service_action and can_dispatch_staff))
 		district_event_choices.add_child(button)
 	district_event_popup.popup_centered(Vector2i(560, 360))
 
@@ -795,7 +800,8 @@ func _refresh_municipal_services() -> void:
 		var quality := municipal_services.get_service_quality_percent(service_id)
 		var maintenance_cost := municipal_services.get_maintenance_cost(service_id)
 		var maintenance_status := "ВКЛ • ₽ %s/работу" % _format_money(maintenance_cost) if municipal_services.is_automatic_maintenance_enabled(service_id) else "ВЫКЛ"
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
+		var assigned_zones := municipal_services.get_service_zone_plot_ids(service_id)
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%  •  Качество: %d%%\nЗоны: %d/%d участков\nЗарплата: ₽ %s/день\nАвтообслуживание: %s\nВыполнено работ: %d  •  %s\nЗатраты на работы: ₽ %s" % [label, count, efficiency, quality, assigned_zones.size(), count, _format_money(daily_salary), maintenance_status, work_count, work_status, _format_money(work_spent)]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
@@ -807,6 +813,13 @@ func _refresh_municipal_services() -> void:
 		maintenance_button.disabled = count <= 0
 		maintenance_button.pressed.connect(_on_municipal_maintenance_toggled.bind(service_id))
 		row.add_child(maintenance_button)
+		var zones_button := Button.new()
+		zones_button.text = "Зоны"
+		zones_button.custom_minimum_size = Vector2(64, 42)
+		zones_button.add_theme_font_size_override("font_size", 10)
+		zones_button.disabled = count <= 0
+		zones_button.pressed.connect(_on_municipal_zones_pressed.bind(service_id))
+		row.add_child(zones_button)
 		var fire_button := Button.new()
 		fire_button.text = "−"
 		fire_button.custom_minimum_size = Vector2(42, 42)
@@ -829,6 +842,51 @@ func _on_municipal_maintenance_toggled(service_id: String) -> void:
 		_save_game()
 	else:
 		municipal_status_label.text = "Для автообслуживания сначала найми хотя бы одного работника."
+	_refresh_municipal_services()
+
+
+func _on_municipal_zones_pressed(service_id: String) -> void:
+	var popup := PopupPanel.new()
+	popup.name = "MunicipalZonesPopup"
+	var layout := VBoxContainer.new()
+	layout.custom_minimum_size = Vector2(320, 0)
+	layout.add_theme_constant_override("separation", 8)
+	popup.add_child(layout)
+	var heading := Label.new()
+	heading.text = "Зоны: %s" % service_id
+	heading.add_theme_color_override("font_color", Color("#f4d98d"))
+	layout.add_child(heading)
+	var hint := Label.new()
+	hint.text = "Один сотрудник обслуживает один участок. Можно выбрать не больше числа работников."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	layout.add_child(hint)
+	var zone_checkboxes: Array[CheckBox] = []
+	var assigned := municipal_services.get_service_zone_plot_ids(service_id)
+	for plot_id in range(6):
+		var checkbox := CheckBox.new()
+		checkbox.text = world.get_plot_name(plot_id)
+		checkbox.button_pressed = assigned.has(plot_id)
+		layout.add_child(checkbox)
+		zone_checkboxes.append(checkbox)
+	var save_button := Button.new()
+	save_button.text = "Сохранить зоны"
+	save_button.pressed.connect(_save_municipal_service_zones.bind(service_id, zone_checkboxes, popup))
+	layout.add_child(save_button)
+	add_child(popup)
+	popup.popup_centered(Vector2i(380, 430))
+
+
+func _save_municipal_service_zones(service_id: String, checkboxes: Array[CheckBox], popup: PopupPanel) -> void:
+	var selected_plots: Array[int] = []
+	for plot_id in range(checkboxes.size()):
+		if checkboxes[plot_id].button_pressed:
+			selected_plots.append(plot_id)
+	if not municipal_services.set_service_zone_plot_ids(service_id, selected_plots):
+		municipal_status_label.text = "Нельзя назначить больше участков, чем есть работников в этой службе."
+		return
+	municipal_status_label.text = "Зоны службы обновлены: %d участков." % selected_plots.size()
+	popup.hide()
+	_save_game()
 	_refresh_municipal_services()
 
 
