@@ -384,9 +384,15 @@ func _create_interface() -> void:
 	quickbar_panel.offset_bottom = -12
 	quickbar_panel.add_theme_stylebox_override("panel", _panel_style(Color("#202b42"), 0.94))
 	root.add_child(quickbar_panel)
+	var quickbar_scroll := ScrollContainer.new()
+	quickbar_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	quickbar_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	quickbar_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quickbar_panel.add_child(quickbar_scroll)
 	var quickbar := HBoxContainer.new()
 	quickbar.add_theme_constant_override("separation", 9)
-	quickbar_panel.add_child(quickbar)
+	quickbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quickbar_scroll.add_child(quickbar)
 	_add_quickbar_button(quickbar, "⌂  ПОСТРОИТЬ", _on_navigation_build_pressed)
 	_add_quickbar_button(quickbar, "ДОРОГА", _on_road_tool_pressed)
 	_add_quickbar_button(quickbar, "АСФАЛЬТ", _on_road_asphalt_pressed)
@@ -1389,7 +1395,7 @@ func _add_navigation_button(container: VBoxContainer, caption: String, action: C
 func _add_quickbar_button(container: HBoxContainer, caption: String, action: Callable) -> void:
 	var button := Button.new()
 	button.text = caption
-	button.custom_minimum_size = Vector2(0, 46)
+	button.custom_minimum_size = Vector2(112, 46)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", 11)
 	button.add_theme_stylebox_override("normal", _button_style(Color("#a9c5e6")))
@@ -1433,7 +1439,7 @@ func _on_interface_resized() -> void:
 		district_panel.offset_left = -panel_width - 10.0
 		district_panel.offset_top = 82.0 if compact else 104.0
 		district_panel.offset_right = -10.0
-		district_panel.offset_bottom = -10.0
+		district_panel.offset_bottom = -84.0
 
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
