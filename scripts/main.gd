@@ -15,6 +15,8 @@ const WeatherServiceScript = preload("res://scripts/systems/weather_service.gd")
 const BusinessServiceScript = preload("res://scripts/systems/business_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
+const EAST_QUARTER_REQUIRED_LEVEL := 3
+const EAST_QUARTER_REQUIRED_REPUTATION := 20
 const BABA_QUEST_REWARD := 150000
 const ROAD_CELL_COST := 5000
 const ROAD_REMOVAL_REFUND := 2500
@@ -755,6 +757,8 @@ func _refresh_progression_popup() -> void:
 
 func _award_district_progress(experience_gain: int, reputation_gain: int, reason: String) -> void:
 	progression_service.add_progress(experience_gain, reputation_gain, reason)
+	if selected_plot_id >= 0 and world != null and not world.is_plot_unlocked(selected_plot_id):
+		_on_plot_selected(selected_plot_id)
 	if progression_achievements_rows != null:
 		_refresh_progression_popup()
 	_save_game()
@@ -1301,10 +1305,12 @@ func _on_plot_selected(plot_id: int) -> void:
 	autonomy_toggle_button.visible = false
 	plot_title.text = plot_name
 	if kind == "locked":
-		plot_description.text = "Этот участок находится в восточном квартале. Открытие квартала даст доступ к четырём новым площадкам, которые затем можно покупать по отдельности."
-		status_label.text = "Стоимость открытия восточного квартала: ₽ %s" % _format_money(world.get_quarter_purchase_cost())
+		var level_ready := progression_service.get_level() >= EAST_QUARTER_REQUIRED_LEVEL
+		var reputation_ready := progression_service.reputation >= EAST_QUARTER_REQUIRED_REPUTATION
+		plot_description.text = "Восточный квартал откроется, когда район достигнет 3-го уровня и репутации 20. После выполнения условий потребуется оплатить покупку территории."
+		status_label.text = "Требования: уровень %d/%d • репутация %d/%d\nСтоимость: ₽ %s" % [progression_service.get_level(), EAST_QUARTER_REQUIRED_LEVEL, progression_service.reputation, EAST_QUARTER_REQUIRED_REPUTATION, _format_money(world.get_quarter_purchase_cost())]
 		build_button.text = "Открыть восточный квартал"
-		build_button.disabled = economy.balance < world.get_quarter_purchase_cost()
+		build_button.disabled = not level_ready or not reputation_ready or economy.balance < world.get_quarter_purchase_cost()
 	elif kind == "unowned":
 		var land_cost := world.get_plot_purchase_cost(plot_id)
 		plot_description.text = "Участок доступен для покупки. После приобретения здесь можно будет построить дом и заселить семью либо подготовить площадку под магазин."
@@ -1790,6 +1796,9 @@ func _on_build_pressed() -> void:
 		_save_game()
 		return
 	if selected_plot_id >= 0 and not world.is_plot_unlocked(selected_plot_id):
+		if progression_service.get_level() < EAST_QUARTER_REQUIRED_LEVEL or progression_service.reputation < EAST_QUARTER_REQUIRED_REPUTATION:
+			status_label.text = "Сначала развей район до 3-го уровня и подними репутацию до 20."
+			return
 		var quarter_cost := world.get_quarter_purchase_cost()
 		if not economy.try_spend(quarter_cost, "Покупка восточного квартала"):
 			status_label.text = "Недостаточно средств для покупки квартала."
