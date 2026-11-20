@@ -66,12 +66,12 @@ func get_save_data() -> Dictionary:
 
 func load_save_data(data: Dictionary) -> void:
 	current_day = maxi(1, int(data.get("current_day", 1)))
-	season_id = str(data.get("season_id", _get_season_for_day(current_day)))
-	if not SEASONS.has(season_id):
-		season_id = _get_season_for_day(current_day)
+	# The calendar is the source of truth if a save contains an outdated season value.
+	season_id = _get_season_for_day(current_day)
 	weather_id = str(data.get("weather_id", "clear"))
-	if not WEATHER_LABELS.has(weather_id):
-		weather_id = "clear"
+	var seasonal_options: Array = WEATHER_BY_SEASON.get(season_id, WEATHER_BY_SEASON["spring"])
+	if not seasonal_options.has(weather_id):
+		weather_id = _roll_weather(season_id)
 	next_weather_day = maxi(current_day + 1, int(data.get("next_weather_day", current_day + 2)))
 	var saved_rng_state := int(data.get("rng_state", 0))
 	if saved_rng_state > 0:
