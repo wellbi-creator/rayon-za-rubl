@@ -1470,15 +1470,31 @@ func _add_quickbar_button(container: HBoxContainer, caption: String, action: Cal
 	button.pressed.connect(action)
 	container.add_child(button)
 
+func _open_district_panel() -> void:
+	if district_panel == null or not is_instance_valid(district_panel):
+		return
+	district_panel.visible = true
+	district_panel.show()
+	district_panel.move_to_front()
+	if district_scroll != null:
+		district_scroll.visible = true
+		district_scroll.queue_redraw()
+
+
 func _on_navigation_map_pressed() -> void:
+	_open_district_panel()
 	status_label.text = "Карта района. Выбери участок, чтобы открыть его действия."
 	if world.road_build_mode:
 		world.set_road_build_mode(false)
 
+
 func _on_navigation_build_pressed() -> void:
+	_open_district_panel()
 	if district_scroll != null and build_button != null:
 		district_scroll.ensure_control_visible(build_button)
 	status_label.text = "Выбери свободный участок на карте, затем нажми «Построить обычный дом»."
+
+
 func _on_interface_resized() -> void:
 	if control_root == null:
 		return
