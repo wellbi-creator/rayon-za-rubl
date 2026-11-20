@@ -45,6 +45,14 @@ func get_business_type_title(business_type: String) -> String:
 func get_business_type_ids() -> Array[String]:
 	return ["corner_shop", "bakery", "cafe"]
 
+func get_business_reputation(plot_id: int) -> int:
+	var business := get_business(plot_id)
+	return clampi(int(business.get("reputation", 50)), 0, 100)
+
+func get_business_reputation_change(plot_id: int) -> int:
+	var business := get_business(plot_id)
+	return clampi(int(business.get("last_reputation_change", 0)), -1, 1)
+
 func get_business_upgrade_level(plot_id: int) -> int:
 	var business := get_business(plot_id)
 	return clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size())
@@ -106,7 +114,16 @@ func purchase_business_upgrade(plot_id: int, economy: EconomyService) -> bool:
 
 func _get_business_attraction_weight(business: Dictionary) -> int:
 	var upgrade_level := clampi(int(business.get("upgrade_level", 0)), 0, BUSINESS_UPGRADE_COSTS.size())
-	return BUSINESS_BASE_ATTRACTION + upgrade_level * BUSINESS_UPGRADE_ATTRACTION
+	var reputation := clampi(int(business.get("reputation", 50)), 0, 100)
+	return maxi(1, BUSINESS_BASE_ATTRACTION + upgrade_level * BUSINESS_UPGRADE_ATTRACTION + reputation - 50)
+
+func _update_business_reputation(business: Dictionary, average_satisfaction: float) -> Dictionary:
+	var current := clampi(int(business.get("reputation", 50)), 0, 100)
+	var target := clampi(roundi(clampf(average_satisfaction, 0.0, 100.0)), 0, 100)
+	var change := 1 if current < target else (-1 if current > target else 0)
+	business["reputation"] = clampi(current + change, 0, 100)
+	business["last_reputation_change"] = change
+	return business
 
 func get_daily_revenue() -> int:
 	return DAILY_REVENUE
@@ -163,7 +180,9 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 		"active": true,
 		"opened_day": last_processed_day,
 		"last_daily_customers": BASE_DAILY_CUSTOMERS,
-		"last_daily_revenue": BASE_DAILY_CUSTOMERS * int(BUSINESS_TYPES[business_type].get("customer_spend", CUSTOMER_SPEND))
+		"last_daily_revenue": BASE_DAILY_CUSTOMERS * int(BUSINESS_TYPES[business_type].get("customer_spend", CUSTOMER_SPEND)),
+		"reputation": 50,
+		"last_reputation_change": 0
 	}
 	return true
 
@@ -182,6 +201,17 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 	if elapsed_days <= 0:
 		return false
 	last_processed_day = day
+	# Reputation follows resident satisfaction, one point per elapsed game day.
+	# Leased venues continue operating and building reputation under their tenant.
+	for key in businesses.keys():
+		var business: Dictionary = businesses[key]
+		if not bool(business.get("active", false)) or resident_count <= 0:
+			business["last_reputation_change"] = 0
+			businesses[key] = business
+			continue
+		for _day_index in range(elapsed_days):
+			business = _update_business_reputation(business, average_satisfaction)
+		businesses[key] = business
 	var active_plot_ids: Array[int] = []
 	for key in businesses.keys():
 		var business: Dictionary = businesses[key]
@@ -253,7 +283,9 @@ func get_save_data() -> Dictionary:
 			"active": bool(business.get("active", false)),
 			"opened_day": maxi(1, int(business.get("opened_day", 1))),
 			"last_daily_customers": maxi(0, int(business.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),
-			"last_daily_revenue": maxi(0, int(business.get("last_daily_revenue", DAILY_REVENUE)))
+			"last_daily_revenue": maxi(0, int(business.get("last_daily_revenue", DAILY_REVENUE))),
+			"reputation": clampi(int(business.get("reputation", 50)), 0, 100),
+			"last_reputation_change": clampi(int(business.get("last_reputation_change", 0)), -1, 1)
 		})
 	return {
 		"businesses": saved_businesses,
@@ -284,5 +316,7 @@ func load_save_data(data: Dictionary) -> void:
 			"active": bool(entry.get("active", false)),
 			"opened_day": maxi(1, int(entry.get("opened_day", 1))),
 			"last_daily_customers": maxi(0, int(entry.get("last_daily_customers", BASE_DAILY_CUSTOMERS))),
-			"last_daily_revenue": maxi(0, int(entry.get("last_daily_revenue", DAILY_REVENUE)))
+			"last_daily_revenue": maxi(0, int(entry.get("last_daily_revenue", DAILY_REVENUE))),
+			"reputation": clampi(int(entry.get("reputation", 50)), 0, 100),
+			"last_reputation_change": clampi(int(entry.get("last_reputation_change", 0)), -1, 1)
 		}
