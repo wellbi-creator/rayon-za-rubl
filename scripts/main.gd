@@ -684,7 +684,7 @@ func _create_business_portfolio_popup() -> void:
 func _on_business_portfolio_pressed() -> void:
 	_refresh_business_portfolio()
 	_polish_context_panel(business_portfolio_popup)
-	business_portfolio_popup.popup_centered(Vector2i(600, 500))
+	_show_responsive_popup(business_portfolio_popup, Vector2i(600, 500))
 
 
 func _refresh_business_portfolio() -> void:
@@ -796,7 +796,7 @@ func _create_finance_popup() -> void:
 func _on_finance_pressed() -> void:
 	_refresh_finance_summary()
 	_polish_context_panel(finance_popup)
-	finance_popup.popup_centered(Vector2i(560, 390))
+	_show_responsive_popup(finance_popup, Vector2i(560, 390))
 
 func _refresh_finance_summary() -> void:
 	if finance_summary_label == null or economy == null:
@@ -1025,7 +1025,7 @@ func _show_district_event() -> void:
 		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id, service_action and can_dispatch_staff))
 		district_event_choices.add_child(button)
 	_polish_context_panel(district_event_popup)
-	district_event_popup.popup_centered(Vector2i(560, 360))
+	_show_responsive_popup(district_event_popup, Vector2i(560, 360))
 
 
 func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: bool = false) -> void:
@@ -1052,7 +1052,7 @@ func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: b
 func _on_progression_pressed() -> void:
 	_refresh_progression_popup()
 	_polish_context_panel(progression_popup)
-	progression_popup.popup_centered(Vector2i(560, 470))
+	_show_responsive_popup(progression_popup, Vector2i(560, 470))
 
 
 func _refresh_progression_popup() -> void:
@@ -1115,7 +1115,7 @@ func _award_district_progress(experience_gain: int, reputation_gain: int, reason
 func _on_municipal_services_pressed() -> void:
 	_refresh_municipal_services()
 	_polish_context_panel(municipal_popup)
-	municipal_popup.popup_centered(Vector2i(560, 470))
+	_show_responsive_popup(municipal_popup, Vector2i(560, 470))
 
 
 func _refresh_municipal_services() -> void:
@@ -1248,7 +1248,7 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
 	_polish_context_panel(popup)
-	popup.popup_centered(Vector2i(380, 500))
+	_show_responsive_popup(popup, Vector2i(380, 500))
 
 
 func _save_municipal_service_zones(service_id: String, checkboxes: Array[CheckBox], plot_ids: Array[int], popup: PopupPanel) -> void:
@@ -1297,7 +1297,7 @@ func _on_municipal_equipment_pressed(service_id: String) -> void:
 	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
 	_polish_context_panel(popup)
-	popup.popup_centered(Vector2i(360, 220))
+	_show_responsive_popup(popup, Vector2i(360, 220))
 
 
 func _on_municipal_equipment_upgrade_pressed(service_id: String, popup: PopupPanel) -> void:
@@ -1332,7 +1332,7 @@ func _on_municipal_fire_pressed(service_id: String) -> void:
 func _on_transaction_history_pressed() -> void:
 	_refresh_transaction_history()
 	_polish_context_panel(transaction_popup)
-	transaction_popup.popup_centered(Vector2i(560, 380))
+	_show_responsive_popup(transaction_popup, Vector2i(560, 380))
 
 
 func _refresh_transaction_history() -> void:
@@ -1484,29 +1484,68 @@ func _on_interface_resized() -> void:
 		return
 	var viewport_size := control_root.size
 	var compact := viewport_size.x < 1050.0
+	var phone_landscape := viewport_size.x < 950.0 or viewport_size.y < 460.0
 	if hint_label != null:
 		hint_label.visible = not compact
 	if top_hud_panel != null:
-		top_hud_panel.position = Vector2(10, 10)
-		top_hud_panel.size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
-		top_hud_panel.custom_minimum_size = Vector2(maxf(0.0, viewport_size.x - 20.0), 62.0 if compact else 70.0)
+		top_hud_panel.position = Vector2(10, 8)
+		top_hud_panel.size = Vector2(maxf(0.0, viewport_size.x - 20.0), 58.0 if phone_landscape else (62.0 if compact else 70.0))
+		top_hud_panel.custom_minimum_size = top_hud_panel.size
 	if navigation_panel != null:
-		navigation_panel.position = Vector2(12.0, 112.0)
-		navigation_panel.custom_minimum_size = Vector2(142.0 if compact else 164.0, 0.0)
-		navigation_panel.visible = viewport_size.x >= 760.0
+		navigation_panel.position = Vector2(10.0, 76.0 if phone_landscape else 112.0)
+		navigation_panel.custom_minimum_size = Vector2(132.0 if phone_landscape else (142.0 if compact else 164.0), 0.0)
+		navigation_panel.visible = viewport_size.x >= 950.0
 	if quickbar_panel != null:
-		quickbar_panel.offset_left = 12.0
-		quickbar_panel.offset_right = -12.0
-		quickbar_panel.offset_top = -68.0 if compact else -78.0
-		quickbar_panel.offset_bottom = -8.0
-		quickbar_panel.visible = viewport_size.y >= 420.0
+		quickbar_panel.offset_left = 8.0
+		quickbar_panel.offset_right = -8.0
+		quickbar_panel.offset_top = -58.0 if phone_landscape else (-68.0 if compact else -78.0)
+		quickbar_panel.offset_bottom = -6.0
+		quickbar_panel.visible = viewport_size.y >= 320.0
 	if district_panel != null:
-		var panel_width := clampf(viewport_size.x * (0.37 if compact else 0.30), 270.0, 390.0)
+		var panel_width := clampf(viewport_size.x * (0.40 if phone_landscape else (0.37 if compact else 0.30)), 240.0, 390.0)
 		district_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		district_panel.offset_left = -panel_width - 10.0
-		district_panel.offset_top = 82.0 if compact else 104.0
-		district_panel.offset_right = -10.0
-		district_panel.offset_bottom = -84.0
+		district_panel.offset_left = -panel_width - 8.0
+		district_panel.offset_top = 72.0 if phone_landscape else (82.0 if compact else 104.0)
+		district_panel.offset_right = -8.0
+		district_panel.offset_bottom = -66.0 if phone_landscape else -84.0
+	if top_hud_panel != null:
+		for hud_child in top_hud_panel.get_children():
+			if hud_child is HBoxContainer:
+				hud_child.add_theme_constant_override("separation", 7 if phone_landscape else (10 if compact else 18))
+				for item in hud_child.get_children():
+					if item is Label:
+						var label := item as Label
+						var base_size := 20 if label == null else label.get_theme_font_size("font_size")
+						if phone_landscape:
+							label.add_theme_font_size_override("font_size", mini(base_size, 13))
+						elif compact:
+							label.add_theme_font_size_override("font_size", mini(base_size, 16))
+						else:
+							label.remove_theme_font_size_override("font_size")
+
+
+func _show_responsive_popup(popup: PopupPanel, preferred_size: Vector2i) -> void:
+	if popup == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var max_width := maxi(280, int(viewport_size.x * 0.92))
+	var max_height := maxi(220, int(viewport_size.y * 0.86))
+	popup.size = Vector2i(
+		mini(preferred_size.x, max_width),
+		mini(preferred_size.y, max_height)
+	)
+	_set_popup_scroll_minimums(popup)
+	popup.popup_centered(popup.size)
+
+
+func _set_popup_scroll_minimums(node: Node) -> void:
+	for child in node.get_children():
+		if child is ScrollContainer:
+			var scroll := child as ScrollContainer
+			scroll.custom_minimum_size = Vector2(0.0, 96.0)
+			scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_set_popup_scroll_minimums(child)
 
 func _panel_style(color: Color, alpha: float) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
