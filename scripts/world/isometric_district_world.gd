@@ -490,22 +490,108 @@ func _draw_plot(plot_id: int) -> void:
 		"building":
 			_draw_construction(center, float(state.get("progress", 0.0)))
 		"built":
-			_draw_house(center, true)
 			if business_plots.has(plot_id):
 				var business_value: Variant = business_plots[plot_id]
 				var shop_active := false
 				var open_hour := 8
 				var close_hour := 20
+				var business_type := "corner_shop"
+				var upgrade_level := 0
+				var leased := false
 				if business_value is Dictionary:
 					shop_active = bool(business_value.get("active", false))
 					open_hour = clampi(int(business_value.get("open_hour", 8)), 0, 23)
 					close_hour = clampi(int(business_value.get("close_hour", 20)), 0, 24)
+					business_type = str(business_value.get("type", "corner_shop"))
+					upgrade_level = clampi(int(business_value.get("upgrade_level", 0)), 0, 2)
+					leased = bool(business_value.get("leased", false))
 				else:
 					shop_active = bool(business_value)
-				var is_open_now := business_current_hour >= open_hour and business_current_hour < close_hour
-				_draw_shop_sign(center, shop_active and is_open_now)
+				var is_open_now := shop_active and business_current_hour >= open_hour and business_current_hour < close_hour
+				_draw_commercial_building(center, business_type, is_open_now, upgrade_level, leased)
+			else:
+				_draw_house(center, true)
 		_:
 			_draw_garden(center)
+
+func _draw_commercial_building(ground: Vector2, business_type: String, open_now: bool, upgrade_level: int, leased: bool) -> void:
+	# A compact isometric storefront, visually distinct from residential houses.
+	var accent := Color("#c77a52")
+	var sign_text := "МАГАЗИН"
+	match business_type:
+		"bakery":
+			accent = Color("#d69a55")
+			sign_text = "ПЕКАРНЯ"
+		"cafe":
+			accent = Color("#a86b83")
+			sign_text = "КАФЕ"
+		var _unused := 0
+	var wall_left := Color("#ead2a7") if business_type != "cafe" else Color("#dfc2b3")
+	var wall_right := Color("#c49b76") if business_type != "cafe" else Color("#b88f91")
+	var glass := Color("#f5d98d") if open_now else Color("#829da0")
+	glass = glass.lerp(Color("#f8d78a"), night_factor * 0.9)
+	_draw_diamond(ground + Vector2(0, 16), Vector2(61, 27), Color("#53624d", 0.30), Color("#b7b08e", 0.35), 1.0)
+	_draw_diamond(ground + Vector2(0, 15), Vector2(54, 22), Color("#8ba06f"), Color("#c1c69a"), 1.0)
+	# Side walls and a shallow roof create a clear storefront silhouette.
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-29, -17), ground + Vector2(0, -1), ground + Vector2(0, -43), ground + Vector2(-29, -59)]), wall_left)
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(0, -1), ground + Vector2(29, -17), ground + Vector2(29, -59), ground + Vector2(0, -43)]), wall_right)
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-36, -59), ground + Vector2(0, -78), ground + Vector2(36, -59), ground + Vector2(0, -42)]), Color("#654b43"))
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-32, -59), ground + Vector2(0, -75), ground + Vector2(32, -59), ground + Vector2(0, -45)]), Color("#8a5c4b"))
+	draw_line(ground + Vector2(0, -75), ground + Vector2(0, -45), Color("#d0a27a"), 1.4)
+	# Large display windows, warm mullions and a recessed entrance.
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-25, -38), ground + Vector2(-7, -29), ground + Vector2(-7, -9), ground + Vector2(-25, -18)]), glass)
+	draw_line(ground + Vector2(-16, -33), ground + Vector2(-16, -14), Color("#f4e4c4"), 1.4)
+	draw_line(ground + Vector2(-25, -18), ground + Vector2(-7, -9), Color("#f4e4c4"), 1.2)
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(5, -28), ground + Vector2(24, -18), ground + Vector2(24, -39), ground + Vector2(5, -49)]), glass.darkened(0.08))
+	draw_line(ground + Vector2(14, -44), ground + Vector2(14, -23), Color("#e9d8b8"), 1.4)
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(2, -27), ground + Vector2(11, -22), ground + Vector2(11, -2), ground + Vector2(2, -7)]), Color("#654737"))
+	draw_circle(ground + Vector2(9, -14), 1.2, Color("#f0cf84"))
+	# Striped canopy and illuminated sign are shared, but each shop keeps its own identity.
+	var awning := ground + Vector2(-28, -41)
+	draw_colored_polygon(PackedVector2Array([awning, awning + Vector2(54, 0), awning + Vector2(54, 8), awning + Vector2(0, 8)]), accent)
+	for stripe in 5:
+		var stripe_x := float(stripe) * 11.0
+		draw_line(awning + Vector2(stripe_x, 1), awning + Vector2(stripe_x, 8), Color("#f5e4c6", 0.88), 2.0)
+	var sign_origin := ground + Vector2(-19, -64)
+	draw_rect(Rect2(sign_origin - Vector2(2, 2), Vector2(41, 13)), Color("#443c34"), true)
+	draw_rect(Rect2(sign_origin, Vector2(37, 9)), accent.lightened(0.12), true)
+	draw_string(ThemeDB.fallback_font, sign_origin + Vector2(1, 7), sign_text, HORIZONTAL_ALIGNMENT_LEFT, 36.0, 6, Color("#fff1d2"))
+	if business_type == "bakery":
+		# Bread loaves in the front display.
+		for loaf_index in 3:
+			var loaf_pos := ground + Vector2(-21.0 + float(loaf_index) * 6.0, -22.0 + float(loaf_index) * 3.0)
+			draw_ellipse(loaf_pos, Vector2(3.2, 1.7), Color("#e7b96f"))
+			draw_line(loaf_pos + Vector2(-1, 0), loaf_pos + Vector2(1, 0), Color("#9a633d"), 0.7)
+	elif business_type == "cafe":
+		# Two outdoor tables and tiny chairs make the cafe readable at map scale.
+		for table_index in 2:
+			var table_pos := ground + Vector2(39.0 + float(table_index) * 7.0, 7.0 + float(table_index) * 5.0)
+			draw_ellipse(table_pos + Vector2(0, 3), Vector2(6, 2.8), Color("#59483d", 0.35))
+			draw_ellipse(table_pos, Vector2(5.5, 2.6), Color("#e4c99e"))
+			draw_line(table_pos + Vector2(0, 1), table_pos + Vector2(0, 7), Color("#6d5140"), 1.2)
+			draw_circle(table_pos + Vector2(-8, 3), 2.0, Color("#9a7658"))
+			draw_circle(table_pos + Vector2(8, 3), 2.0, Color("#9a7658"))
+	else:
+		# Grocery shelves and stacked produce in the display window.
+		for shelf_index in 2:
+			draw_line(ground + Vector2(-24, -22.0 + float(shelf_index) * 6.0), ground + Vector2(-9, -15.0 + float(shelf_index) * 6.0), Color("#e8d2a5"), 1.0)
+			draw_circle(ground + Vector2(-20.0 + float(shelf_index) * 5.0, -20.0 + float(shelf_index) * 6.0), 1.3, Color("#d5a45e"))
+	if upgrade_level > 0:
+		# A visible premium trim marks purchased attraction upgrades.
+		draw_line(ground + Vector2(-31, -59), ground + Vector2(0, -77), Color("#f0d18a"), 2.0)
+		draw_line(ground + Vector2(0, -77), ground + Vector2(31, -59), Color("#f0d18a"), 2.0)
+		draw_circle(ground + Vector2(0, -79), 3.0, Color("#f4d47a"))
+	if upgrade_level > 1:
+		draw_circle(ground + Vector2(-32, -42), 3.0, Color("#f2d48c"))
+		draw_circle(ground + Vector2(32, -42), 3.0, Color("#f2d48c"))
+	if leased:
+		draw_rect(Rect2(ground + Vector2(12, -71), Vector2(17, 7)), Color("#e5d6b8"), true)
+		draw_string(ThemeDB.fallback_font, ground + Vector2(13, -65), "АРЕНДА", HORIZONTAL_ALIGNMENT_LEFT, 16.0, 4, Color("#5c5146"))
+	if night_factor > 0.04:
+		draw_circle(ground + Vector2(-16, -27), 12.0, Color("#f7d98b", night_factor * 0.12))
+		draw_circle(ground + Vector2(15, -29), 12.0, Color("#f7d98b", night_factor * 0.10))
+	if not open_now:
+		draw_line(ground + Vector2(-27, -40), ground + Vector2(27, -40), Color("#53615b", 0.7), 1.0)
 
 func _draw_shop_sign(ground: Vector2, open_now: bool) -> void:
 	var sign_color := Color("#e0bd70") if open_now else Color("#8b9389")
