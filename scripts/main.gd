@@ -74,6 +74,8 @@ var hint_label: Label
 var transaction_popup: PopupPanel
 var business_portfolio_popup: PopupPanel
 var business_portfolio_summary_label: Label
+var finance_popup: PopupPanel
+var finance_summary_label: Label
 var business_portfolio_rows: VBoxContainer
 var transaction_rows: VBoxContainer
 var transaction_summary_label: Label
@@ -156,6 +158,7 @@ func _create_interface() -> void:
 	control_root = root
 	root.resized.connect(_on_interface_resized)
 	_create_transaction_history_popup()
+	_create_finance_popup()
 	_create_business_portfolio_popup()
 	_create_municipal_services_popup()
 	_create_progression_popup()
@@ -259,6 +262,14 @@ func _create_interface() -> void:
 	business_portfolio_button.add_theme_font_size_override("font_size", 10)
 	business_portfolio_button.add_theme_stylebox_override("normal", _button_style(Color("#d5b98f")))
 	business_portfolio_button.pressed.connect(_on_business_portfolio_pressed)
+	var finance_button := Button.new()
+	finance_button.text = "ФИНАНСЫ РАЙОНА"
+	finance_button.custom_minimum_size = Vector2(0, 36)
+	finance_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	finance_button.add_theme_font_size_override("font_size", 11)
+	finance_button.add_theme_stylebox_override("normal", _button_style(Color("#b8c7c0")))
+	finance_button.pressed.connect(_on_finance_pressed)
+	content.add_child(finance_button)
 	management_buttons.add_child(business_portfolio_button)
 	road_tool_button = Button.new()
 	road_tool_button.text = "ДОРОГИ"
@@ -662,6 +673,78 @@ func _refresh_business_portfolio() -> void:
 		details_label.add_theme_color_override("font_color", Color("#c9d0b9"))
 		row.add_child(details_label)
 
+
+func _create_finance_popup() -> void:
+	finance_popup = PopupPanel.new()
+	finance_popup.title = "Финансы района"
+	finance_popup.size = Vector2i(560, 390)
+	finance_popup.transient = true
+	finance_popup.exclusive = true
+	add_child(finance_popup)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	finance_popup.add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	panel.add_child(content)
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	var title := Label.new()
+	title.text = "ФИНАНСОВАЯ СВОДКА РАЙОНА"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "✕"
+	close_button.custom_minimum_size = Vector2(42, 34)
+	close_button.pressed.connect(finance_popup.hide)
+	header.add_child(close_button)
+	finance_summary_label = Label.new()
+	finance_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	finance_summary_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	finance_summary_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+	content.add_child(finance_summary_label)
+
+func _on_finance_pressed() -> void:
+	_refresh_finance_summary()
+	finance_popup.popup_centered(Vector2i(560, 390))
+
+func _refresh_finance_summary() -> void:
+	if finance_summary_label == null or economy == null:
+		return
+	var resident_count := resident_service.get_total_resident_count()
+	var business_projection := business_service.get_daily_financial_projection(resident_count, _get_average_resident_satisfaction(), progression_service.reputation, weather_service.weather_id)
+	var business_revenue := int(business_projection.get("daily_revenue", 0))
+	var rent_income := int(business_projection.get("daily_rent", 0))
+	var business_costs := int(business_projection.get("daily_expenses", 0))
+	var household_costs := upkeep_service.get_daily_cost(resident_count)
+	var payroll := municipal_services.get_total_daily_payroll()
+	var maintenance := 0
+	for definition in municipal_services.get_service_definitions():
+		var service_id := str(definition.get("id", ""))
+		if municipal_services.is_automatic_maintenance_enabled(service_id) and municipal_services.get_employee_count(service_id) > 0:
+			maintenance += municipal_services.get_maintenance_cost(service_id)
+	var daily_income := business_revenue + rent_income
+	var daily_costs := business_costs + household_costs + payroll + maintenance
+	var daily_result := daily_income - daily_costs
+	var result_sign := "+" if daily_result >= 0 else "−"
+	var total_debt := business_service.unpaid_operating_costs + municipal_services.get_unpaid_wages() + upkeep_service.unpaid_balance
+	finance_summary_label.text = "ТЕКУЩИЙ БАЛАНС\n₽ %s\n\nПРОГНОЗ НА ИГРОВЫЕ СУТКИ\nВыручка бизнеса: + ₽ %s\nАренда: + ₽ %s\nРасходы бизнеса: − ₽ %s\nКоммунальные расходы жителей: − ₽ %s\nЗарплаты служб: − ₽ %s\nПлановое обслуживание: до ₽ %s\n\nОжидаемый операционный результат: %s ₽ %s\n\nТЕКУЩИЕ ДОЛГИ\nБизнес: ₽ %s\nЗарплаты служб: ₽ %s\nКоммунальные расходы жителей: ₽ %s\nВсего задолженность: ₽ %s\n\nПрогноз ориентировочный. Спрос зависит от населения, удовлетворённости, репутации и погоды. Обслуживание показано как верхняя оценка." % [
+		_format_money(economy.balance),
+		_format_money(business_revenue),
+		_format_money(rent_income),
+		_format_money(business_costs),
+		_format_money(household_costs),
+		_format_money(payroll),
+		_format_money(maintenance),
+		result_sign, _format_money(absi(daily_result)),
+		_format_money(business_service.unpaid_operating_costs),
+		_format_money(municipal_services.get_unpaid_wages()),
+		_format_money(upkeep_service.unpaid_balance),
+		_format_money(total_debt)
+	]
 
 func _create_municipal_services_popup() -> void:
 	municipal_popup = PopupPanel.new()
