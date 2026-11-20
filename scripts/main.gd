@@ -10,6 +10,7 @@ const GameTimeScript = preload("res://scripts/systems/game_time.gd")
 const DistrictUpkeepServiceScript = preload("res://scripts/systems/district_upkeep_service.gd")
 const MunicipalServicesServiceScript = preload("res://scripts/systems/municipal_services_service.gd")
 const DistrictProgressionServiceScript = preload("res://scripts/systems/district_progression_service.gd")
+const DistrictEventServiceScript = preload("res://scripts/systems/district_event_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -23,6 +24,7 @@ var game_time: GameTime
 var upkeep_service: DistrictUpkeepService
 var municipal_services: MunicipalServicesService
 var progression_service: DistrictProgressionService
+var district_event_service: DistrictEventService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
@@ -64,6 +66,11 @@ var progression_popup: PopupPanel
 var progression_summary_label: Label
 var progression_achievements_rows: VBoxContainer
 var progression_events_label: Label
+var district_event_popup: PopupPanel
+var district_event_title_label: Label
+var district_event_description_label: Label
+var district_event_choices: VBoxContainer
+var district_event_status_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -71,6 +78,7 @@ func _ready() -> void:
 	upkeep_service = DistrictUpkeepServiceScript.new()
 	municipal_services = MunicipalServicesServiceScript.new()
 	progression_service = DistrictProgressionServiceScript.new()
+	district_event_service = DistrictEventServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
@@ -118,6 +126,7 @@ func _create_interface() -> void:
 	_create_transaction_history_popup()
 	_create_municipal_services_popup()
 	_create_progression_popup()
+	_create_district_event_popup()
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -492,6 +501,98 @@ func _create_progression_popup() -> void:
 	content.add_child(progression_events_label)
 
 
+func _create_district_event_popup() -> void:
+	district_event_popup = PopupPanel.new()
+	district_event_popup.title = "Событие района"
+	district_event_popup.size = Vector2i(560, 360)
+	district_event_popup.transient = true
+	district_event_popup.exclusive = true
+	add_child(district_event_popup)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	district_event_popup.add_child(panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	panel.add_child(content)
+
+	district_event_title_label = Label.new()
+	district_event_title_label.add_theme_font_size_override("font_size", 19)
+	district_event_title_label.add_theme_color_override("font_color", Color("#f4d98d"))
+	district_event_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(district_event_title_label)
+
+	district_event_description_label = Label.new()
+	district_event_description_label.add_theme_color_override("font_color", Color("#e0e5d6"))
+	district_event_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	district_event_description_label.custom_minimum_size = Vector2(500, 72)
+	content.add_child(district_event_description_label)
+
+	var choices_heading := Label.new()
+	choices_heading.text = "КАК ПОСТУПИМ?"
+	choices_heading.add_theme_font_size_override("font_size", 13)
+	choices_heading.add_theme_color_override("font_color", Color("#f4e8c8"))
+	content.add_child(choices_heading)
+
+	district_event_choices = VBoxContainer.new()
+	district_event_choices.add_theme_constant_override("separation", 6)
+	content.add_child(district_event_choices)
+
+	district_event_status_label = Label.new()
+	district_event_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	district_event_status_label.add_theme_color_override("font_color", Color("#c9d0b9"))
+	content.add_child(district_event_status_label)
+
+
+func _show_district_event() -> void:
+	if district_event_service == null or district_event_popup == null:
+		return
+	var event := district_event_service.get_active_event()
+	if event.is_empty():
+		return
+	district_event_title_label.text = str(event.get("title", "Событие района"))
+	district_event_description_label.text = str(event.get("description", "Району требуется внимание."))
+	district_event_status_label.text = "День %d" % int(event.get("created_day", game_time.get_day()))
+	for child in district_event_choices.get_children():
+		district_event_choices.remove_child(child)
+		child.queue_free()
+	for choice in event.get("choices", []):
+		if not choice is Dictionary:
+			continue
+		var choice_id := str(choice.get("id", ""))
+		var cost := district_event_service.get_choice_cost(choice_id, municipal_services)
+		var button := Button.new()
+		button.text = "%s%s" % [
+			str(choice.get("label", "Выбрать")),
+			"  •  ₽ %s" % _format_money(cost) if cost > 0 else "  •  бесплатно"
+		]
+		button.custom_minimum_size = Vector2(0, 42)
+		button.add_theme_font_size_override("font_size", 12)
+		button.disabled = cost < 0 or cost > economy.balance
+		button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id))
+		district_event_choices.add_child(button)
+	district_event_popup.popup_centered(Vector2i(560, 360))
+
+
+func _on_district_event_choice_pressed(choice_id: String) -> void:
+	var result := district_event_service.resolve_choice(choice_id, game_time.get_day(), economy, municipal_services)
+	if not bool(result.get("success", false)):
+		district_event_status_label.text = str(result.get("message", "Не удалось применить решение."))
+		_show_district_event()
+		return
+	progression_service.add_progress(int(result.get("experience", 0)), int(result.get("reputation", 0)), str(result.get("reason", "Решение события района")))
+	if progression_service.unlock_achievement("first_district_event"):
+		progression_service.add_progress(15, 1, "Решено первое событие района")
+	if progression_achievements_rows != null:
+		_refresh_progression_popup()
+	district_event_popup.hide()
+	status_label.text = str(result.get("message", "Событие района завершено."))
+	_save_game()
+
+
 func _on_progression_pressed() -> void:
 	_refresh_progression_popup()
 	progression_popup.popup_centered(Vector2i(560, 470))
@@ -738,8 +839,13 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
-		if upkeep_processed or payroll_processed:
+		var event_spawned := district_event_service.process_day(day) if district_event_service != null else false
+		if event_spawned:
+			_show_district_event()
+		if upkeep_processed or payroll_processed or event_spawned:
 			_save_game()
+		if district_event_service != null and district_event_service.has_active_event() and district_event_popup != null and not district_event_popup.visible:
+			_show_district_event()
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
@@ -1256,6 +1362,7 @@ func _save_game() -> void:
 		"district_upkeep": upkeep_service.get_save_data(),
 		"municipal_services": municipal_services.get_save_data(),
 		"district_progression": progression_service.get_save_data(),
+		"district_events": district_event_service.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -1305,6 +1412,11 @@ func _load_game() -> void:
 	var progression_data: Variant = data.get("district_progression", {})
 	if progression_data is Dictionary:
 		progression_service.load_save_data(progression_data)
+	var event_data: Variant = data.get("district_events", {})
+	if event_data is Dictionary and not event_data.is_empty():
+		district_event_service.load_save_data(event_data)
+	else:
+		district_event_service.initialize_day(game_time.get_day())
 	# Backfill one-time achievements for milestones completed in older saves.
 	if baba_wiring_repaired:
 		progression_service.unlock_achievement("baba_helper")
