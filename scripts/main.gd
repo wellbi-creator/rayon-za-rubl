@@ -538,7 +538,7 @@ func _refresh_progression_popup() -> void:
 	var events := progression_service.get_recent_events()
 	if not events.is_empty():
 		var last_event: Dictionary = events[events.size() - 1]
-		progression_events_label.text += "\nПоследний вклад: %s  •  +%d XP  •  репутация %+d" % [
+		progression_events_label.text += "\nПоследний вклад: %s  •  +%d XP  •  репутация %d" % [
 			str(last_event.get("reason", "Развитие района")),
 			int(last_event.get("experience", 0)),
 			int(last_event.get("reputation", 0))
@@ -1305,6 +1305,18 @@ func _load_game() -> void:
 	var progression_data: Variant = data.get("district_progression", {})
 	if progression_data is Dictionary:
 		progression_service.load_save_data(progression_data)
+	# Backfill one-time achievements for milestones completed in older saves.
+	if baba_wiring_repaired:
+		progression_service.unlock_achievement("baba_helper")
+	for plot_id in range(1, world.plot_states.size()):
+		if world.get_plot_kind(plot_id) == "built":
+			progression_service.unlock_achievement("first_house")
+		if move_in_service.is_ready(plot_id):
+			progression_service.unlock_achievement("first_ready_home")
+	if resident_service.get_total_resident_count() > 0:
+		progression_service.unlock_achievement("first_family")
+	if municipal_services.get_total_employee_count() > 0:
+		progression_service.unlock_achievement("first_worker")
 	is_loading_game = false
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
