@@ -687,6 +687,52 @@ func _draw_house(ground: Vector2, repaired: bool) -> void:
 		ground + Vector2(13, 2), ground + Vector2(4, -3)
 	]), Color("#76513d"))
 	draw_circle(ground + Vector2(10, -12), 1.5, Color("#e2bd78"))
+	# Residential facade pass: trim, window ledges, planters and a sheltered entrance.
+	var trim_light := Color("#f0dfc0", 0.92)
+	var trim_shadow := Color("#8c684e", 0.88)
+	# Corner boards and subtle masonry courses give both wall planes more depth.
+	draw_line(ground + Vector2(-29, -18), ground + Vector2(-29, -2), trim_light, 1.6)
+	draw_line(ground + Vector2(29, -18), ground + Vector2(29, -2), trim_shadow, 1.5)
+	draw_line(ground + Vector2(-28, -9), ground + Vector2(-2, 5), Color("#b89570", 0.55), 0.8)
+	draw_line(ground + Vector2(2, 7), ground + Vector2(28, -7), Color("#916f54", 0.48), 0.8)
+	# Projecting sills and compact shutters frame the existing windows.
+	draw_line(ground + Vector2(-23, -18), ground + Vector2(-10, -11), Color("#f4e5c9"), 2.0)
+	draw_line(ground + Vector2(6, -6), ground + Vector2(19, 1), Color("#e7d2b1"), 2.0)
+	draw_line(ground + Vector2(-25, -38), ground + Vector2(-25, -25), trim_shadow, 1.4)
+	draw_line(ground + Vector2(-9, -30), ground + Vector2(-9, -17), trim_shadow, 1.4)
+	draw_line(ground + Vector2(5, -27), ground + Vector2(5, -13), trim_light, 1.2)
+	draw_line(ground + Vector2(21, -18), ground + Vector2(21, -5), trim_light, 1.2)
+	# Flower boxes sit just below the window sills; flowers stay small at map scale.
+	draw_colored_polygon(PackedVector2Array([
+		ground + Vector2(-24, -17), ground + Vector2(-11, -10),
+		ground + Vector2(-11, -7), ground + Vector2(-24, -14)
+	]), Color("#76513f"))
+	draw_colored_polygon(PackedVector2Array([
+		ground + Vector2(5, -5), ground + Vector2(19, 2),
+		ground + Vector2(19, 5), ground + Vector2(5, -2)
+	]), Color("#76513f"))
+	for flower_index in 3:
+		var flower_offset := float(flower_index) * 4.0
+		draw_circle(ground + Vector2(-21 + flower_offset, -19 + flower_offset * 0.5), 1.5, Color("#d98d83"))
+		draw_circle(ground + Vector2(8 + flower_offset, -7 + flower_offset * 0.5), 1.4, Color("#e5c879"))
+	# A small porch canopy and two steps make the front door easier to read.
+	draw_colored_polygon(PackedVector2Array([
+		ground + Vector2(1, -29), ground + Vector2(15, -21),
+		ground + Vector2(20, -25), ground + Vector2(6, -33)
+	]), Color("#9a624b"))
+	draw_line(ground + Vector2(6, -32), ground + Vector2(6, -27), Color("#e2bd87"), 1.2)
+	draw_line(ground + Vector2(16, -26), ground + Vector2(16, -21), Color("#e2bd87"), 1.2)
+	_draw_diamond(ground + Vector2(10, 5), Vector2(13, 7), Color("#a99a7e"), Color("#ded0b5"), 0.8)
+	_draw_diamond(ground + Vector2(10, 8), Vector2(10, 5), Color("#c8b99b"), Color("#e6dac4"), 0.6)
+	# Downpipe follows the outer corner of the right wall into the foundation.
+	draw_line(ground + Vector2(29, -56), ground + Vector2(29, -2), Color("#765747"), 2.0)
+	draw_line(ground + Vector2(27, -55), ground + Vector2(27, -3), Color("#d0a47b", 0.8), 0.8)
+	draw_line(ground + Vector2(24, -1), ground + Vector2(31, -1), Color("#765747"), 1.5)
+	# Foundation cap and roof-edge highlight tie the new details into the existing silhouette.
+	draw_line(ground + Vector2(-30, -2), ground + Vector2(0, 14), Color("#8c725a"), 1.5)
+	draw_line(ground + Vector2(0, 14), ground + Vector2(30, -2), Color("#755746"), 1.5)
+	draw_line(ground + Vector2(-37, -21), ground + Vector2(0, -43), Color("#c98f70", 0.8), 1.0)
+	draw_line(ground + Vector2(0, -43), ground + Vector2(37, -21), Color("#a87860", 0.8), 1.0)
 	draw_line(ground + Vector2(-31, -18), ground + Vector2(-31, 25), Color("#f0d7ad", 0.5), 1.0)
 	_draw_bush(ground + Vector2(-43, 12))
 	_draw_bush(ground + Vector2(43, 12))
