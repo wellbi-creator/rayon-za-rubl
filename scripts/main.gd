@@ -8,6 +8,7 @@ const MoveInServiceScript = preload("res://scripts/systems/move_in_service.gd")
 const ResidentServiceScript = preload("res://scripts/systems/resident_service.gd")
 const GameTimeScript = preload("res://scripts/systems/game_time.gd")
 const DistrictUpkeepServiceScript = preload("res://scripts/systems/district_upkeep_service.gd")
+const MunicipalServicesServiceScript = preload("res://scripts/systems/municipal_services_service.gd")
 const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
@@ -19,6 +20,7 @@ var move_in_service: MoveInService
 var resident_service: ResidentService
 var game_time: GameTime
 var upkeep_service: DistrictUpkeepService
+var municipal_services: MunicipalServicesService
 var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
@@ -52,11 +54,16 @@ var hint_label: Label
 var transaction_popup: PopupPanel
 var transaction_rows: VBoxContainer
 var transaction_summary_label: Label
+var municipal_popup: PopupPanel
+var municipal_rows: VBoxContainer
+var municipal_summary_label: Label
+var municipal_status_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
 	add_child(economy)
 	upkeep_service = DistrictUpkeepServiceScript.new()
+	municipal_services = MunicipalServicesServiceScript.new()
 	economy.balance_changed.connect(_on_balance_changed)
 	save_service = SaveServiceScript.new()
 	add_child(save_service)
@@ -102,6 +109,7 @@ func _create_interface() -> void:
 	control_root = root
 	root.resized.connect(_on_interface_resized)
 	_create_transaction_history_popup()
+	_create_municipal_services_popup()
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -155,13 +163,25 @@ func _create_interface() -> void:
 	heading.add_theme_color_override("font_color", Color("#f4e8c8"))
 	content.add_child(heading)
 
+	var management_buttons := HBoxContainer.new()
+	management_buttons.add_theme_constant_override("separation", 8)
+	content.add_child(management_buttons)
 	var transaction_button := Button.new()
-	transaction_button.text = "₽  ЖУРНАЛ ОПЕРАЦИЙ"
+	transaction_button.text = "ЖУРНАЛ ОПЕРАЦИЙ"
 	transaction_button.custom_minimum_size = Vector2(0, 40)
+	transaction_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	transaction_button.add_theme_font_size_override("font_size", 11)
 	transaction_button.add_theme_stylebox_override("normal", _button_style(Color("#d8c58e")))
-	transaction_button.add_theme_stylebox_override("hover", _button_style(Color("#ead7a5")))
 	transaction_button.pressed.connect(_on_transaction_history_pressed)
-	content.add_child(transaction_button)
+	management_buttons.add_child(transaction_button)
+	var municipal_button := Button.new()
+	municipal_button.text = "СЛУЖБЫ"
+	municipal_button.custom_minimum_size = Vector2(0, 40)
+	municipal_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	municipal_button.add_theme_font_size_override("font_size", 11)
+	municipal_button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
+	municipal_button.pressed.connect(_on_municipal_services_pressed)
+	management_buttons.add_child(municipal_button)
 
 	plot_title = Label.new()
 	plot_title.text = "Выбери участок"
@@ -347,6 +367,123 @@ func _create_transaction_history_popup() -> void:
 	scroll.add_child(transaction_rows)
 
 
+func _create_municipal_services_popup() -> void:
+	municipal_popup = PopupPanel.new()
+	municipal_popup.title = "Коммунальные службы района"
+	municipal_popup.size = Vector2i(560, 470)
+	municipal_popup.transient = true
+	municipal_popup.exclusive = true
+	add_child(municipal_popup)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.add_theme_stylebox_override("panel", _panel_style(Color("#263c34"), 0.98))
+	municipal_popup.add_child(panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	var title := Label.new()
+	title.text = "ШТАТ КОММУНАЛЬНЫХ СЛУЖБ"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color("#f4e8c8"))
+	header.add_child(title)
+	var close_button := Button.new()
+	close_button.text = "✕"
+	close_button.custom_minimum_size = Vector2(42, 34)
+	close_button.pressed.connect(municipal_popup.hide)
+	header.add_child(close_button)
+
+	municipal_summary_label = Label.new()
+	municipal_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	municipal_summary_label.add_theme_color_override("font_color", Color("#f4d98d"))
+	content.add_child(municipal_summary_label)
+
+	municipal_status_label = Label.new()
+	municipal_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	municipal_status_label.add_theme_color_override("font_color", Color("#c9d0b9"))
+	content.add_child(municipal_status_label)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(500, 340)
+	content.add_child(scroll)
+	municipal_rows = VBoxContainer.new()
+	municipal_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	municipal_rows.add_theme_constant_override("separation", 6)
+	scroll.add_child(municipal_rows)
+
+
+func _on_municipal_services_pressed() -> void:
+	_refresh_municipal_services()
+	municipal_popup.popup_centered(Vector2i(560, 470))
+
+
+func _refresh_municipal_services() -> void:
+	if municipal_rows == null or municipal_services == null:
+		return
+	municipal_summary_label.text = "Работников: %d  •  зарплата за игровые сутки: ₽ %s  •  долг: ₽ %s" % [
+		municipal_services.get_total_employee_count(),
+		_format_money(municipal_services.get_total_daily_payroll()),
+		_format_money(municipal_services.get_unpaid_wages())
+	]
+	for child in municipal_rows.get_children():
+		municipal_rows.remove_child(child)
+		child.queue_free()
+	for definition in municipal_services.get_service_definitions():
+		var service_id := str(definition["id"])
+		var label := str(definition["label"])
+		var count := municipal_services.get_employee_count(service_id)
+		var daily_salary := municipal_services.get_daily_salary(service_id)
+		var hire_cost := municipal_services.get_hire_cost(service_id)
+		var row_panel := PanelContainer.new()
+		row_panel.add_theme_stylebox_override("panel", _panel_style(Color("#354b40"), 0.9))
+		municipal_rows.add_child(row_panel)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		row_panel.add_child(row)
+		var info := Label.new()
+		info.text = "%s\nШтат: %d  •  ₽ %s/день" % [label, count, _format_money(daily_salary)]
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_theme_color_override("font_color", Color("#e0e5d6"))
+		row.add_child(info)
+		var fire_button := Button.new()
+		fire_button.text = "−"
+		fire_button.custom_minimum_size = Vector2(42, 42)
+		fire_button.disabled = count <= 0
+		fire_button.pressed.connect(_on_municipal_fire_pressed.bind(service_id))
+		row.add_child(fire_button)
+		var hire_button := Button.new()
+		hire_button.text = "+ ₽ %s" % _format_money(hire_cost)
+		hire_button.custom_minimum_size = Vector2(112, 42)
+		hire_button.disabled = count >= MunicipalServicesService.MAX_EMPLOYEES_PER_SERVICE or economy.balance < hire_cost
+		hire_button.add_theme_font_size_override("font_size", 11)
+		hire_button.pressed.connect(_on_municipal_hire_pressed.bind(service_id))
+		row.add_child(hire_button)
+
+
+func _on_municipal_hire_pressed(service_id: String) -> void:
+	var hire_cost := municipal_services.get_hire_cost(service_id)
+	if municipal_services.hire_employee(service_id, economy):
+		municipal_status_label.text = "Сотрудник принят. Найм оплачен: ₽ %s." % _format_money(hire_cost)
+		_save_game()
+	else:
+		municipal_status_label.text = "Найм невозможен: проверь баланс или лимит штата."
+	_refresh_municipal_services()
+
+
+func _on_municipal_fire_pressed(service_id: String) -> void:
+	if municipal_services.fire_employee(service_id):
+		municipal_status_label.text = "Сотрудник уволен. Возврат средств за найм не предусмотрен."
+		_save_game()
+	_refresh_municipal_services()
+
+
 func _on_transaction_history_pressed() -> void:
 	_refresh_transaction_history()
 	transaction_popup.popup_centered(Vector2i(560, 380))
@@ -463,12 +600,17 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if resident_service != null:
 		resident_service.update_time(hour, minute, day)
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
-		if upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy):
+		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
+		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
+		if upkeep_processed or payroll_processed:
 			_save_game()
 
 func _on_balance_changed(_new_balance: int) -> void:
 	_update_balance()
-	_save_game()
+	if municipal_rows != null:
+		_refresh_municipal_services()
+	if not is_loading_game:
+		_save_game()
 
 func _format_money(value: int) -> String:
 	var raw := str(value)
@@ -968,6 +1110,7 @@ func _save_game() -> void:
 		"balance": economy.balance,
 		"economy_transactions": economy.get_transaction_history(),
 		"district_upkeep": upkeep_service.get_save_data(),
+		"municipal_services": municipal_services.get_save_data(),
 		"baba_notebook_opened": baba_notebook_opened,
 		"baba_wiring_repaired": baba_wiring_repaired,
 		"world": world.get_save_data(),
@@ -1009,6 +1152,11 @@ func _load_game() -> void:
 	else:
 		# Legacy saves start tracking from their current day; no retroactive charges.
 		upkeep_service.initialize_day(game_time.get_day())
+	var municipal_data: Variant = data.get("municipal_services", {})
+	if municipal_data is Dictionary and not municipal_data.is_empty():
+		municipal_services.load_save_data(municipal_data)
+	else:
+		municipal_services.initialize_day(game_time.get_day())
 	is_loading_game = false
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	var construction_data: Variant = data.get("construction", {})
