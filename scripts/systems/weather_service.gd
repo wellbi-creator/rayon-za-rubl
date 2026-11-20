@@ -4,9 +4,9 @@ class_name WeatherService
 const SEASON_LENGTH_DAYS := 30
 const SEASONS := ["spring", "summer", "autumn", "winter"]
 const WEATHER_BY_SEASON := {
-	"spring": ["clear", "clear", "cloudy", "rain", "rain", "fog"],
-	"summer": ["clear", "clear", "clear", "cloudy", "rain", "fog"],
-	"autumn": ["clear", "cloudy", "cloudy", "rain", "rain", "fog"],
+	"spring": ["clear", "clear", "cloudy", "rain", "rain", "fog", "storm"],
+	"summer": ["clear", "clear", "clear", "cloudy", "rain", "fog", "heatwave", "heatwave", "storm"],
+	"autumn": ["clear", "cloudy", "cloudy", "rain", "rain", "fog", "storm"],
 	"winter": ["clear", "cloudy", "snow", "snow", "snow", "fog"]
 }
 const SEASON_LABELS := {
@@ -20,7 +20,9 @@ const WEATHER_LABELS := {
 	"cloudy": "Облачно",
 	"rain": "Дождь",
 	"snow": "Снег",
-	"fog": "Туман"
+	"fog": "Туман",
+	"storm": "Гроза",
+	"heatwave": "Жара"
 }
 
 var rng := RandomNumberGenerator.new()
