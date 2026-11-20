@@ -943,7 +943,7 @@ func load_save_data(data: Dictionary) -> void:
 		road_path_network.load_save_data(road_data)
 	player_built_road_cells.clear()
 	var saved_player_roads: Variant = data.get("player_built_road_cells", [])
-	if saved_player_roads is Array:
+	if data.has("player_built_road_cells") and saved_player_roads is Array:
 		for entry in saved_player_roads:
 			if entry is Dictionary:
 				var cell := Vector2i(int(entry.get("x", -1)), int(entry.get("y", -1)))
