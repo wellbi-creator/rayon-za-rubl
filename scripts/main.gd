@@ -11,7 +11,7 @@ const BUILD_COSTS := {"ordinary": 100000}
 const BABA_REPAIR_COST := 120000
 const BABA_QUEST_REWARD := 150000
 
-var world
+var world: DistrictWorld
 var selected_plot_id: int = -1
 var construction_service: ConstructionService
 var move_in_service: MoveInService
@@ -46,7 +46,6 @@ var build_button: Button
 var status_label: Label
 var control_root: Control
 var hint_label: Label
-var render_diagnostic_label: Label
 
 func _ready() -> void:
 	economy = EconomyServiceScript.new()
@@ -68,61 +67,16 @@ func _ready() -> void:
 	add_child(construction_service)
 	construction_service.project_updated.connect(_on_construction_updated)
 	construction_service.project_completed.connect(_on_construction_completed)
-	_ensure_world_node()
+	world = DistrictWorldScript.new()
+	add_child(world)
+	world.plot_selected.connect(_on_plot_selected)
 	_create_interface()
 	_create_save_timer()
 	_load_game()
-	if is_instance_valid(world):
-		world.set_resident_groups(resident_service.get_resident_display_data())
+	world.set_resident_groups(resident_service.get_resident_display_data())
 	_update_balance()
 	_on_game_time_changed(game_time.get_hour(), game_time.get_minute(), game_time.get_day())
 	_show_empty_selection()
-
-func _process(_delta: float) -> void:
-	# Keep the world reference attached and recover the district if its node was freed.
-	_ensure_world_node()
-	if render_diagnostic_label == null:
-		return
-	var frame_info := "MAIN PROCESS ACTIVE  frame=%d  ticks=%d" % [Engine.get_process_frames(), Time.get_ticks_msec()]
-	if is_instance_valid(world):
-		render_diagnostic_label.text = frame_info + "\n" + str(world.get_render_diagnostic_text())
-	else:
-		render_diagnostic_label.text = frame_info + "\nWORLD RECOVERY FAILED"
-
-func _ensure_world_node() -> void:
-	# Resolve the scene-owned node by its attached script resource instead of
-	# relying on the global class_name registry in exported Web builds.
-	if is_instance_valid(world) and world.is_inside_tree():
-		_connect_world_signals()
-		return
-
-	var existing: Node = get_node_or_null("DistrictWorld")
-	if existing != null and existing.get_script() == DistrictWorldScript:
-		world = existing
-	else:
-		if existing != null:
-			existing.queue_free()
-		var created_world: Node = DistrictWorldScript.new()
-		if created_world == null:
-			push_error("DistrictWorld script could not be instantiated.")
-			return
-		created_world.name = "DistrictWorld"
-		add_child(created_world)
-		world = created_world
-
-	if not is_instance_valid(world) or not world.is_inside_tree():
-		push_error("DistrictWorld node was not attached to the Main scene tree.")
-		return
-
-	_connect_world_signals()
-	if resident_service != null:
-		world.set_resident_groups(resident_service.get_resident_display_data())
-	if game_time != null:
-		world.set_time_of_day(game_time.get_hour(), game_time.get_minute())
-
-func _connect_world_signals() -> void:
-	if is_instance_valid(world) and not world.plot_selected.is_connected(_on_plot_selected):
-		world.plot_selected.connect(_on_plot_selected)
 
 func _create_save_timer() -> void:
 	save_timer = Timer.new()
@@ -140,20 +94,6 @@ func _create_interface() -> void:
 	layer.add_child(root)
 	control_root = root
 	root.resized.connect(_on_interface_resized)
-
-	# Temporary on-screen diagnostics for the blank-world report on mobile Web.
-	render_diagnostic_label = Label.new()
-	render_diagnostic_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	render_diagnostic_label.position = Vector2(18, 82)
-	render_diagnostic_label.custom_minimum_size = Vector2(900, 38)
-	render_diagnostic_label.text = "WORLD DEBUG: waiting for render data..."
-	render_diagnostic_label.add_theme_font_size_override("font_size", 16)
-	render_diagnostic_label.add_theme_color_override("font_color", Color("#fff36b"))
-	render_diagnostic_label.add_theme_color_override("font_outline_color", Color("#102018"))
-	render_diagnostic_label.add_theme_constant_override("outline_size", 6)
-	render_diagnostic_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	render_diagnostic_label.z_index = 100
-	root.add_child(render_diagnostic_label)
 
 	var top_panel := PanelContainer.new()
 	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
