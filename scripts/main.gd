@@ -786,7 +786,10 @@ func _refresh_municipal_services() -> void:
 		row_panel.add_child(row)
 		var info := Label.new()
 		var efficiency := municipal_services.get_service_efficiency_percent(service_id)
-		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день" % [label, count, efficiency, _format_money(daily_salary)]
+		var work_count := municipal_services.get_work_orders_completed(service_id)
+		var last_work := municipal_services.get_last_work_day(service_id)
+		var work_status := "Последняя работа: день %d" % last_work if last_work > 0 else "Работ пока не было"
+		info.text = "%s\nШтат: %d  •  Эффективность: %d%%\nЗарплата: ₽ %s/день\nВыполнено работ: %d  •  %s" % [label, count, efficiency, _format_money(daily_salary), work_count, work_status]
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_theme_color_override("font_color", Color("#e0e5d6"))
