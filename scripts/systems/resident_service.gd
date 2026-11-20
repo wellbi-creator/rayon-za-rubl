@@ -67,6 +67,8 @@ var occupied_homes: Dictionary = {}
 var moved_families: Dictionary = {}
 var current_minute_of_day: int = 480
 var current_day: int = 1
+var current_season_id: String = "spring"
+var current_weather_id: String = "clear"
 var last_simulated_total_minute: int = -1
 
 
@@ -458,6 +460,13 @@ func update_time(hour: int, minute: int, day: int) -> void:
 			var state: Dictionary = moved_families[family_id]
 			residents_changed.emit(int(state.get("plot_id", -1)))
 
+func set_environment(season_id: String, weather_id: String) -> void:
+	if season_id in ["spring", "summer", "autumn", "winter"]:
+		current_season_id = season_id
+	if weather_id in ["clear", "cloudy", "rain", "snow", "fog"]:
+		current_weather_id = weather_id
+
+
 func _get_total_game_minutes() -> int:
 	return current_day * 1440 + current_minute_of_day
 
@@ -479,11 +488,26 @@ func _simulate_needs_minute(total_minute: int) -> void:
 			var rates: Dictionary = member.get("need_rates", {})
 			needs["hunger"] = clampf(float(needs.get("hunger", 80.0)) - 0.10 * float(rates.get("hunger", 1.0)), 0.0, 100.0)
 			needs["hygiene"] = clampf(float(needs.get("hygiene", 80.0)) - 0.045 * float(rates.get("hygiene", 1.0)), 0.0, 100.0)
-			needs["leisure"] = clampf(float(needs.get("leisure", 75.0)) - 0.035 * float(rates.get("leisure", 1.0)), 0.0, 100.0)
+			var leisure_decay := 0.035
+			var energy_decay := 0.055
+			if member_activity == "walking":
+				match current_weather_id:
+					"rain":
+						leisure_decay += 0.025
+					"snow":
+						leisure_decay += 0.035
+					"fog":
+						leisure_decay += 0.015
+					"clear":
+						if current_season_id in ["spring", "summer"]:
+							leisure_decay = maxf(0.02, leisure_decay - 0.01)
+				if current_season_id == "winter":
+					energy_decay += 0.012
+			needs["leisure"] = clampf(float(needs.get("leisure", 75.0)) - leisure_decay * float(rates.get("leisure", 1.0)), 0.0, 100.0)
 			if sleeping:
 				needs["energy"] = clampf(float(needs.get("energy", 75.0)) + 0.35 * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			else:
-				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - 0.055 * float(rates.get("energy", 1.0)), 0.0, 100.0)
+				needs["energy"] = clampf(float(needs.get("energy", 75.0)) - energy_decay * float(rates.get("energy", 1.0)), 0.0, 100.0)
 			member["needs"] = needs
 		state["members"] = members
 		_run_autonomous_action(state, total_minute, str(state.get("activity", "at_home")))
