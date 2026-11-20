@@ -979,11 +979,15 @@ func _on_road_cell_requested(cell: Vector2i) -> void:
 		if not world.can_remove_road_cell(cell):
 			road_tool_status_label.text = "Нельзя снять этот сегмент: он отсутствует или его удаление разорвёт дорожную сеть."
 			return
+		var refund_allowed := world.is_player_built_road_cell(cell)
 		if not world.remove_road_cell(cell):
 			road_tool_status_label.text = "Не удалось демонтировать дорогу. Изменений нет."
 			return
-		economy.add_money(ROAD_REMOVAL_REFUND, "Возврат за демонтаж дороги")
-		road_tool_status_label.text = "Сегмент снят. Возвращено %s ₽." % _format_money(ROAD_REMOVAL_REFUND)
+		if refund_allowed:
+			economy.add_money(ROAD_REMOVAL_REFUND, "Возврат за демонтаж дороги")
+			road_tool_status_label.text = "Сегмент снят. Возвращено %s ₽." % _format_money(ROAD_REMOVAL_REFUND)
+		else:
+			road_tool_status_label.text = "Стартовая дорога демонтирована. Возврат за неё не предусмотрен."
 		_save_game()
 		return
 	if not world.can_build_road_cell(cell):
