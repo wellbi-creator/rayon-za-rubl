@@ -683,6 +683,7 @@ func _create_business_portfolio_popup() -> void:
 
 func _on_business_portfolio_pressed() -> void:
 	_refresh_business_portfolio()
+	_polish_context_panel(business_portfolio_popup)
 	business_portfolio_popup.popup_centered(Vector2i(600, 500))
 
 
@@ -794,6 +795,7 @@ func _create_finance_popup() -> void:
 
 func _on_finance_pressed() -> void:
 	_refresh_finance_summary()
+	_polish_context_panel(finance_popup)
 	finance_popup.popup_centered(Vector2i(560, 390))
 
 func _refresh_finance_summary() -> void:
@@ -1022,6 +1024,7 @@ func _show_district_event() -> void:
 		button.add_theme_stylebox_override("normal", _button_style(Color("#b8cf9a")))
 		button.pressed.connect(_on_district_event_choice_pressed.bind(choice_id, service_action and can_dispatch_staff))
 		district_event_choices.add_child(button)
+	_polish_context_panel(district_event_popup)
 	district_event_popup.popup_centered(Vector2i(560, 360))
 
 
@@ -1048,6 +1051,7 @@ func _on_district_event_choice_pressed(choice_id: String, dispatched_by_staff: b
 
 func _on_progression_pressed() -> void:
 	_refresh_progression_popup()
+	_polish_context_panel(progression_popup)
 	progression_popup.popup_centered(Vector2i(560, 470))
 
 
@@ -1110,6 +1114,7 @@ func _award_district_progress(experience_gain: int, reputation_gain: int, reason
 
 func _on_municipal_services_pressed() -> void:
 	_refresh_municipal_services()
+	_polish_context_panel(municipal_popup)
 	municipal_popup.popup_centered(Vector2i(560, 470))
 
 
@@ -1242,6 +1247,7 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	layout.add_child(save_button)
 	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
+	_polish_context_panel(popup)
 	popup.popup_centered(Vector2i(380, 500))
 
 
@@ -1290,6 +1296,7 @@ func _on_municipal_equipment_pressed(service_id: String) -> void:
 	layout.add_child(upgrade_button)
 	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
+	_polish_context_panel(popup)
 	popup.popup_centered(Vector2i(360, 220))
 
 
@@ -1324,6 +1331,7 @@ func _on_municipal_fire_pressed(service_id: String) -> void:
 
 func _on_transaction_history_pressed() -> void:
 	_refresh_transaction_history()
+	_polish_context_panel(transaction_popup)
 	transaction_popup.popup_centered(Vector2i(560, 380))
 
 
@@ -1397,7 +1405,12 @@ func _refresh_transaction_history() -> void:
 
 func _polish_context_panel(container: Control) -> void:
 	for child in container.get_children():
-		if child is Button:
+		if child is PanelContainer:
+			var card := child as PanelContainer
+			var current_panel := card.get_theme_stylebox("panel") as StyleBoxFlat
+			if current_panel != null:
+				card.add_theme_stylebox_override("panel", _panel_style(current_panel.bg_color, current_panel.bg_color.a))
+		elif child is Button:
 			var button := child as Button
 			var normal_style := button.get_theme_stylebox("normal") as StyleBoxFlat
 			var base_color := normal_style.bg_color if normal_style != null else Color("#a9c5e6")
