@@ -580,8 +580,9 @@ func _show_district_event() -> void:
 func _on_district_event_choice_pressed(choice_id: String) -> void:
 	var result := district_event_service.resolve_choice(choice_id, game_time.get_day(), economy, municipal_services)
 	if not bool(result.get("success", false)):
-		district_event_status_label.text = str(result.get("message", "Не удалось применить решение."))
+		var failure_message := str(result.get("message", "Не удалось применить решение."))
 		_show_district_event()
+		district_event_status_label.text = failure_message
 		return
 	progression_service.add_progress(int(result.get("experience", 0)), int(result.get("reputation", 0)), str(result.get("reason", "Решение события района")))
 	if progression_service.unlock_achievement("first_district_event"):
