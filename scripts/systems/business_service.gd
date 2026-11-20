@@ -241,6 +241,46 @@ func set_business_active(plot_id: int, active: bool) -> bool:
 	businesses[plot_id] = business
 	return true
 
+func get_daily_financial_projection(resident_count: int, average_satisfaction: float, reputation: int, weather_id: String) -> Dictionary:
+	var active_plot_ids: Array[int] = []
+	var daily_rent := 0
+	for key in businesses.keys():
+		var plot_id := int(key)
+		var business: Dictionary = businesses[key]
+		if bool(business.get("leased", false)):
+			daily_rent += get_daily_rent(plot_id)
+		elif bool(business.get("active", false)):
+			active_plot_ids.append(plot_id)
+	active_plot_ids.sort()
+	if active_plot_ids.is_empty():
+		return {"daily_revenue": 0, "daily_expenses": 0, "daily_rent": daily_rent, "active_count": 0, "customers": 0}
+	var total_customers := get_daily_customer_count(resident_count, average_satisfaction, reputation, weather_id)
+	var total_weight := 0
+	for plot_id in active_plot_ids:
+		total_weight += _get_business_attraction_weight(businesses[plot_id])
+	var allocations: Dictionary = {}
+	var allocated_customers := 0
+	for plot_id in active_plot_ids:
+		var weight := _get_business_attraction_weight(businesses[plot_id])
+		var allocated := floori(float(total_customers * weight) / float(maxi(1, total_weight)))
+		allocations[plot_id] = allocated
+		allocated_customers += allocated
+	var remaining_customers := total_customers - allocated_customers
+	for plot_id in active_plot_ids:
+		if remaining_customers <= 0:
+			break
+		allocations[plot_id] = int(allocations[plot_id]) + 1
+		remaining_customers -= 1
+	var daily_revenue := 0
+	var daily_expenses := 0
+	for plot_id in active_plot_ids:
+		var business: Dictionary = businesses[plot_id]
+		var business_type := str(business.get("type", SUPPORTED_BUSINESS))
+		var type_data: Dictionary = BUSINESS_TYPES.get(business_type, BUSINESS_TYPES[SUPPORTED_BUSINESS])
+		daily_revenue += int(allocations.get(plot_id, 0)) * int(type_data.get("customer_spend", CUSTOMER_SPEND))
+		daily_expenses += get_business_daily_expenses(plot_id)
+	return {"daily_revenue": daily_revenue, "daily_expenses": daily_expenses, "daily_rent": daily_rent, "active_count": active_plot_ids.size(), "customers": total_customers}
+
 func process_day(day: int, economy: EconomyService, resident_count: int = 0, average_satisfaction: float = 75.0, reputation: int = 0, weather_id: String = "clear") -> bool:
 	if economy == null:
 		return false
