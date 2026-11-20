@@ -724,7 +724,7 @@ func _refresh_finance_summary() -> void:
 	var maintenance := 0
 	for definition in municipal_services.get_service_definitions():
 		var service_id := str(definition.get("id", ""))
-		if municipal_services.is_automatic_maintenance_enabled(service_id):
+		if municipal_services.is_automatic_maintenance_enabled(service_id) and municipal_services.get_employee_count(service_id) > 0:
 			maintenance += municipal_services.get_maintenance_cost(service_id)
 	var daily_income := business_revenue + rent_income
 	var daily_costs := business_costs + household_costs + payroll + maintenance
