@@ -353,7 +353,7 @@ func get_portfolio_summary() -> Dictionary:
 		"total_operating_costs": 0,
 		"total_operating_costs_paid": 0,
 		"unpaid_operating_costs": 0,
-		"total_rent_received": total_rent_received
+		"total_rent_received": 0
 	}
 	for key in businesses.keys():
 		var business: Dictionary = businesses[key]
