@@ -57,11 +57,26 @@ jobs:
           echo "=== Godot editor diagnostics ==="
           godot --headless --editor --path . --quit --verbose 2>&1 | tee /tmp/godot-editor-diagnostics.log
 
+      - name: Smoke-test the main scene
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --quit-after 5 --verbose 2>&1 | tee /tmp/godot-main-scene.log
+          if grep -E "SCRIPT ERROR:|Parse Error:|Failed to load script|Cannot open file" /tmp/godot-main-scene.log; then
+            echo "Main scene startup reported a script or resource error."
+            exit 1
+          fi
+
       - name: Export Web build
         run: |
           mkdir -p build/web
           godot --headless --verbose --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-web-export.log
           test -s build/web/index.html
+          test -s build/web/index.js
+          test -s build/web/index.wasm
+          test -s build/web/index.pck
+          echo "=== Exported Web payload sizes ==="
+          ls -lh build/web/index.html build/web/index.js build/web/index.wasm build/web/index.pck
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
