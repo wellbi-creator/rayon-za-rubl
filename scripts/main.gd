@@ -213,13 +213,16 @@ func _create_interface() -> void:
 
 	readiness_selector = OptionButton.new()
 	for requirement in move_in_service.get_requirements():
-		readiness_selector.add_item(str(requirement["label"]))
+		readiness_selector.add_item("%s — ₽ %s" % [
+			str(requirement["label"]),
+			_format_money(int(requirement.get("cost", 0)))
+		])
 	readiness_selector.visible = false
 	readiness_selector.item_selected.connect(_on_readiness_option_selected)
 	content.add_child(readiness_selector)
 
 	readiness_note = Label.new()
-	readiness_note.text = "Прототип: отметки без списания денег. Стоимость работ будет сбалансирована отдельно."
+	readiness_note.text = "Каждый этап оплачивается отдельно. Общая стоимость полной подготовки: 150 000 ₽."
 	readiness_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	readiness_note.add_theme_font_size_override("font_size", 11)
 	readiness_note.add_theme_color_override("font_color", Color("#c9d0b9"))
@@ -692,14 +695,19 @@ func _on_plot_selected(plot_id: int) -> void:
 			readiness_button.text = "Все проверки пройдены"
 			readiness_button.disabled = true
 		else:
-			readiness_button.text = "Отметить этап выполненным"
-			readiness_button.disabled = false
 			var checklist := move_in_service.get_checklist(plot_id)
-			var selected_index := clampi(readiness_selector.selected, 0, move_in_service.get_requirements().size() - 1)
-			var selected_req := str(move_in_service.get_requirements()[selected_index]["id"])
+			var requirements := move_in_service.get_requirements()
+			var selected_index := clampi(readiness_selector.selected, 0, requirements.size() - 1)
+			var selected_requirement: Dictionary = requirements[selected_index]
+			var selected_req := str(selected_requirement["id"])
+			var selected_cost := int(selected_requirement.get("cost", 0))
+			readiness_button.text = "Оплатить этап — ₽ %s" % _format_money(selected_cost)
+			readiness_button.disabled = economy.balance < selected_cost
 			if bool(checklist.get(selected_req, false)):
 				readiness_button.text = "Этап уже выполнен"
 				readiness_button.disabled = true
+			elif economy.balance < selected_cost:
+				readiness_button.text = "Не хватает ₽ %s" % _format_money(selected_cost - economy.balance)
 
 		if ready:
 			var resident_family := current_family
@@ -846,11 +854,28 @@ func _on_readiness_button_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
 		return
 	var requirements := move_in_service.get_requirements()
+	if requirements.is_empty():
+		return
 	var index := clampi(readiness_selector.selected, 0, requirements.size() - 1)
-	var requirement_id := str(requirements[index]["id"])
+	var requirement: Dictionary = requirements[index]
+	var requirement_id := str(requirement["id"])
+	var checklist := move_in_service.get_checklist(selected_plot_id)
+	if bool(checklist.get(requirement_id, false)):
+		status_label.text = "Этот этап уже выполнен."
+		return
+	var cost := int(requirement.get("cost", 0))
+	if not economy.try_spend(cost, "Подготовка дома: %s" % str(requirement["label"])):
+		status_label.text = "Не хватает средств. Нужно ещё ₽ %s." % _format_money(maxi(0, cost - economy.balance))
+		return
 	if move_in_service.complete_requirement(selected_plot_id, requirement_id):
 		_on_plot_selected(selected_plot_id)
+		status_label.text = "%s выполнено. Списано ₽ %s." % [
+			str(requirement["label"]),
+			_format_money(cost)
+		]
 		_save_game()
+	else:
+		economy.add_money(cost, "Возврат: этап подготовки не завершён")
 
 func _on_readiness_updated(plot_id: int, _completed_count: int, _total_count: int) -> void:
 	if selected_plot_id == plot_id:

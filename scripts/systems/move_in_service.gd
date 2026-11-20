@@ -5,14 +5,14 @@ signal readiness_updated(plot_id: int, completed_count: int, total_count: int)
 signal house_ready(plot_id: int)
 
 const REQUIREMENTS := [
-	{"id": "electricity", "label": "Электричество"},
-	{"id": "water", "label": "Водоснабжение"},
-	{"id": "heating", "label": "Отопление"},
-	{"id": "plumbing", "label": "Сантехника"},
-	{"id": "finishing", "label": "Внутренняя отделка"},
-	{"id": "furniture", "label": "Мебель"},
-	{"id": "lighting", "label": "Освещение"},
-	{"id": "landscaping", "label": "Благоустройство"}
+	{"id": "electricity", "label": "Электричество", "cost": 18000},
+	{"id": "water", "label": "Водоснабжение", "cost": 16000},
+	{"id": "heating", "label": "Отопление", "cost": 22000},
+	{"id": "plumbing", "label": "Сантехника", "cost": 14000},
+	{"id": "finishing", "label": "Внутренняя отделка", "cost": 28000},
+	{"id": "furniture", "label": "Мебель", "cost": 32000},
+	{"id": "lighting", "label": "Освещение", "cost": 9000},
+	{"id": "landscaping", "label": "Благоустройство", "cost": 11000}
 ]
 
 var house_checklists: Dictionary = {}
