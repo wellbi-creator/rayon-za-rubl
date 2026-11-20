@@ -1348,6 +1348,8 @@ func _on_plot_selected(plot_id: int) -> void:
 					business_button.text = "Открыть магазин — ₽ %s" % _format_money(business_service.get_opening_cost())
 					business_button.disabled = economy.balance < business_service.get_opening_cost()
 				else:
+					resident_button.visible = false
+					resident_label.visible = false
 					var active := bool(business.get("active", false))
 					business_status_label.text = "МАГАЗИН У ДОМА • %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
@@ -1381,7 +1383,7 @@ func _on_business_action_pressed() -> void:
 
 
 func _on_resident_button_pressed() -> void:
-	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
+	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built" or not business_service.get_business(selected_plot_id).is_empty():
 		return
 	if not move_in_service.is_ready(selected_plot_id) or resident_service.is_plot_occupied(selected_plot_id):
 		return
