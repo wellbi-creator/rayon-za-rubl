@@ -1599,26 +1599,36 @@ func _on_plot_selected(plot_id: int) -> void:
 					var reputation_trend := "+1 за сутки" if reputation_change > 0 else ("−1 за сутки" if reputation_change < 0 else "без изменений")
 					var daily_expenses := business_service.get_business_daily_expenses(plot_id)
 					var daily_profit := daily_revenue - daily_expenses
+					var lifetime_customers := int(business.get("total_customers", 0))
+					var lifetime_revenue := int(business.get("total_revenue", 0))
+					var lifetime_expenses := int(business.get("total_operating_costs", 0))
+					var lifetime_result := lifetime_revenue - lifetime_expenses
+					var lifetime_rent := int(business.get("total_rent_received", 0))
 					if leased:
-						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено аренды всего: ₽ %s\nРепутация: %d/100 (%s)\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
+						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено от этого помещения: ₽ %s\nОбщая аренда района: ₽ %s\nРепутация: %d/100 (%s)\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
 							business_title.to_upper(),
 							_format_money(daily_rent),
+							_format_money(lifetime_rent),
 							_format_money(business_service.total_rent_received),
 							business_reputation,
 							reputation_trend,
 							upgrade_level
 						]
 					else:
-						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
+						business_status_label.text = "%s • %s\nРепутация: %d/100 (%s)\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день • всего: %s\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nЗа всё время: выручка ₽ %s • расходы ₽ %s • итог %s ₽\nДолг по расходам: ₽ %s" % [
 							business_title.to_upper(),
 							"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 							business_reputation,
 							reputation_trend,
 							upgrade_level,
 							daily_customers,
+							_format_money(lifetime_customers),
 							_format_money(daily_revenue),
 							_format_money(daily_expenses),
 							"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
+							_format_money(lifetime_revenue),
+							_format_money(lifetime_expenses),
+							"%s%s" % ["+" if lifetime_result >= 0 else "−", _format_money(absi(lifetime_result))],
 							_format_money(business_service.unpaid_operating_costs)
 						]
 					business_button.visible = not leased
