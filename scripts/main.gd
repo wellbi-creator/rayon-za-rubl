@@ -39,6 +39,7 @@ var game_time_label: Label
 var resident_label: Label
 var resident_button: Button
 var business_button: Button
+var business_type_selector: OptionButton
 var business_status_label: Label
 var household_actions_heading: Label
 var household_actions_grid: GridContainer
@@ -386,6 +387,15 @@ func _create_interface() -> void:
 	business_status_label.add_theme_color_override("font_color", Color("#e0e5d6"))
 	business_status_label.visible = false
 	content.add_child(business_status_label)
+
+	business_type_selector = OptionButton.new()
+	business_type_selector.add_theme_font_size_override("font_size", 11)
+	business_type_selector.item_selected.connect(_on_business_type_selected)
+	business_type_selector.visible = false
+	for type_id in business_service.get_business_type_ids():
+		business_type_selector.add_item("%s — ₽ %s" % [business_service.get_business_type_title(type_id), _format_money(business_service.get_opening_cost(type_id))])
+		business_type_selector.set_item_metadata(business_type_selector.item_count - 1, type_id)
+	content.add_child(business_type_selector)
 
 	business_button = Button.new()
 	business_button.text = "Открыть магазин"
@@ -1299,6 +1309,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	resident_button.visible = false
 	business_status_label.visible = false
 	business_button.visible = false
+	business_type_selector.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
 	member_autonomy_container.visible = false
@@ -1543,26 +1554,43 @@ func _on_plot_selected(plot_id: int) -> void:
 				business_status_label.visible = true
 				business_button.visible = true
 				if business.is_empty():
-					business_status_label.text = "Помещение свободно. Можно открыть магазин у дома и получать ежедневную выручку."
-					business_button.text = "Открыть магазин — ₽ %s" % _format_money(business_service.get_opening_cost())
-					business_button.disabled = economy.balance < business_service.get_opening_cost()
+					business_status_label.text = "Выбери специализацию помещения. У каждого заведения своя стоимость открытия, средний чек и ежедневные расходы."
+					business_type_selector.visible = true
+					var selected_type := str(business_type_selector.get_item_metadata(business_type_selector.selected))
+					var opening_cost := business_service.get_opening_cost(selected_type)
+					business_button.text = "Открыть: %s — ₽ %s" % [business_service.get_business_type_title(selected_type), _format_money(opening_cost)]
+					business_button.disabled = economy.balance < opening_cost
 				else:
 					resident_button.visible = false
 					resident_label.visible = false
+					business_type_selector.visible = false
 					var active := bool(business.get("active", false))
+					var business_type := str(business.get("type", "corner_shop"))
+					var business_title := business_service.get_business_type_title(business_type)
 					var daily_customers := int(business.get("last_daily_customers", 80))
 					var daily_revenue := int(business.get("last_daily_revenue", business_service.get_daily_revenue()))
-					var daily_profit := daily_revenue - business_service.get_daily_expenses()
-					business_status_label.text = "МАГАЗИН У ДОМА • %s\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • чистыми: +₽ %s/день\nДолг по расходам: ₽ %s" % [
+					var daily_expenses := business_service.get_daily_expenses(business_type)
+					var daily_profit := daily_revenue - daily_expenses
+					business_status_label.text = "%s • %s\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
+						business_title.to_upper(),
 						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
 						daily_customers,
 						_format_money(daily_revenue),
-						_format_money(business_service.get_daily_expenses()),
-						_format_money(daily_profit),
+						_format_money(daily_expenses),
+						"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
 						_format_money(business_service.unpaid_operating_costs)
 					]
 					business_button.text = "Приостановить магазин" if active else "Возобновить магазин"
 					business_button.disabled = false
+
+func _on_business_type_selected(index: int) -> void:
+	if index < 0 or index >= business_type_selector.item_count:
+		return
+	var selected_type := str(business_type_selector.get_item_metadata(index))
+	var opening_cost := business_service.get_opening_cost(selected_type)
+	business_button.text = "Открыть: %s — ₽ %s" % [business_service.get_business_type_title(selected_type), _format_money(opening_cost)]
+	business_button.disabled = economy.balance < opening_cost
+
 
 func _on_business_action_pressed() -> void:
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "built":
@@ -1571,7 +1599,8 @@ func _on_business_action_pressed() -> void:
 		return
 	var business := business_service.get_business(selected_plot_id)
 	if business.is_empty():
-		if not business_service.open_business(selected_plot_id, economy):
+		var selected_type := str(business_type_selector.get_item_metadata(business_type_selector.selected))
+		if not business_service.open_business(selected_plot_id, economy, selected_type):
 			status_label.text = "Не удалось открыть магазин. Проверь готовность помещения и баланс района."
 			return
 		progression_service.add_progress(60, 4, "Открыт первый магазин у дома")
