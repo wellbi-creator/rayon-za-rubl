@@ -227,6 +227,8 @@ func open_business(plot_id: int, economy: EconomyService, business_type: String 
 		"total_customers": 0,
 		"total_revenue": 0,
 		"total_operating_costs": 0,
+		"total_operating_costs_paid": 0,
+		"unpaid_operating_costs": 0,
 		"total_rent_received": 0
 	}
 	return true
@@ -296,6 +298,7 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 			business["total_customers"] = maxi(0, int(business.get("total_customers", 0))) + store_customers * elapsed_days
 			business["total_revenue"] = maxi(0, int(business.get("total_revenue", 0))) + store_revenue * elapsed_days
 			business["total_operating_costs"] = maxi(0, int(business.get("total_operating_costs", 0))) + daily_business_expenses * elapsed_days
+			business["unpaid_operating_costs"] = maxi(0, int(business.get("unpaid_operating_costs", 0))) + daily_business_expenses * elapsed_days
 			businesses[plot_id] = business
 			total_daily_revenue += store_revenue
 		economy.add_money(total_daily_revenue * elapsed_days, "Выручка магазинов района")
@@ -321,6 +324,23 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 		var payment := mini(unpaid_operating_costs, economy.balance)
 		if payment > 0 and economy.try_spend(payment, "Операционные расходы магазинов"):
 			unpaid_operating_costs -= payment
+			var remaining_payment := payment
+			var payment_plot_ids: Array[int] = []
+			for key in businesses.keys():
+				payment_plot_ids.append(int(key))
+			payment_plot_ids.sort()
+			for plot_id in payment_plot_ids:
+				if remaining_payment <= 0:
+					break
+				var business: Dictionary = businesses[plot_id]
+				var business_debt := maxi(0, int(business.get("unpaid_operating_costs", 0)))
+				var paid_for_business := mini(remaining_payment, business_debt)
+				if paid_for_business <= 0:
+					continue
+				business["unpaid_operating_costs"] = business_debt - paid_for_business
+				business["total_operating_costs_paid"] = maxi(0, int(business.get("total_operating_costs_paid", 0))) + paid_for_business
+				businesses[plot_id] = business
+				remaining_payment -= paid_for_business
 	return true
 
 func get_save_data() -> Dictionary:
@@ -342,6 +362,8 @@ func get_save_data() -> Dictionary:
 			"total_customers": maxi(0, int(business.get("total_customers", 0))),
 			"total_revenue": maxi(0, int(business.get("total_revenue", 0))),
 			"total_operating_costs": maxi(0, int(business.get("total_operating_costs", 0))),
+			"total_operating_costs_paid": maxi(0, int(business.get("total_operating_costs_paid", 0))),
+			"unpaid_operating_costs": maxi(0, int(business.get("unpaid_operating_costs", 0))),
 			"total_rent_received": maxi(0, int(business.get("total_rent_received", 0)))
 		})
 	return {
@@ -380,5 +402,7 @@ func load_save_data(data: Dictionary) -> void:
 			"total_customers": maxi(0, int(entry.get("total_customers", 0))),
 			"total_revenue": maxi(0, int(entry.get("total_revenue", 0))),
 			"total_operating_costs": maxi(0, int(entry.get("total_operating_costs", 0))),
+			"total_operating_costs_paid": maxi(0, int(entry.get("total_operating_costs_paid", 0))),
+			"unpaid_operating_costs": maxi(0, int(entry.get("unpaid_operating_costs", 0))),
 			"total_rent_received": maxi(0, int(entry.get("total_rent_received", 0)))
 		}
