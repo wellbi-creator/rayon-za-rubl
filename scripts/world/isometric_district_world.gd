@@ -290,19 +290,29 @@ func _draw_transport_entry(entry: Dictionary) -> void:
 	draw_line(points[0], points[1], body_color.lightened(0.22), 1.2)
 	draw_line(points[1], points[2], body_color.lightened(0.3), 1.2)
 	draw_line(points[2], points[3], body_color.darkened(0.18), 1.2)
-	# Front and rear glass panels make the vehicle readable at the current camera scale.
+	# Raised roof and separate windshield planes add volume while following route heading.
+	var roof_points := PackedVector2Array()
+	for point in [Vector2(-6, -3.4), Vector2(-3, -6.1), Vector2(5, -5.8), Vector2(8, -2.8), Vector2(2, 0.1), Vector2(-5, 0.0)]:
+		roof_points.append(ground + point.rotated(facing))
+	draw_colored_polygon(roof_points, body_color.lightened(0.16))
+	draw_line(roof_points[0], roof_points[1], body_color.lightened(0.34), 1.0)
+	draw_line(roof_points[1], roof_points[2], body_color.lightened(0.4), 1.0)
+	# Front and rear glass panels use different tints for a clearer cabin silhouette.
 	draw_colored_polygon(PackedVector2Array([
-		ground + Vector2(-1, -3.8).rotated(facing),
-		ground + Vector2(5, -3.4).rotated(facing),
-		ground + Vector2(8, 0).rotated(facing),
-		ground + Vector2(2, 0.2).rotated(facing)
-	]), Color("#b9d5d4", 0.94))
+		ground + Vector2(1, -3.8).rotated(facing),
+		ground + Vector2(5, -3.5).rotated(facing),
+		ground + Vector2(8, -0.2).rotated(facing),
+		ground + Vector2(3, 0.0).rotated(facing)
+	]), Color("#c8e2df", 0.96))
 	draw_colored_polygon(PackedVector2Array([
-		ground + Vector2(-7, -3.2).rotated(facing),
+		ground + Vector2(-6, -3.3).rotated(facing),
 		ground + Vector2(-2, -3.8).rotated(facing),
-		ground + Vector2(-1, 0.2).rotated(facing),
-		ground + Vector2(-7, 0.4).rotated(facing)
-	]), Color("#8eafb0", 0.9))
+		ground + Vector2(-1, 0.0).rotated(facing),
+		ground + Vector2(-6, 0.2).rotated(facing)
+	]), Color("#91b7bc", 0.94))
+	# A center roof seam and side reflections suggest doors and polished paint.
+	draw_line(ground + Vector2(-1, -5.8).rotated(facing), ground + Vector2(1, 4.8).rotated(facing), body_color.darkened(0.12), 0.8)
+	draw_line(ground + Vector2(-4, 4.0).rotated(facing), ground + Vector2(5, 4.0).rotated(facing), body_color.lightened(0.22), 0.8)
 	# Subtle bumpers and paired lights remain aligned for both travel directions.
 	draw_line(ground + Vector2(10, 0).rotated(facing), ground + Vector2(12, 0).rotated(facing), Color("#e6d7ad"), 1.5)
 	draw_circle(ground + Vector2(10, -2.1).rotated(facing), 1.0, Color("#f5e5ad"))
@@ -972,20 +982,42 @@ func _position_on_walk_route(route: Array[Vector2], distance: float) -> Vector2:
 	return route[route.size() - 1]
 
 func _draw_person(pos: Vector2, variant: int, walking: bool = false, walk_phase: float = 0.0) -> void:
-	var shirts := [Color("#d58c68"), Color("#6e91a3"), Color("#d5bd78")]
-	var shirt: Color = shirts[variant % shirts.size()]
+	# Small layered character sprites use a consistent ground-contact point for depth sorting.
+	var shirts := [Color("#d58c68"), Color("#6e91a3"), Color("#d5bd78"), Color("#78966f"), Color("#a77f9f"), Color("#d0d0c3")]
+	var trousers := [Color("#394b59"), Color("#4b5149"), Color("#665247"), Color("#485b6a")]
+	var skin_tones := [Color("#e7c6a3"), Color("#c99570"), Color("#f0d3b3"), Color("#a96f50")]
+	var hair_colors := [Color("#49372f"), Color("#786044"), Color("#302d2a"), Color("#b18a58")]
+	var shirt: Color = shirts[posmod(variant, shirts.size())]
+	var pants: Color = trousers[posmod(variant * 3 + 1, trousers.size())]
+	var skin: Color = skin_tones[posmod(variant * 5 + 2, skin_tones.size())]
+	var hair: Color = hair_colors[posmod(variant * 7 + 1, hair_colors.size())]
 	var stride := sin(walk_phase * 5.5) if walking else sin(walk_phase) * 0.12
 	var body_bob := absf(stride) * 1.2 if walking else sin(walk_phase * 2.0) * 0.45
 	var body_pos := pos + Vector2(0, -body_bob)
-	draw_ellipse(pos + Vector2(1, 5), Vector2(4, 2), Color("#34443a", 0.28))
-	draw_circle(body_pos + Vector2(0, -5), 3.0, Color("#e7c6a3"))
-	draw_rect(Rect2(body_pos + Vector2(-2.5, -2), Vector2(5, 7)), shirt, true)
 	var leg_swing := stride * 2.2
-	draw_line(body_pos + Vector2(-1, 5), body_pos + Vector2(-2 - leg_swing, 8), Color("#39433f"), 1.5)
-	draw_line(body_pos + Vector2(1, 5), body_pos + Vector2(2 + leg_swing, 8), Color("#39433f"), 1.5)
-	if walking:
-		draw_line(body_pos + Vector2(-2, 0), body_pos + Vector2(-4 - stride, 3), shirt.darkened(0.12), 1.2)
-		draw_line(body_pos + Vector2(2, 0), body_pos + Vector2(4 + stride, 3), shirt.darkened(0.12), 1.2)
+	draw_ellipse(pos + Vector2(1, 5), Vector2(4.5, 2.1), Color("#34443a", 0.30))
+	# Back arm and legs are drawn before the torso to preserve a clean silhouette.
+	draw_line(body_pos + Vector2(-2, 0), body_pos + Vector2(-3.2 - stride * 0.45, 4), skin.darkened(0.05), 1.6)
+	draw_line(body_pos + Vector2(-1, 5), body_pos + Vector2(-2 - leg_swing, 8), pants, 1.8)
+	draw_line(body_pos + Vector2(1, 5), body_pos + Vector2(2 + leg_swing, 8), pants, 1.8)
+	draw_line(body_pos + Vector2(-3, 8), body_pos + Vector2(-1 - leg_swing, 8), Color("#d8c7a7"), 1.3)
+	draw_line(body_pos + Vector2(2, 8), body_pos + Vector2(4 + leg_swing, 8), Color("#d8c7a7"), 1.3)
+	# Jacket, collar and a small highlight make the torso read at normal zoom.
+	draw_rect(Rect2(body_pos + Vector2(-3, -2), Vector2(6, 7)), shirt, true)
+	draw_line(body_pos + Vector2(0, -1), body_pos + Vector2(0, 4), shirt.darkened(0.18), 0.8)
+	draw_colored_polygon(PackedVector2Array([body_pos + Vector2(-1.5, -2), body_pos + Vector2(0, 0), body_pos + Vector2(1.5, -2)]), Color("#f1dfc5", 0.88))
+	# Front arm and hand swing gently with the walking cycle.
+	draw_line(body_pos + Vector2(2, 0), body_pos + Vector2(3.2 + stride * 0.45, 4), skin, 1.6)
+	draw_circle(body_pos + Vector2(3.2 + stride * 0.45, 4), 0.9, skin)
+	# Head, hair cap and a tiny side fringe provide a readable face silhouette.
+	draw_circle(body_pos + Vector2(0, -5.2), 3.0, skin)
+	draw_arc(body_pos + Vector2(0, -5.5), 3.0, PI, TAU, 8, hair, 1.8)
+	draw_circle(body_pos + Vector2(-2.2, -6.0), 1.2, hair)
+	if variant % 4 == 1:
+		# A compact backpack distinguishes some pedestrians without changing their route.
+		draw_rect(Rect2(body_pos + Vector2(-4, -1), Vector2(2, 4)), Color("#8b6548"), true)
+	if not walking:
+		draw_circle(body_pos + Vector2(0, -0.4), 0.6, Color("#f0dfc5", 0.8))
 
 func _draw_diamond(center: Vector2, size: Vector2, fill: Color, outline: Color, width: float) -> void:
 	var points := PackedVector2Array([
