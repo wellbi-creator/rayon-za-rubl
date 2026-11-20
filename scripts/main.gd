@@ -40,6 +40,7 @@ var resident_label: Label
 var resident_button: Button
 var business_button: Button
 var business_upgrade_button: Button
+var business_lease_button: Button
 var business_type_selector: OptionButton
 var business_status_label: Label
 var household_actions_heading: Label
@@ -415,6 +416,15 @@ func _create_interface() -> void:
 	business_upgrade_button.pressed.connect(_on_business_upgrade_pressed)
 	business_upgrade_button.visible = false
 	content.add_child(business_upgrade_button)
+
+	business_lease_button = Button.new()
+	business_lease_button.text = "Сдать помещение в аренду"
+	business_lease_button.custom_minimum_size = Vector2(0, 36)
+	business_lease_button.add_theme_font_size_override("font_size", 11)
+	business_lease_button.add_theme_stylebox_override("normal", _button_style(Color("#d5bd91")))
+	business_lease_button.pressed.connect(_on_business_lease_pressed)
+	business_lease_button.visible = false
+	content.add_child(business_lease_button)
 
 	household_actions_heading = Label.new()
 	household_actions_heading.text = "ДЕЙСТВИЯ ДЛЯ СЕМЬИ"
@@ -1320,6 +1330,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	business_status_label.visible = false
 	business_button.visible = false
 	business_upgrade_button.visible = false
+	business_lease_button.visible = false
 	business_type_selector.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
@@ -1576,6 +1587,8 @@ func _on_plot_selected(plot_id: int) -> void:
 					resident_label.visible = false
 					business_type_selector.visible = false
 					var active := bool(business.get("active", false))
+					var leased := business_service.is_business_leased(plot_id)
+					var daily_rent := business_service.get_daily_rent(plot_id)
 					var business_type := str(business.get("type", "corner_shop"))
 					var business_title := business_service.get_business_type_title(business_type)
 					var daily_customers := int(business.get("last_daily_customers", 80))
@@ -1583,26 +1596,53 @@ func _on_plot_selected(plot_id: int) -> void:
 					var upgrade_level := business_service.get_business_upgrade_level(plot_id)
 					var daily_expenses := business_service.get_business_daily_expenses(plot_id)
 					var daily_profit := daily_revenue - daily_expenses
-					business_status_label.text = "%s • %s\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
-						business_title.to_upper(),
-						"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
-						upgrade_level,
-						daily_customers,
-						_format_money(daily_revenue),
-						_format_money(daily_expenses),
-						"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
-						_format_money(business_service.unpaid_operating_costs)
-					]
+					if leased:
+						business_status_label.text = "%s • СДАНО В АРЕНДУ\nАрендатор платит: ₽ %s за игровые сутки\nПолучено аренды всего: ₽ %s\nСодержание и операционные расходы оплачивает арендатор.\nПривлекательность: уровень %d/2" % [
+							business_title.to_upper(),
+							_format_money(daily_rent),
+							_format_money(business_service.total_rent_received),
+							upgrade_level
+						]
+					else:
+						business_status_label.text = "%s • %s\nПривлекательность: уровень %d/2\nГрафик: 08:00–20:00\nПосетители: %d/день\nВыручка: ₽ %s/день • расходы: ₽ %s/день • результат: %s ₽/день\nДолг по расходам: ₽ %s" % [
+							business_title.to_upper(),
+							"РАБОТАЕТ" if active else "ПРИОСТАНОВЛЕН",
+							upgrade_level,
+							daily_customers,
+							_format_money(daily_revenue),
+							_format_money(daily_expenses),
+							"%s%s" % ["+" if daily_profit >= 0 else "−", _format_money(absi(daily_profit))],
+							_format_money(business_service.unpaid_operating_costs)
+						]
+					business_button.visible = not leased
 					business_button.text = "Приостановить заведение" if active else "Возобновить заведение"
 					business_button.disabled = false
-					business_upgrade_button.visible = true
+					business_lease_button.visible = true
+					business_lease_button.text = "Расторгнуть договор аренды" if leased else "Сдать в аренду — ₽ %s/сутки" % _format_money(daily_rent)
+					business_upgrade_button.visible = not leased
 					var next_upgrade_cost := business_service.get_business_upgrade_cost(plot_id)
-					if next_upgrade_cost > 0:
+					if leased:
+						business_upgrade_button.visible = false
+					elif next_upgrade_cost > 0:
 						business_upgrade_button.text = "Улучшить привлекательность — ₽ %s" % _format_money(next_upgrade_cost)
 						business_upgrade_button.disabled = economy.balance < next_upgrade_cost
 					else:
 						business_upgrade_button.text = "Максимальная привлекательность"
 						business_upgrade_button.disabled = true
+
+func _on_business_lease_pressed() -> void:
+	if selected_plot_id < 1:
+		return
+	var leased := business_service.is_business_leased(selected_plot_id)
+	var changed := business_service.terminate_business_lease(selected_plot_id) if leased else business_service.lease_business(selected_plot_id)
+	if not changed:
+		status_label.text = "Не удалось изменить договор аренды."
+		return
+	status_label.text = "Договор аренды расторгнут. Заведение остановлено." if leased else "Помещение сдано в аренду. Арендная плата будет поступать за каждые прошедшие игровые сутки."
+	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
+	_save_game()
+	_on_plot_selected(selected_plot_id)
+
 
 func _on_business_upgrade_pressed() -> void:
 	if selected_plot_id < 1:
