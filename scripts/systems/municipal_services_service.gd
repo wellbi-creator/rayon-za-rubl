@@ -6,6 +6,9 @@ const EMPLOYEES_FOR_FULL_EFFICIENCY := 5
 const MAINTENANCE_BASE_COST := 150
 const MAINTENANCE_COST_PER_EMPLOYEE := 100
 const DISTRICT_PLOT_COUNT := 6
+const EQUIPMENT_UPGRADE_COSTS := [12000, 28000, 50000]
+const EQUIPMENT_EFFICIENCY_PER_LEVEL := 10
+const EQUIPMENT_MAINTENANCE_PER_LEVEL := 75
 const SERVICES := [
 	{"id": "road", "label": "Дорожные рабочие", "hire_cost": 4000, "daily_salary": 500},
 	{"id": "electricity", "label": "Электрики", "hire_cost": 5000, "daily_salary": 650},
@@ -25,6 +28,9 @@ var service_quality: Dictionary = {}
 var automatic_maintenance_enabled: Dictionary = {}
 var last_maintenance_day: Dictionary = {}
 var service_zone_plot_ids: Dictionary = {}
+var equipment_levels: Dictionary = {}
+var plot_infrastructure_condition: Dictionary = {}
+var last_infrastructure_day: int = 1
 
 func _init() -> void:
 	for service in SERVICES:
@@ -37,6 +43,9 @@ func _init() -> void:
 		automatic_maintenance_enabled[service_id] = false
 		last_maintenance_day[service_id] = 1
 		service_zone_plot_ids[service_id] = []
+		equipment_levels[service_id] = 0
+	for plot_id in range(DISTRICT_PLOT_COUNT):
+		plot_infrastructure_condition[str(plot_id)] = 100
 
 func get_service_definitions() -> Array:
 	return SERVICES.duplicate(true)
@@ -45,7 +54,27 @@ func get_employee_count(service_id: String) -> int:
 	return int(employees.get(service_id, 0))
 
 func get_service_efficiency_percent(service_id: String) -> int:
-	return roundi(float(mini(get_employee_count(service_id), EMPLOYEES_FOR_FULL_EFFICIENCY)) / float(EMPLOYEES_FOR_FULL_EFFICIENCY) * 100.0)
+	var staff_efficiency := roundi(float(mini(get_employee_count(service_id), EMPLOYEES_FOR_FULL_EFFICIENCY)) / float(EMPLOYEES_FOR_FULL_EFFICIENCY) * 100.0)
+	var equipment_bonus := get_equipment_level(service_id) * EQUIPMENT_EFFICIENCY_PER_LEVEL
+	return mini(100, staff_efficiency + equipment_bonus)
+
+func get_equipment_level(service_id: String) -> int:
+	return clampi(int(equipment_levels.get(service_id, 0)), 0, EQUIPMENT_UPGRADE_COSTS.size())
+
+func get_equipment_upgrade_cost(service_id: String) -> int:
+	var level := get_equipment_level(service_id)
+	if _get_definition(service_id).is_empty() or level >= EQUIPMENT_UPGRADE_COSTS.size():
+		return -1
+	return int(EQUIPMENT_UPGRADE_COSTS[level])
+
+func upgrade_equipment(service_id: String, economy: EconomyService) -> bool:
+	var cost := get_equipment_upgrade_cost(service_id)
+	if cost < 0 or economy == null:
+		return false
+	if not economy.try_spend(cost, "Оборудование: %s" % str(_get_definition(service_id)["label"])):
+		return false
+	equipment_levels[service_id] = get_equipment_level(service_id) + 1
+	return true
 
 func get_service_quality_percent(service_id: String) -> int:
 	return clampi(int(service_quality.get(service_id, 100)), 0, 100)
@@ -100,7 +129,7 @@ func set_automatic_maintenance_enabled(service_id: String, enabled: bool) -> boo
 func get_maintenance_cost(service_id: String) -> int:
 	if get_employee_count(service_id) <= 0:
 		return 0
-	return MAINTENANCE_BASE_COST + get_employee_count(service_id) * MAINTENANCE_COST_PER_EMPLOYEE
+	return MAINTENANCE_BASE_COST + get_employee_count(service_id) * MAINTENANCE_COST_PER_EMPLOYEE + get_equipment_level(service_id) * EQUIPMENT_MAINTENANCE_PER_LEVEL
 
 func get_average_service_quality() -> int:
 	var total := 0
@@ -114,6 +143,52 @@ func get_automatic_maintenance_count() -> int:
 		if is_automatic_maintenance_enabled(str(service["id"])):
 			total += 1
 	return total
+
+func get_plot_service_quality_by_plot() -> Dictionary:
+	var result: Dictionary = {}
+	for plot_id in range(DISTRICT_PLOT_COUNT):
+		var total_quality := 0
+		var covered_services := 0
+		for service in SERVICES:
+			var service_id := str(service["id"])
+			if get_employee_count(service_id) <= 0 or not is_plot_assigned_to_service(service_id, plot_id):
+				continue
+			total_quality += get_service_quality_percent(service_id)
+			covered_services += 1
+		if covered_services > 0:
+			result[str(plot_id)] = roundi(float(total_quality) / covered_services)
+	return result
+
+func get_plot_infrastructure_condition_data() -> Dictionary:
+	return plot_infrastructure_condition.duplicate(true)
+
+func get_plot_infrastructure_condition(plot_id: int) -> int:
+	return clampi(int(plot_infrastructure_condition.get(str(plot_id), 100)), 0, 100)
+
+func get_average_infrastructure_condition() -> int:
+	var total := 0
+	for plot_id in range(DISTRICT_PLOT_COUNT):
+		total += get_plot_infrastructure_condition(plot_id)
+	return roundi(float(total) / DISTRICT_PLOT_COUNT)
+
+func process_daily_infrastructure(day: int) -> bool:
+	if day <= last_infrastructure_day:
+		return false
+	for processed_day in range(last_infrastructure_day + 1, day + 1):
+		var quality_by_plot := get_plot_service_quality_by_plot()
+		for plot_id in range(DISTRICT_PLOT_COUNT):
+			var key := str(plot_id)
+			if not quality_by_plot.has(key):
+				continue
+			var condition := get_plot_infrastructure_condition(plot_id)
+			var quality := int(quality_by_plot[key])
+			if quality >= 80:
+				condition = mini(100, condition + 1)
+			elif quality <= 35:
+				condition = maxi(0, condition - 1)
+			plot_infrastructure_condition[key] = condition
+	last_infrastructure_day = day
+	return true
 
 func process_daily_maintenance(day: int, economy: EconomyService) -> bool:
 	var processed := false
@@ -233,6 +308,7 @@ func initialize_day(day: int) -> void:
 	unpaid_wages = 0
 	for service in SERVICES:
 		last_maintenance_day[str(service["id"])] = last_payroll_day
+	last_infrastructure_day = last_payroll_day
 
 func get_save_data() -> Dictionary:
 	return {
@@ -245,7 +321,10 @@ func get_save_data() -> Dictionary:
 		"service_quality": service_quality.duplicate(true),
 		"automatic_maintenance_enabled": automatic_maintenance_enabled.duplicate(true),
 		"last_maintenance_day": last_maintenance_day.duplicate(true),
-		"service_zone_plot_ids": service_zone_plot_ids.duplicate(true)
+		"service_zone_plot_ids": service_zone_plot_ids.duplicate(true),
+		"equipment_levels": equipment_levels.duplicate(true),
+		"plot_infrastructure_condition": plot_infrastructure_condition.duplicate(true),
+		"last_infrastructure_day": last_infrastructure_day
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -263,6 +342,9 @@ func load_save_data(data: Dictionary) -> void:
 	var saved_maintenance: Variant = data.get("automatic_maintenance_enabled", {})
 	var saved_maintenance_day: Variant = data.get("last_maintenance_day", {})
 	var saved_zones: Variant = data.get("service_zone_plot_ids", {})
+	var saved_equipment: Variant = data.get("equipment_levels", {})
+	var saved_infrastructure: Variant = data.get("plot_infrastructure_condition", {})
+	last_infrastructure_day = maxi(last_payroll_day, int(data.get("last_infrastructure_day", last_payroll_day)))
 	for service in SERVICES:
 		var service_id := str(service["id"])
 		work_orders_completed[service_id] = maxi(0, int(saved_work_orders.get(service_id, 0))) if saved_work_orders is Dictionary else 0
@@ -284,6 +366,10 @@ func load_save_data(data: Dictionary) -> void:
 		while restored_zones.size() > get_employee_count(service_id):
 			restored_zones.pop_back()
 		service_zone_plot_ids[service_id] = restored_zones
+		equipment_levels[service_id] = clampi(int(saved_equipment.get(service_id, 0)), 0, EQUIPMENT_UPGRADE_COSTS.size()) if saved_equipment is Dictionary else 0
+	for plot_id in range(DISTRICT_PLOT_COUNT):
+		var key := str(plot_id)
+		plot_infrastructure_condition[key] = clampi(int(saved_infrastructure.get(key, 100)), 0, 100) if saved_infrastructure is Dictionary else 100
 
 func _get_definition(service_id: String) -> Dictionary:
 	for service in SERVICES:
