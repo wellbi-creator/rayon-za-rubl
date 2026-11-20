@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/isometric_prototype_camera.gd" id="1_camera"]
 [ext_resource type="Script" path="res://scripts/world/construction_visuals_3d.gd" id="2_construction"]
@@ -76,6 +76,33 @@ roughness = 0.48
 [sub_resource type="StandardMaterial3D" id="StreetLampMat"]
 albedo_color = Color(1, 0.78, 0.43, 1)
 roughness = 0.38
+
+
+[sub_resource type="StandardMaterial3D" id="TrafficSignalHousingMat"]
+albedo_color = Color(0.07, 0.08, 0.09, 1)
+metallic = 0.35
+roughness = 0.55
+
+[sub_resource type="StandardMaterial3D" id="TrafficRedMat"]
+albedo_color = Color(0.95, 0.08, 0.06, 1)
+emission_enabled = true
+emission = Color(0.8, 0.025, 0.015, 1)
+
+[sub_resource type="StandardMaterial3D" id="TrafficAmberMat"]
+albedo_color = Color(1, 0.58, 0.08, 1)
+emission_enabled = true
+emission = Color(0.85, 0.32, 0.015, 1)
+
+[sub_resource type="StandardMaterial3D" id="TrafficGreenMat"]
+albedo_color = Color(0.12, 0.82, 0.25, 1)
+emission_enabled = true
+emission = Color(0.025, 0.55, 0.08, 1)
+
+[sub_resource type="SphereMesh" id="TrafficSignalLensMesh"]
+radius = 0.16
+height = 0.32
+radial_segments = 12
+rings = 6
 
 [sub_resource type="CylinderMesh" id="StreetPoleMesh"]
 top_radius = 0.1
@@ -382,7 +409,129 @@ mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoadMarkingMat")
 scale = Vector3(0.55, 0.025, 3.7)
 
+
+[node name="TrafficSignalWestOuter" type="Node3D" parent="."]
+position = Vector3(-38.5, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="TrafficSignalWestOuter"]
+position = Vector3(0, 2.05, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.65, 0.75, 0.65)
+
+[node name="Housing" type="MeshInstance3D" parent="TrafficSignalWestOuter"]
+position = Vector3(0, 3.85, -0.12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("TrafficSignalHousingMat")
+scale = Vector3(0.62, 1.45, 0.42)
+
+[node name="RedLens" type="MeshInstance3D" parent="TrafficSignalWestOuter"]
+position = Vector3(0, 4.3, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficRedMat")
+
+[node name="AmberLens" type="MeshInstance3D" parent="TrafficSignalWestOuter"]
+position = Vector3(0, 3.85, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficAmberMat")
+
+[node name="GreenLens" type="MeshInstance3D" parent="TrafficSignalWestOuter"]
+position = Vector3(0, 3.4, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficGreenMat")
+
+[node name="TrafficSignalWestInner" type="Node3D" parent="."]
+position = Vector3(-31.5, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="TrafficSignalWestInner"]
+position = Vector3(0, 2.05, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.65, 0.75, 0.65)
+
+[node name="Housing" type="MeshInstance3D" parent="TrafficSignalWestInner"]
+position = Vector3(0, 3.85, -0.12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("TrafficSignalHousingMat")
+scale = Vector3(0.62, 1.45, 0.42)
+
+[node name="RedLens" type="MeshInstance3D" parent="TrafficSignalWestInner"]
+position = Vector3(0, 4.3, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficRedMat")
+
+[node name="AmberLens" type="MeshInstance3D" parent="TrafficSignalWestInner"]
+position = Vector3(0, 3.85, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficAmberMat")
+
+[node name="GreenLens" type="MeshInstance3D" parent="TrafficSignalWestInner"]
+position = Vector3(0, 3.4, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficGreenMat")
+
+[node name="TrafficSignalEastInner" type="Node3D" parent="."]
+position = Vector3(31.5, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="TrafficSignalEastInner"]
+position = Vector3(0, 2.05, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.65, 0.75, 0.65)
+
+[node name="Housing" type="MeshInstance3D" parent="TrafficSignalEastInner"]
+position = Vector3(0, 3.85, -0.12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("TrafficSignalHousingMat")
+scale = Vector3(0.62, 1.45, 0.42)
+
+[node name="RedLens" type="MeshInstance3D" parent="TrafficSignalEastInner"]
+position = Vector3(0, 4.3, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficRedMat")
+
+[node name="AmberLens" type="MeshInstance3D" parent="TrafficSignalEastInner"]
+position = Vector3(0, 3.85, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficAmberMat")
+
+[node name="GreenLens" type="MeshInstance3D" parent="TrafficSignalEastInner"]
+position = Vector3(0, 3.4, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficGreenMat")
+
+[node name="TrafficSignalEastOuter" type="Node3D" parent="."]
+position = Vector3(38.5, 0, -1.55)
+
+[node name="Pole" type="MeshInstance3D" parent="TrafficSignalEastOuter"]
+position = Vector3(0, 2.05, 0)
+mesh = SubResource("StreetPoleMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.65, 0.75, 0.65)
+
+[node name="Housing" type="MeshInstance3D" parent="TrafficSignalEastOuter"]
+position = Vector3(0, 3.85, -0.12)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("TrafficSignalHousingMat")
+scale = Vector3(0.62, 1.45, 0.42)
+
+[node name="RedLens" type="MeshInstance3D" parent="TrafficSignalEastOuter"]
+position = Vector3(0, 4.3, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficRedMat")
+
+[node name="AmberLens" type="MeshInstance3D" parent="TrafficSignalEastOuter"]
+position = Vector3(0, 3.85, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficAmberMat")
+
+[node name="GreenLens" type="MeshInstance3D" parent="TrafficSignalEastOuter"]
+position = Vector3(0, 3.4, -0.36)
+mesh = SubResource("TrafficSignalLensMesh")
+surface_material_override/0 = SubResource("TrafficGreenMat")
+
 [node name="PlotWest" type="MeshInstance3D" parent="."]
+
 position = Vector3(-20, 0.025, 12)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("LotMat")
