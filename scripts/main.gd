@@ -1342,6 +1342,7 @@ func _on_plot_selected(plot_id: int) -> void:
 	business_upgrade_button.visible = false
 	business_lease_button.visible = false
 	business_type_selector.visible = false
+	business_schedule_selector.visible = false
 	household_actions_grid.visible = false
 	household_actions_heading.visible = false
 	member_autonomy_container.visible = false
