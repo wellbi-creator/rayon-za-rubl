@@ -343,6 +343,35 @@ func process_day(day: int, economy: EconomyService, resident_count: int = 0, ave
 				remaining_payment -= paid_for_business
 	return true
 
+func get_portfolio_summary() -> Dictionary:
+	var summary := {
+		"business_count": businesses.size(),
+		"active_count": 0,
+		"leased_count": 0,
+		"total_customers": 0,
+		"total_revenue": 0,
+		"total_operating_costs": 0,
+		"total_operating_costs_paid": 0,
+		"unpaid_operating_costs": 0,
+		"total_rent_received": total_rent_received
+	}
+	for key in businesses.keys():
+		var business: Dictionary = businesses[key]
+		if bool(business.get("active", false)):
+			summary["active_count"] = int(summary["active_count"]) + 1
+		if bool(business.get("leased", false)):
+			summary["leased_count"] = int(summary["leased_count"]) + 1
+			summary["total_rent_received"] = int(summary["total_rent_received"]) + maxi(0, int(business.get("total_rent_received", 0)))
+			continue
+		summary["total_customers"] = int(summary["total_customers"]) + maxi(0, int(business.get("total_customers", 0)))
+		summary["total_revenue"] = int(summary["total_revenue"]) + maxi(0, int(business.get("total_revenue", 0)))
+		summary["total_operating_costs"] = int(summary["total_operating_costs"]) + maxi(0, int(business.get("total_operating_costs", 0)))
+		summary["total_operating_costs_paid"] = int(summary["total_operating_costs_paid"]) + maxi(0, int(business.get("total_operating_costs_paid", 0)))
+		summary["unpaid_operating_costs"] = int(summary["unpaid_operating_costs"]) + maxi(0, int(business.get("unpaid_operating_costs", 0)))
+	summary["operating_result"] = int(summary["total_revenue"]) - int(summary["total_operating_costs"])
+	return summary
+
+
 func get_save_data() -> Dictionary:
 	var saved_businesses: Array[Dictionary] = []
 	for key in businesses.keys():
