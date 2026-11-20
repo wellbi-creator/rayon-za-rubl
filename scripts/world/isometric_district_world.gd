@@ -718,6 +718,27 @@ func _collect_resident_draw_entries() -> Array[Dictionary]:
 				"plot_id": plot_id,
 				"member_index": member_index
 			})
+	# Active neighborhood shops attract a small, continuous trickle of customers.
+	# They reuse the resident pedestrian renderer and the safe walk route around each plot.
+	for key in business_plots.keys():
+		var plot_id := int(key)
+		if plot_id < 1 or plot_id >= PLOT_CELLS.size() or not bool(business_plots[key]):
+			continue
+		if str(plot_states[plot_id].get("kind", "empty")) != "built":
+			continue
+		var route := _get_walk_route(plot_id)
+		for customer_index in 2:
+			var phase := pedestrian_time * 1.3 + float(plot_id) * 1.1 + float(customer_index) * 2.4
+			var route_distance := pedestrian_time * 17.0 + float(customer_index) * 74.0 + float(plot_id) * 29.0
+			var customer_pos := _position_on_walk_route(route, route_distance)
+			draw_entries.append({
+				"position": customer_pos,
+				"variant": customer_index + 1,
+				"walking": true,
+				"phase": phase,
+				"plot_id": plot_id,
+				"member_index": 8 + customer_index
+			})
 	draw_entries.sort_custom(_resident_draw_order)
 	return draw_entries
 
