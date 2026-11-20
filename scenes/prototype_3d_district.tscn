@@ -262,6 +262,126 @@ mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("SidewalkMat")
 scale = Vector3(0.65, 0.12, 120)
 
+[node name="CrosswalkStripe01" type="MeshInstance3D" parent="."]
+position = Vector3(-43, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe02" type="MeshInstance3D" parent="."]
+position = Vector3(-41.8, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe03" type="MeshInstance3D" parent="."]
+position = Vector3(-40.6, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe04" type="MeshInstance3D" parent="."]
+position = Vector3(-39.4, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe05" type="MeshInstance3D" parent="."]
+position = Vector3(-38.2, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe06" type="MeshInstance3D" parent="."]
+position = Vector3(-31.8, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe07" type="MeshInstance3D" parent="."]
+position = Vector3(-30.6, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe08" type="MeshInstance3D" parent="."]
+position = Vector3(-29.4, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe09" type="MeshInstance3D" parent="."]
+position = Vector3(-28.2, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe10" type="MeshInstance3D" parent="."]
+position = Vector3(-27, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe11" type="MeshInstance3D" parent="."]
+position = Vector3(27, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe12" type="MeshInstance3D" parent="."]
+position = Vector3(28.2, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe13" type="MeshInstance3D" parent="."]
+position = Vector3(29.4, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe14" type="MeshInstance3D" parent="."]
+position = Vector3(30.6, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe15" type="MeshInstance3D" parent="."]
+position = Vector3(31.8, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe16" type="MeshInstance3D" parent="."]
+position = Vector3(38.2, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe17" type="MeshInstance3D" parent="."]
+position = Vector3(39.4, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe18" type="MeshInstance3D" parent="."]
+position = Vector3(40.6, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe19" type="MeshInstance3D" parent="."]
+position = Vector3(41.8, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
+[node name="CrosswalkStripe20" type="MeshInstance3D" parent="."]
+position = Vector3(43, 0.115, -4)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.55, 0.025, 3.7)
+
 [node name="PlotWest" type="MeshInstance3D" parent="."]
 position = Vector3(-20, 0.025, 12)
 mesh = SubResource("BoxMesh")
