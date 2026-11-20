@@ -30,10 +30,13 @@ func is_road_cell(cell: Vector2i) -> bool:
 func is_cell_in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < map_width and cell.y < map_height
 
-func add_road_cell(cell: Vector2i) -> bool:
+func can_add_road_cell(cell: Vector2i) -> bool:
 	if not is_cell_in_bounds(cell) or is_road_cell(cell):
 		return false
-	if not _road_cells.is_empty() and _get_road_neighbor_count(cell) == 0:
+	return _road_cells.is_empty() or _get_road_neighbor_count(cell) > 0
+
+func add_road_cell(cell: Vector2i) -> bool:
+	if not can_add_road_cell(cell):
 		return false
 	_road_cells[cell] = true
 	return true
