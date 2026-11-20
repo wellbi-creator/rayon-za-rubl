@@ -73,4 +73,4 @@ func _reveal_and_raise(sequence: Tween, part: MeshInstance3D, duration: float, d
 	var target_scale: Vector3 = target["scale"]
 	sequence.tween_callback(func() -> void: part.visible = true)
 	sequence.tween_property(part, "scale:y", target_scale.y, duration).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	sequence.parallel().tween_property(part, "position:y", target_position.y, duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	sequence.parallel().tween_property(part, "position:y", target_position.y, duration).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
