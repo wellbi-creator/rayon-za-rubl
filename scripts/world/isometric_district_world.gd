@@ -7,15 +7,22 @@ signal road_cell_requested(cell: Vector2i)
 const Grid = preload("res://scripts/world/isometric_grid.gd")
 const RoadPathNetwork = preload("res://scripts/world/road_path_network.gd")
 const TILE := Vector2(128.0, 64.0)
-const MAP_WIDTH := 9
+const MAP_WIDTH := 13
 const MAP_HEIGHT := 7
+const STARTER_PLOT_COUNT := 6
+const EAST_QUARTER_PLOT_START := 6
+const EAST_QUARTER_PLOT_COUNT := 4
+const EAST_QUARTER_PURCHASE_COST := 300000
 const PLOT_CELLS: Array[Vector2i] = [
 	Vector2i(1, 1), Vector2i(2, 5), Vector2i(6, 1),
-	Vector2i(7, 5), Vector2i(1, 5), Vector2i(7, 1)
+	Vector2i(7, 5), Vector2i(1, 5), Vector2i(7, 1),
+	Vector2i(9, 1), Vector2i(11, 1), Vector2i(9, 5), Vector2i(11, 5)
 ]
 const PLOT_NAMES: Array[String] = [
 	"Дом Бабы Зины", "Участок №2", "Участок №3",
-	"Участок №4", "Участок №5", "Участок №6"
+	"Участок №4", "Участок №5", "Участок №6",
+	"Восточный квартал • участок 1", "Восточный квартал • участок 2",
+	"Восточный квартал • участок 3", "Восточный квартал • участок 4"
 ]
 
 var plot_states: Array[Dictionary] = []
@@ -55,10 +62,13 @@ var weather_animation_time := 0.0
 func _ready() -> void:
 	road_path_network = RoadPathNetwork.new()
 	road_path_network.configure(MAP_WIDTH, MAP_HEIGHT, 3, 4)
+	# Extend from the central road outward so every new cell touches the existing graph.
+	for y in [2, 1, 0, 4, 5, 6]:
+		road_path_network.add_road_cell(Vector2i(10, y))
 	for lamp_cell in [Vector2i(2, 3), Vector2i(6, 3), Vector2i(4, 1), Vector2i(4, 5)]:
 		road_lamp_cells[lamp_cell] = true
 	for i in PLOT_CELLS.size():
-		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0})
+		plot_states.append({"kind": "home" if i == 0 else "empty", "progress": 0.0, "unlocked": i < STARTER_PLOT_COUNT})
 	camera = Camera2D.new()
 	camera.position = Grid.grid_to_world(Vector2i(4, 3), TILE)
 	camera_target_position = camera.position
@@ -406,6 +416,12 @@ func _draw_plot(plot_id: int) -> void:
 	var center: Vector2 = Grid.grid_to_world(cell, TILE)
 	var state: Dictionary = plot_states[plot_id]
 	var selected := selected_plot == plot_id
+	if not bool(state.get("unlocked", plot_id < STARTER_PLOT_COUNT)):
+		_draw_diamond(center, TILE * Vector2(0.88, 0.76), Color("#68766b"), Color("#a4ad91"), 2.0)
+		if selected:
+			_draw_diamond(center, TILE * Vector2(0.96, 0.84), Color("#f6d77a", 0.12), Color("#ffe49a"), 3.0)
+		draw_string(ThemeDB.fallback_font, center + Vector2(-29, 4), "ЗАКРЫТО", HORIZONTAL_ALIGNMENT_LEFT, 58.0, 9, Color("#e7dfc8"))
+		return
 	var plot_color := Color("#b0bd8a") if plot_id == 0 else Color("#9eb582")
 	_draw_diamond(center, TILE * Vector2(0.88, 0.76), plot_color, Color("#e5d9b9"), 2.0)
 	if selected:
@@ -760,11 +776,14 @@ func _resident_draw_order(a: Dictionary, b: Dictionary) -> bool:
 
 func _get_walk_route(plot_id: int) -> Array[Vector2]:
 	var home_cell: Vector2i = PLOT_CELLS[plot_id]
+	var arterial_x := 10 if home_cell.x >= 9 else 4
 	var vertical_road_y := 1 if home_cell.y <= 3 else 5
-	var approach := Grid.grid_to_world(Vector2i(4, vertical_road_y), TILE)
-	var junction := Grid.grid_to_world(Vector2i(4, 3), TILE)
+	var approach := Grid.grid_to_world(Vector2i(arterial_x, vertical_road_y), TILE)
+	var junction := Grid.grid_to_world(Vector2i(arterial_x, 3), TILE)
 	var home := Grid.grid_to_world(home_cell, TILE)
 	var route: Array[Vector2] = [home + Vector2(0, 17), approach, junction]
+	if arterial_x != 4:
+		route.append(Grid.grid_to_world(Vector2i(4, 3), TILE))
 	var side_road_x := 1 if home_cell.x < 4 else 7
 	route.append(Grid.grid_to_world(Vector2i(side_road_x, 3), TILE))
 	return route
@@ -978,6 +997,8 @@ func can_build_road_cell(cell: Vector2i) -> bool:
 		return false
 	if PLOT_CELLS.has(cell):
 		return false
+	if cell.x >= 9 and not is_plot_unlocked(EAST_QUARTER_PLOT_START):
+		return false
 	if cell in [Vector2i(0, 0), Vector2i(8, 0), Vector2i(0, 6), Vector2i(8, 6), Vector2i(2, 2), Vector2i(6, 5), Vector2i(5, 5)]:
 		return false
 	return true
@@ -1048,7 +1069,35 @@ func get_save_data() -> Dictionary:
 func load_save_data(data: Dictionary) -> void:
 	var road_data: Variant = data.get("road_network", {})
 	if road_data is Dictionary and not road_data.is_empty():
-		road_path_network.load_save_data(road_data)
+		var migrated_road_data: Dictionary = road_data.duplicate(true)
+		var saved_width := int(migrated_road_data.get("map_width", MAP_WIDTH))
+		var saved_height := int(migrated_road_data.get("map_height", MAP_HEIGHT))
+		var saved_cells: Variant = migrated_road_data.get("cells", [])
+		if saved_cells is Array and saved_width <= MAP_WIDTH and saved_height <= MAP_HEIGHT and (saved_width < MAP_WIDTH or saved_height < MAP_HEIGHT):
+			# Reconnect the new arterial to the original central junction even if a player
+			# had previously removed one of the old eastern terminal road cells.
+			for x in range(4, MAP_WIDTH):
+				var horizontal_exists := false
+				for horizontal_entry in saved_cells:
+					if horizontal_entry is Dictionary and int(horizontal_entry.get("x", -1)) == x and int(horizontal_entry.get("y", -1)) == 3:
+						horizontal_exists = true
+						break
+				if not horizontal_exists:
+					saved_cells.append({"x": x, "y": 3, "surface": "standard"})
+			for y in range(MAP_HEIGHT):
+				if y == 3:
+					continue
+				var vertical_exists := false
+				for vertical_entry in saved_cells:
+					if vertical_entry is Dictionary and int(vertical_entry.get("x", -1)) == 10 and int(vertical_entry.get("y", -1)) == y:
+						vertical_exists = true
+						break
+				if not vertical_exists:
+					saved_cells.append({"x": 10, "y": y, "surface": "standard"})
+			migrated_road_data["map_width"] = MAP_WIDTH
+			migrated_road_data["map_height"] = MAP_HEIGHT
+			migrated_road_data["cells"] = saved_cells
+		road_path_network.load_save_data(migrated_road_data)
 	player_built_road_cells.clear()
 	var saved_player_roads: Variant = data.get("player_built_road_cells", [])
 	if data.has("player_built_road_cells") and saved_player_roads is Array:
@@ -1060,7 +1109,7 @@ func load_save_data(data: Dictionary) -> void:
 	else:
 		# M5.2 saves predate explicit ownership; infer non-starter segments safely.
 		for cell in road_path_network.get_road_cells():
-			if cell.y != 3 and cell.x != 4:
+			if cell.y != 3 and cell.x != 4 and cell.x != 10:
 				player_built_road_cells[cell] = true
 	road_lamp_cells.clear()
 	var saved_road_lamps: Variant = data.get("road_lamps", [])
@@ -1075,19 +1124,21 @@ func load_save_data(data: Dictionary) -> void:
 			if road_path_network.is_road_cell(lamp_cell):
 				road_lamp_cells[lamp_cell] = true
 	var saved_plots: Variant = data.get("plot_states", [])
-	if saved_plots is Array and saved_plots.size() == PLOT_CELLS.size():
+	if saved_plots is Array and saved_plots.size() <= PLOT_CELLS.size():
 		plot_states.clear()
-		for entry in saved_plots:
-			if entry is Dictionary:
+		for plot_id in PLOT_CELLS.size():
+			if plot_id < saved_plots.size() and saved_plots[plot_id] is Dictionary:
+				var entry: Dictionary = saved_plots[plot_id]
 				var kind := str(entry.get("kind", "empty"))
 				if kind not in ["home", "empty", "building", "built"]:
 					kind = "empty"
 				plot_states.append({
 					"kind": kind,
-					"progress": clampf(float(entry.get("progress", 0.0)), 0.0, 1.0)
+					"progress": clampf(float(entry.get("progress", 0.0)), 0.0, 1.0),
+					"unlocked": bool(entry.get("unlocked", plot_id < STARTER_PLOT_COUNT))
 				})
 			else:
-				plot_states.append({"kind": "empty", "progress": 0.0})
+				plot_states.append({"kind": "empty", "progress": 0.0, "unlocked": plot_id < STARTER_PLOT_COUNT})
 	baba_home_repaired = bool(data.get("baba_home_repaired", false))
 	queue_redraw()
 
@@ -1096,21 +1147,56 @@ func set_baba_home_repaired(repaired: bool) -> void:
 	queue_redraw()
 
 func set_plot_building(plot_id: int, progress: float) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size():
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
 		return
-	plot_states[plot_id] = {"kind": "building", "progress": clampf(progress, 0.0, 1.0)}
+	var state: Dictionary = plot_states[plot_id].duplicate(true)
+	state["kind"] = "building"
+	state["progress"] = clampf(progress, 0.0, 1.0)
+	plot_states[plot_id] = state
 	queue_redraw()
 
 func finish_plot(plot_id: int) -> void:
-	if plot_id < 0 or plot_id >= plot_states.size():
+	if plot_id < 0 or plot_id >= plot_states.size() or not is_plot_unlocked(plot_id):
 		return
-	plot_states[plot_id] = {"kind": "built", "progress": 1.0}
+	var state: Dictionary = plot_states[plot_id].duplicate(true)
+	state["kind"] = "built"
+	state["progress"] = 1.0
+	plot_states[plot_id] = state
 	queue_redraw()
 
 func get_plot_kind(plot_id: int) -> String:
 	if plot_id < 0 or plot_id >= plot_states.size():
 		return ""
+	if not is_plot_unlocked(plot_id):
+		return "locked"
 	return str(plot_states[plot_id].get("kind", ""))
+
+func is_plot_unlocked(plot_id: int) -> bool:
+	if plot_id < 0 or plot_id >= plot_states.size():
+		return false
+	return bool(plot_states[plot_id].get("unlocked", plot_id < STARTER_PLOT_COUNT))
+
+func get_unlocked_plot_ids() -> Array[int]:
+	var result: Array[int] = []
+	for plot_id in plot_states.size():
+		if is_plot_unlocked(plot_id):
+			result.append(plot_id)
+	return result
+
+func get_quarter_purchase_cost() -> int:
+	return EAST_QUARTER_PURCHASE_COST
+
+func unlock_east_quarter() -> bool:
+	var changed := false
+	for plot_id in range(EAST_QUARTER_PLOT_START, EAST_QUARTER_PLOT_START + EAST_QUARTER_PLOT_COUNT):
+		if plot_id >= 0 and plot_id < plot_states.size() and not is_plot_unlocked(plot_id):
+			var state: Dictionary = plot_states[plot_id]
+			state["unlocked"] = true
+			plot_states[plot_id] = state
+			changed = true
+	if changed:
+		queue_redraw()
+	return changed
 
 func get_plot_name(plot_id: int) -> String:
 	if plot_id < 0 or plot_id >= PLOT_NAMES.size():

@@ -5,7 +5,7 @@ const MAX_EMPLOYEES_PER_SERVICE := 10
 const EMPLOYEES_FOR_FULL_EFFICIENCY := 5
 const MAINTENANCE_BASE_COST := 150
 const MAINTENANCE_COST_PER_EMPLOYEE := 100
-const DISTRICT_PLOT_COUNT := 6
+const DISTRICT_PLOT_COUNT := 10
 const EQUIPMENT_UPGRADE_COSTS := [12000, 28000, 50000]
 const EQUIPMENT_EFFICIENCY_PER_LEVEL := 10
 const EQUIPMENT_MAINTENANCE_PER_LEVEL := 75
@@ -30,6 +30,7 @@ var last_maintenance_day: Dictionary = {}
 var service_zone_plot_ids: Dictionary = {}
 var equipment_levels: Dictionary = {}
 var plot_infrastructure_condition: Dictionary = {}
+var available_plot_ids: Array[int] = [0, 1, 2, 3, 4, 5]
 var last_infrastructure_day: int = 1
 
 func _init() -> void:
@@ -49,6 +50,23 @@ func _init() -> void:
 
 func get_service_definitions() -> Array:
 	return SERVICES.duplicate(true)
+
+func set_available_plot_ids(plot_ids: Array) -> void:
+	var validated: Array[int] = []
+	for value in plot_ids:
+		var plot_id := int(value)
+		if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and not validated.has(plot_id):
+			validated.append(plot_id)
+	if validated.is_empty():
+		validated = [0]
+	available_plot_ids = validated
+	for service in SERVICES:
+		var service_id := str(service["id"])
+		var filtered: Array[int] = []
+		for plot_id in get_service_zone_plot_ids(service_id):
+			if available_plot_ids.has(plot_id):
+				filtered.append(plot_id)
+		service_zone_plot_ids[service_id] = filtered
 
 func get_employee_count(service_id: String) -> int:
 	return int(employees.get(service_id, 0))
@@ -89,7 +107,7 @@ func get_service_zone_plot_ids(service_id: String) -> Array[int]:
 	if saved_ids is Array:
 		for value in saved_ids:
 			var plot_id := int(value)
-			if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and not result.has(plot_id):
+			if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and available_plot_ids.has(plot_id) and not result.has(plot_id):
 				result.append(plot_id)
 	return result
 
@@ -102,7 +120,7 @@ func set_service_zone_plot_ids(service_id: String, plot_ids: Array) -> bool:
 	var validated: Array[int] = []
 	for value in plot_ids:
 		var plot_id := int(value)
-		if plot_id < 0 or plot_id >= DISTRICT_PLOT_COUNT or validated.has(plot_id):
+		if plot_id < 0 or plot_id >= DISTRICT_PLOT_COUNT or not available_plot_ids.has(plot_id) or validated.has(plot_id):
 			return false
 		validated.append(plot_id)
 	service_zone_plot_ids[service_id] = validated
@@ -110,7 +128,7 @@ func set_service_zone_plot_ids(service_id: String, plot_ids: Array) -> bool:
 
 func _get_first_unassigned_plot(service_id: String) -> int:
 	var assigned := get_service_zone_plot_ids(service_id)
-	for plot_id in range(DISTRICT_PLOT_COUNT):
+	for plot_id in available_plot_ids:
 		if not assigned.has(plot_id):
 			return plot_id
 	return -1
@@ -146,7 +164,7 @@ func get_automatic_maintenance_count() -> int:
 
 func get_plot_service_quality_by_plot() -> Dictionary:
 	var result: Dictionary = {}
-	for plot_id in range(DISTRICT_PLOT_COUNT):
+	for plot_id in available_plot_ids:
 		var total_quality := 0
 		var covered_services := 0
 		for service in SERVICES:
@@ -167,16 +185,16 @@ func get_plot_infrastructure_condition(plot_id: int) -> int:
 
 func get_average_infrastructure_condition() -> int:
 	var total := 0
-	for plot_id in range(DISTRICT_PLOT_COUNT):
+	for plot_id in available_plot_ids:
 		total += get_plot_infrastructure_condition(plot_id)
-	return roundi(float(total) / DISTRICT_PLOT_COUNT)
+	return roundi(float(total) / maxi(1, available_plot_ids.size()))
 
 func process_daily_infrastructure(day: int) -> bool:
 	if day <= last_infrastructure_day:
 		return false
 	for processed_day in range(last_infrastructure_day + 1, day + 1):
 		var quality_by_plot := get_plot_service_quality_by_plot()
-		for plot_id in range(DISTRICT_PLOT_COUNT):
+		for plot_id in available_plot_ids:
 			var key := str(plot_id)
 			if not quality_by_plot.has(key):
 				continue

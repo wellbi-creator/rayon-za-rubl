@@ -2,7 +2,7 @@ extends RefCounted
 class_name DistrictEventService
 
 const MAX_EVENT_HISTORY := 20
-const DISTRICT_PLOT_COUNT := 6
+const DISTRICT_PLOT_COUNT := 10
 const EVENTS := [
 	{
 		"id": "streetlight_failure",
@@ -66,6 +66,16 @@ var active_event: Dictionary = {}
 var event_history: Array[Dictionary] = []
 var last_processed_day: int = 1
 var next_event_day: int = 3
+var available_plot_ids: Array[int] = [0, 1, 2, 3, 4, 5]
+
+func set_available_plot_ids(plot_ids: Array) -> void:
+	var validated: Array[int] = []
+	for value in plot_ids:
+		var plot_id := int(value)
+		if plot_id >= 0 and plot_id < DISTRICT_PLOT_COUNT and not validated.has(plot_id):
+			validated.append(plot_id)
+	if not validated.is_empty():
+		available_plot_ids = validated
 
 func _init() -> void:
 	rng.randomize()
@@ -78,7 +88,7 @@ func process_day(day: int) -> bool:
 		return false
 	var definition: Dictionary = EVENTS[rng.randi_range(0, EVENTS.size() - 1)].duplicate(true)
 	definition["created_day"] = day
-	definition["target_plot_id"] = rng.randi_range(0, DISTRICT_PLOT_COUNT - 1)
+	definition["target_plot_id"] = available_plot_ids[rng.randi_range(0, available_plot_ids.size() - 1)]
 	active_event = definition
 	return true
 

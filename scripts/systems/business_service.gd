@@ -65,7 +65,7 @@ func get_daily_customer_count(resident_count: int, average_satisfaction: float, 
 	return maxi(10, roundi(float(base_customers) * weather_multiplier))
 
 func open_business(plot_id: int, economy: EconomyService) -> bool:
-	if plot_id < 1 or plot_id >= 6 or economy == null or businesses.has(plot_id):
+	if plot_id < 1 or plot_id >= 10 or economy == null or businesses.has(plot_id):
 		return false
 	if not economy.try_spend(OPENING_COST, "Открытие магазина у дома"):
 		return false
@@ -143,7 +143,7 @@ func load_save_data(data: Dictionary) -> void:
 			continue
 		var plot_id := int(entry.get("plot_id", -1))
 		var business_type := str(entry.get("type", SUPPORTED_BUSINESS))
-		if plot_id < 1 or plot_id >= 6 or business_type != SUPPORTED_BUSINESS:
+		if plot_id < 1 or plot_id >= 10 or business_type != SUPPORTED_BUSINESS:
 			continue
 		businesses[plot_id] = {
 			"type": business_type,

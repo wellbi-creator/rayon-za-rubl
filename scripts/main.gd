@@ -122,6 +122,8 @@ func _ready() -> void:
 	_create_interface()
 	_create_save_timer()
 	_load_game()
+	municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
+	district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
 	world.set_resident_groups(resident_service.get_resident_display_data())
 	world.set_business_plots(business_service.get_business_visual_data(), game_time.get_hour())
 	_update_balance()
@@ -645,7 +647,7 @@ func _show_district_event() -> void:
 		return
 	district_event_title_label.text = str(event.get("title", "Событие района"))
 	district_event_description_label.text = str(event.get("description", "Району требуется внимание."))
-	var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, 5)
+	var target_plot_id := clampi(int(event.get("target_plot_id", 0)), 0, world.plot_states.size() - 1)
 	var target_plot_name := world.get_plot_name(target_plot_id) if world != null else "Участок района"
 	district_event_description_label.text += "\n\nЗона происшествия: %s" % target_plot_name
 	var event_service_id := str(event.get("service_id", ""))
@@ -867,27 +869,34 @@ func _on_municipal_zones_pressed(service_id: String) -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layout.add_child(hint)
 	var zone_checkboxes: Array[CheckBox] = []
+	var zone_plot_ids: Array[int] = []
 	var assigned := municipal_services.get_service_zone_plot_ids(service_id)
-	for plot_id in range(6):
+	var zone_scroll := ScrollContainer.new()
+	zone_scroll.custom_minimum_size = Vector2(320, 300)
+	var zone_list := VBoxContainer.new()
+	zone_scroll.add_child(zone_list)
+	for plot_id in world.get_unlocked_plot_ids():
 		var checkbox := CheckBox.new()
 		checkbox.text = "%s • инфраструктура %d%%" % [world.get_plot_name(plot_id), municipal_services.get_plot_infrastructure_condition(plot_id)]
 		checkbox.button_pressed = assigned.has(plot_id)
-		layout.add_child(checkbox)
+		zone_list.add_child(checkbox)
 		zone_checkboxes.append(checkbox)
+		zone_plot_ids.append(plot_id)
+	layout.add_child(zone_scroll)
 	var save_button := Button.new()
 	save_button.text = "Сохранить зоны"
-	save_button.pressed.connect(_save_municipal_service_zones.bind(service_id, zone_checkboxes, popup))
+	save_button.pressed.connect(_save_municipal_service_zones.bind(service_id, zone_checkboxes, zone_plot_ids, popup))
 	layout.add_child(save_button)
 	popup.popup_hide.connect(popup.queue_free)
 	add_child(popup)
-	popup.popup_centered(Vector2i(380, 430))
+	popup.popup_centered(Vector2i(380, 500))
 
 
-func _save_municipal_service_zones(service_id: String, checkboxes: Array[CheckBox], popup: PopupPanel) -> void:
+func _save_municipal_service_zones(service_id: String, checkboxes: Array[CheckBox], plot_ids: Array[int], popup: PopupPanel) -> void:
 	var selected_plots: Array[int] = []
-	for plot_id in range(checkboxes.size()):
-		if checkboxes[plot_id].button_pressed:
-			selected_plots.append(plot_id)
+	for index in range(checkboxes.size()):
+		if checkboxes[index].button_pressed:
+			selected_plots.append(plot_ids[index])
 	if not municipal_services.set_service_zone_plot_ids(service_id, selected_plots):
 		municipal_status_label.text = "Нельзя назначить больше участков, чем есть работников в этой службе."
 		return
@@ -1102,6 +1111,9 @@ func _on_game_time_changed(hour: int, minute: int, day: int) -> void:
 	if not is_loading_game and resident_service != null:
 		resident_service.update_time(hour, minute, day)
 	if not is_loading_game and upkeep_service != null and economy != null and resident_service != null:
+		if world != null:
+			municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
+			district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
 		var upkeep_processed := upkeep_service.process_day(day, resident_service.get_total_resident_count(), economy)
 		var payroll_processed := municipal_services.process_day(day, economy) if municipal_services != null else false
 		var maintenance_processed := municipal_services.process_daily_maintenance(day, economy) if municipal_services != null else false
@@ -1288,7 +1300,12 @@ func _on_plot_selected(plot_id: int) -> void:
 	member_autonomy_container.visible = false
 	autonomy_toggle_button.visible = false
 	plot_title.text = plot_name
-	if kind == "home" and plot_id == 0:
+	if kind == "locked":
+		plot_description.text = "Этот участок находится в восточном квартале. Купи квартал, чтобы открыть сразу четыре новых участка для строительства и бизнеса."
+		status_label.text = "Стоимость открытия восточного квартала: ₽ %s" % _format_money(world.get_quarter_purchase_cost())
+		build_button.text = "Купить восточный квартал"
+		build_button.disabled = economy.balance < world.get_quarter_purchase_cost()
+	elif kind == "home" and plot_id == 0:
 		if baba_wiring_repaired:
 			plot_description.text = "Баба Зина благодарит тебя: в доме снова работает электричество. В её блокноте появятся новые просьбы."
 			status_label.text = "Задание выполнено • Проводка восстановлена"
@@ -1751,6 +1768,21 @@ func _on_context_action_pressed() -> void:
 	_on_build_pressed()
 
 func _on_build_pressed() -> void:
+	if selected_plot_id >= 0 and not world.is_plot_unlocked(selected_plot_id):
+		var quarter_cost := world.get_quarter_purchase_cost()
+		if not economy.try_spend(quarter_cost, "Покупка восточного квартала"):
+			status_label.text = "Недостаточно средств для покупки квартала."
+			return
+		if not world.unlock_east_quarter():
+			economy.add_money(quarter_cost, "Возврат: квартал уже открыт")
+			status_label.text = "Квартал уже открыт."
+			return
+		municipal_services.set_available_plot_ids(world.get_unlocked_plot_ids())
+		district_event_service.set_available_plot_ids(world.get_unlocked_plot_ids())
+		status_label.text = "Восточный квартал открыт! Доступны четыре новых участка."
+		_on_plot_selected(selected_plot_id)
+		_save_game()
+		return
 	if selected_plot_id < 1 or world.get_plot_kind(selected_plot_id) != "empty":
 		return
 	if not BUILD_COSTS.has(selected_house_type):
