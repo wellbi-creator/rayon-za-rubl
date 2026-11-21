@@ -127,11 +127,23 @@ position = Vector3(0, -0.1, 0)
 mesh = SubResource("GroundMesh")
 surface_material_override/0 = SubResource("GroundMat")
 
-[node name="Road" type="MeshInstance3D" parent="."]
+[node name="RoadNetwork" type="CSGCombiner3D" parent="."]
 position = Vector3(0, 0.025, -4)
-mesh = SubResource("BoxMesh")
-surface_material_override/0 = SubResource("RoadMat")
-scale = Vector3(160, 0.15, 4.5)
+use_collision = false
+
+[node name="MainRoadSurface" type="CSGBox3D" parent="RoadNetwork"]
+size = Vector3(160, 0.15, 4.5)
+material = SubResource("RoadMat")
+
+[node name="CrossStreetWestSurface" type="CSGBox3D" parent="RoadNetwork"]
+position = Vector3(-35, 0, 4)
+size = Vector3(4.5, 0.15, 120)
+material = SubResource("RoadMat")
+
+[node name="CrossStreetEastSurface" type="CSGBox3D" parent="RoadNetwork"]
+position = Vector3(35, 0, 4)
+size = Vector3(4.5, 0.15, 120)
+material = SubResource("RoadMat")
 
 [node name="SidewalkNear" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.11, -1.55)
@@ -261,18 +273,6 @@ position = Vector3(0, 5.25, 0.48)
 mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("StreetLampMat")
 scale = Vector3(1.0, 0.16, 0.3)
-
-[node name="CrossStreetWest" type="MeshInstance3D" parent="."]
-position = Vector3(-35, 0.025, 0)
-mesh = SubResource("BoxMesh")
-surface_material_override/0 = SubResource("RoadMat")
-scale = Vector3(4.5, 0.15, 120)
-
-[node name="CrossStreetEast" type="MeshInstance3D" parent="."]
-position = Vector3(35, 0.025, 0)
-mesh = SubResource("BoxMesh")
-surface_material_override/0 = SubResource("RoadMat")
-scale = Vector3(4.5, 0.15, 120)
 
 [node name="CrossWalkWestNear" type="MeshInstance3D" parent="."]
 position = Vector3(-32, 0.11, 0)
