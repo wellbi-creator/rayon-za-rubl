@@ -539,6 +539,126 @@ position = Vector3(0, 3.4, -0.36)
 mesh = SubResource("TrafficSignalLensMesh")
 surface_material_override/0 = SubResource("TrafficGreenMat")
 
+[node name="CrossStreetWestCenterDash01" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -53)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash02" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -39)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash03" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -25)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash04" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -11)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash05" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, 11)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash06" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, 25)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash07" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, 39)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestCenterDash08" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, 53)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetWestStopLine1" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -7.1)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.7, 0.025, 0.16)
+
+[node name="CrossStreetWestStopLine2" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.112, -0.9)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.7, 0.025, 0.16)
+
+[node name="CrossStreetEastCenterDash01" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -53)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash02" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -39)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash03" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -25)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash04" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -11)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash05" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, 11)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash06" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, 25)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash07" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, 39)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastCenterDash08" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, 53)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(0.13, 0.025, 3.0)
+
+[node name="CrossStreetEastStopLine1" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -7.1)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.7, 0.025, 0.16)
+
+[node name="CrossStreetEastStopLine2" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.112, -0.9)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoadMarkingMat")
+scale = Vector3(3.7, 0.025, 0.16)
+
 [node name="PlotWest" type="MeshInstance3D" parent="."]
 
 position = Vector3(-20, 0.025, 12)
