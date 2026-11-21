@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/world/isometric_prototype_camera.gd" id="1_camera"]
 [ext_resource type="Script" path="res://scripts/world/construction_visuals_3d.gd" id="2_construction"]
+[ext_resource type="Script" path="res://scripts/world/road_network_mesh_3d.gd" id="3_road"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMat"]
 albedo_color = Color(0.32, 0.48, 0.31, 1)
@@ -127,23 +128,10 @@ position = Vector3(0, -0.1, 0)
 mesh = SubResource("GroundMesh")
 surface_material_override/0 = SubResource("GroundMat")
 
-[node name="RoadNetwork" type="CSGCombiner3D" parent="."]
+[node name="RoadNetwork" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.025, -4)
-use_collision = false
-
-[node name="MainRoadSurface" type="CSGBox3D" parent="RoadNetwork"]
-size = Vector3(160, 0.15, 4.5)
-material = SubResource("RoadMat")
-
-[node name="CrossStreetWestSurface" type="CSGBox3D" parent="RoadNetwork"]
-position = Vector3(-35, 0, 4)
-size = Vector3(4.5, 0.15, 120)
-material = SubResource("RoadMat")
-
-[node name="CrossStreetEastSurface" type="CSGBox3D" parent="RoadNetwork"]
-position = Vector3(35, 0, 4)
-size = Vector3(4.5, 0.15, 120)
-material = SubResource("RoadMat")
+script = ExtResource("3_road")
+surface_material_override/0 = SubResource("RoadMat")
 
 [node name="SidewalkNear" type="MeshInstance3D" parent="."]
 position = Vector3(0, 0.11, -1.55)
