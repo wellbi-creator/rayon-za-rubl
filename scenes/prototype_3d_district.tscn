@@ -711,6 +711,102 @@ mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoofTrimMat")
 scale = Vector3(6.3, 0.2, 0.22)
 
+[node name="FrontBalconyPlatform" type="MeshInstance3D" parent="."]
+position = Vector3(-1.45, 1.78, 1.55)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("FoundationMat")
+scale = Vector3(2.25, 0.18, 1.45)
+
+[node name="FrontBalconyFrontRail" type="MeshInstance3D" parent="."]
+position = Vector3(-1.45, 2.36, 0.84)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(2.25, 0.12, 0.12)
+
+[node name="FrontBalconyLowerRail" type="MeshInstance3D" parent="."]
+position = Vector3(-1.45, 2.02, 0.84)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(2.25, 0.09, 0.09)
+
+[node name="FrontBalconyPostLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-2.5, 2.22, 0.84)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.12, 0.82, 0.12)
+
+[node name="FrontBalconyPostCenter" type="MeshInstance3D" parent="."]
+position = Vector3(-1.45, 2.22, 0.84)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.12, 0.82, 0.12)
+
+[node name="FrontBalconyPostRight" type="MeshInstance3D" parent="."]
+position = Vector3(-0.4, 2.22, 0.84)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.12, 0.82, 0.12)
+
+[node name="FrontBalconySideRailLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-2.5, 2.36, 1.55)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.12, 0.12, 1.42)
+
+[node name="FrontBalconySideRailRight" type="MeshInstance3D" parent="."]
+position = Vector3(-0.4, 2.36, 1.55)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("StreetPoleMat")
+scale = Vector3(0.12, 0.12, 1.42)
+
+[node name="SideWindowWest" type="MeshInstance3D" parent="."]
+position = Vector3(-2.67, 2.4, 5.0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("WindowMat")
+scale = Vector3(0.12, 1.15, 1.25)
+
+[node name="SideWindowEast" type="MeshInstance3D" parent="."]
+position = Vector3(2.67, 2.4, 5.0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("WindowMat")
+scale = Vector3(0.12, 1.15, 1.25)
+
+[node name="SidePlinthWest" type="MeshInstance3D" parent="."]
+position = Vector3(-2.68, 0.48, 5.0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("FoundationMat")
+scale = Vector3(0.18, 0.32, 5.15)
+
+[node name="SidePlinthEast" type="MeshInstance3D" parent="."]
+position = Vector3(2.68, 0.48, 5.0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("FoundationMat")
+scale = Vector3(0.18, 0.32, 5.15)
+
+[node name="SideCornerTrimWestFront" type="MeshInstance3D" parent="."]
+position = Vector3(-2.68, 1.95, 2.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(0.16, 3.0, 0.16)
+
+[node name="SideCornerTrimWestBack" type="MeshInstance3D" parent="."]
+position = Vector3(-2.68, 1.95, 7.52)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(0.16, 3.0, 0.16)
+
+[node name="SideCornerTrimEastFront" type="MeshInstance3D" parent="."]
+position = Vector3(2.68, 1.95, 2.48)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(0.16, 3.0, 0.16)
+
+[node name="SideCornerTrimEastBack" type="MeshInstance3D" parent="."]
+position = Vector3(2.68, 1.95, 7.52)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("RoofTrimMat")
+scale = Vector3(0.16, 3.0, 0.16)
+
 [node name="TreeTrunkA" type="MeshInstance3D" parent="."]
 position = Vector3(-7, 0.95, 8)
 mesh = SubResource("TrunkMesh")
