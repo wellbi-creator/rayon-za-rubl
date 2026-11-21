@@ -659,6 +659,35 @@ mesh = SubResource("BoxMesh")
 surface_material_override/0 = SubResource("RoadMarkingMat")
 scale = Vector3(3.7, 0.025, 0.16)
 
+
+[node name="CrosswalkRampWestNear" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.13, -1.85)
+rotation = Vector3(-0.1, 0, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(16, 0.1, 0.75)
+
+[node name="CrosswalkRampWestFar" type="MeshInstance3D" parent="."]
+position = Vector3(-35, 0.13, -6.15)
+rotation = Vector3(0.1, 0, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(16, 0.1, 0.75)
+
+[node name="CrosswalkRampEastNear" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.13, -1.85)
+rotation = Vector3(-0.1, 0, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(16, 0.1, 0.75)
+
+[node name="CrosswalkRampEastFar" type="MeshInstance3D" parent="."]
+position = Vector3(35, 0.13, -6.15)
+rotation = Vector3(0.1, 0, 0)
+mesh = SubResource("BoxMesh")
+surface_material_override/0 = SubResource("SidewalkMat")
+scale = Vector3(16, 0.1, 0.75)
+
 [node name="PlotWest" type="MeshInstance3D" parent="."]
 
 position = Vector3(-20, 0.025, 12)
