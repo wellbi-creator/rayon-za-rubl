@@ -21,6 +21,7 @@ func _input(event: InputEvent) -> void:
 
 
 
+const TelegramPlatformScript = preload("res://scripts/platform/telegram_platform.gd")
 const DistrictWorldScript = preload("res://scripts/world/isometric_district_world.gd")
 const EconomyServiceScript = preload("res://scripts/systems/economy_service.gd")
 const SaveServiceScript = preload("res://scripts/systems/save_service.gd")
@@ -78,6 +79,7 @@ var readiness_note: Label
 var selected_house_type: String = "ordinary"
 var house_type_selector: OptionButton
 var last_construction_save_second: int = -1
+var telegram_platform
 var economy: EconomyService
 var save_service: SaveService
 var save_timer: Timer
@@ -132,6 +134,8 @@ var household_card_content: VBoxContainer
 var household_card_tab: String = "family"
 
 func _ready() -> void:
+	telegram_platform = TelegramPlatformScript.new()
+	telegram_platform.initialize()
 	economy = EconomyServiceScript.new()
 	add_child(economy)
 	upkeep_service = DistrictUpkeepServiceScript.new()
