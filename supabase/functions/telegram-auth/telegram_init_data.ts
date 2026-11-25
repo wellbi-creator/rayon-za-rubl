@@ -65,7 +65,7 @@ export async function validateTelegramInitData(
   values.delete("hash");
   values.delete("signature");
   const dataCheckString = Array.from(values.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n");
 
