@@ -16,7 +16,8 @@
 - [x] Source-level аудит исходников, сцен, конфигурации, сервисов, локальных сохранений и CI; отчёт `docs/M0_SOURCE_AUDIT.md`.
 - [x] Godot import/headless validation и Godot Web Export успешно выполнены в GitHub Actions: workflow runs #299 и #220 (25.11.2026).
 - [x] Godot Web Export успешно собирается в CI (workflow run #220); шаг публикации GitHub Pages пропущен для PR и не считается проверкой публикации.
-- [ ] Telegram WebApp bridge и серверная проверка initData.
+- [x] Telegram WebApp bridge реализован и прошёл CI: PR #148; проверка запуска внутри реального Telegram WebView остаётся частью M1.
+- [ ] Серверная проверка Telegram initData через Supabase Edge Function.
 - [ ] Supabase schema, RLS policies и Edge Functions.
 - [ ] Сквозной тест входа, сохранения и восстановления профиля.
 
@@ -38,8 +39,8 @@ M0 остаётся открытым до выполнения всех неза
 - [x] M2.37 — детализация силуэтов автомобилей: колёса, стёкла и световые элементы без изменения маршрутов и игровой симуляции; импорт, Web Export и публикация прошли успешно, ожидается визуальное подтверждение на iPhone.
 
 ## Следующий технический этап — Telegram и облачный профиль
-- T1 bridge: базовая реализация вынесена в PR; пункт остаётся незавершённым до CI-проверки и проверки запуска в реальном Telegram WebView.
-- [ ] T1 — минимальный Telegram WebApp bridge и безопасный offline/dev fallback; контракт: `docs/TELEGRAM_SUPABASE_INTEGRATION_PLAN.md`.
+- [x] T1 — минимальный Telegram WebApp bridge и безопасный offline/dev fallback; PR #148 объединён, Godot validation и Web Export прошли CI. Реальный Telegram WebView smoke test остаётся в M1.
+
 - [ ] T2 — серверная проверка Telegram initData через Supabase Edge Function.
 - [ ] T3 — схема профиля, RLS и выдача пользовательской Supabase session.
 - [ ] T4 — безопасная синхронизация локального сейва с облаком без потери данных.
