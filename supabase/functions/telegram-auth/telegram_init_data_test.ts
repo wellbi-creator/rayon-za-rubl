@@ -2,7 +2,10 @@ import { validateTelegramInitData } from "./telegram_init_data.ts";
 
 const encoder = new TextEncoder();
 async function sign(keyBytes: Uint8Array, message: string): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  // Copy into a concrete ArrayBuffer for Web Crypto's BufferSource typings.
+  const keyData = new ArrayBuffer(keyBytes.byteLength);
+  new Uint8Array(keyData).set(keyBytes);
+  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
 }
 function hex(bytes: Uint8Array): string {
