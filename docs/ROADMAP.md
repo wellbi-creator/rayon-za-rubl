@@ -40,7 +40,8 @@ M0 остаётся открытым до выполнения всех неза
 ## M1 — Вертикальный срез и клиентская интеграция
 - [x] Проверена и документирована структура текущего Godot-проекта, основная сцена и отсутствие autoload; см. `docs/M0_SOURCE_AUDIT.md`.
 - [x] Импорт проекта и headless-проверка Godot 4.3 прошли в CI (workflow run #299).
-- [x] Godot Web Export прошёл в CI (workflow run #220). [ ] Публикация GitHub Pages и запуск внутри Telegram WebView ещё не проверены.
+- [x] Godot Web Export прошёл в CI (workflow run #220).
+- [ ] Публикация GitHub Pages и запуск внутри Telegram WebView.
 - [ ] Подготовить Telegram WebApp bridge без хранения секретов в клиенте.
 - [ ] Проверить Landscape HUD на iPhone, Android и ПК.
 - [ ] Сквозной сценарий: запуск → Telegram auth → загрузка профиля → игровой цикл → сохранение → повторный вход.
